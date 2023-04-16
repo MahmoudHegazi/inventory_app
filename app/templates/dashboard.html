@@ -1,0 +1,119 @@
+{% extends 'base.html' %}
+{% block title %}Dashboard{% if dashboard %}: {{dashboard.title}}{% endif %}{% endblock %}
+{% block page_description %}this is Dashboard page, can view/edit/delete dashboard and view/add/edit it's listings {% endblock %}
+{% block body %}
+<div class="container border rounded p-3">
+  {% include 'messages.html' %}
+  <img src="{{url_for('static', filename='assets/images/loading_circle.gif')}}" class="loading_circle" style="display:none;" />
+
+  <div class="container-fluid content_container">
+    <a href="{{url_for('routes.index')}}" class="ml-2 btn btn-light">
+      Back To Dashboards
+    </a>
+    {% if dashboard %}
+    <div class="d-flex justify-content-end align-items-center flex-wrap">
+      <a href="{{url_for('routes.edit_dashboard', dashboard_id=dashboard.id)}}" class="btn btn-primary">
+        Edit Dashboard
+      </a>
+      <a href="{{url_for('routes.add_dashboard', redirect=url_for('routes.view_dashboard', dashboard_id=dashboard.id))}}" class="ml-2 btn btn-warning">
+        Add New Dashboard
+      </a>
+      <button type="button" class="ml-2 btn btn-success">
+        Reports
+      </button>
+    </div>
+    <div class="row mt-2">
+      <div class="border rounded col-4 p-3 d-flex justify-content-center align-items-start cursor-pointer text-decoration-none text-dark media_small_width_100">
+        <div class="hover_shadow row container shadow p-3">
+            <div class="col-sm-12 mb-3 text-center">
+                <img src="{{url_for('static', filename='assets/images/default_dashboard.png')}}" alt="dashboard icon" width="150" class="mxwidth-150" />
+                <h3 class="overflow_within title"><span class="badge badge-primary">{{dashboard.title}}</span></h3>
+            </div>
+            <div class="col-sm-12">
+              <p class="overflow_within">Id: <span class="id">{{dashboard.id}}</span></p>
+            </div>
+            <div class="col-sm-12">
+              <p class="overflow_within">Total Listings: <span class="total_listings">{{dashboard.num_of_listings}}</span></p>
+            </div>
+            <div class="col-sm-12">
+              <p class="overflow_within">Total Orders: <span class="total_orders">{{dashboard.num_of_orders}}</span></p>
+            </div>
+            <div class="col-sm-12">
+              <p class="overflow_within">Monthly Purchases: <span class="monthly_purchases">{{dashboard.sum_of_monthly_purchases}}</span></p>
+            </div>
+            <div class="col-sm-12">
+              <p class="overflow_within">Created At: <span class="total_orders">{{dashboard.created_date}}</span></p>
+            </div>
+            <div class="col-sm-12">
+              <p class="overflow_within">Updated At: 
+                <span class="monthly_purchases">{% if dashboard.updated_date %}{{dashboard.updated_date}}{% endif %}</span>
+              </p>
+            </div>
+            <div class="col-sm-12 row">
+              <div class="col-sm-6">
+                <button data-url="{{url_for('routes.delete_dashboard', dashboard_id=dashboard.id)}}" data-toggle="modal" 
+                  data-target="#deleteDashboardModal" data-dashboard-id="{{dashboard.id}}" onclick="toggleLoadingCircle(true, 'block')" 
+                  class="wtform_modal_deletebtn btn btn-danger btn-block">Delete
+                </button>
+             </div>
+            </div>
+        </div>
+      </div>      
+      <div class="col-sm-8 p-3 row border rounded">
+        <div class="container">
+          <div class="mt-1 mb-2 d-flex justify-content-between align-items-center">
+            <h4>Listings</h4>
+            <div>
+              <a href="{{url_for('routes.listings', dashboard_id=dashboard.id)}}" class="btn btn-outline-primary">View Listings</a>
+              <a href="{{url_for('routes.add_listing', dashboard_id=dashboard.id)}}" class="btn btn-outline-success">Add Listing</a>
+            </div>
+          </div>
+          <div class="overflow_600">
+              <table class="table table-bordered">
+                <thead>
+                  <tr>
+                    <th>SKU</th>
+                    <th>Product Name</th>
+                    <th>Action</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {% if dashboard.listings %}
+                  {% for listing in dashboard.listings %}
+                  <tr>
+                    <td>{{listing.sku}}</td>
+                    <td>{{listing.product_name}}</td>
+                    <td>
+                      <div class="d-flex justify-content-around align-items-center">
+                        <a href="{{url_for('routes.view_listing', dashboard_id=listing.dashboard.id, listing_id=listing.id)}}" class="btn btn-primary btn-sm"><i class="fa fa-eye"></i></a>
+                        <a href="{{url_for('routes.edit_listing', dashboard_id=listing.dashboard.id, listing_id=listing.id)}}" class="btn btn-secondary btn-sm"><i class="fa fa-edit"></i></a>
+                      </div>
+                    </td>
+                  </tr>
+                  {% endfor %}
+                  {% endif %}
+                </tbody>
+              </table>
+          </div>
+        </div>
+      </div>
+    </div>
+    {% else %}
+    <div class="alert alert-danger">Unable to Display Dashboard right now.</div>
+    {% endif %}
+  </div>
+</div>
+{% from 'forms.html' import dashboard_forms %}
+{{ dashboard_forms(deleteform=deleteform) }}
+
+{% endblock body %}
+
+
+{% block page_scripts %}
+<script>
+// noEffects = true;
+$('#deleteDashboardModal').on('shown.bs.modal', ()=>{toggleLoadingCircle(false, 'block');});
+deleteWtformsModalProccess(dataAttId='data-dashboard-id', formId='remove_dashboard', idInputId='dashboard_id', modalId='deleteDashboardModal');
+
+</script>
+{% endblock page_scripts %}

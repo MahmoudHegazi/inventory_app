@@ -1,0 +1,91 @@
+{% extends 'base.html' %}
+{% block title %}Add Dashboard{% endblock %}
+{% block page_description %}This is form to add new Dashboard{% endblock %}
+{% block body %}
+<div class="container border rounded p-3">
+  {% include 'messages.html' %}
+  <div class="d-flex justify-content-end align-items-center">
+    <a href="{{url_for('routes.index')}}" type="button" class="btn btn-primary">
+      Back To Home
+    </a>    
+  </div>
+  <div class="container-fluid content_container">
+    <div class="row">
+      <!-- Logged User Dashboards  -->
+      {% if form %}
+      <div class="col-12 p-3 d-flex justify-content-center align-items-center cursor-pointer text-decoration-none text-dark media_small_width_100">
+        <div class="container">
+            <form action="{{url_for('routes.add_dashboard')}}" method="POST">          
+              {{form.hidden_tag()}}
+              <div class="form-group">
+                {{form.title.label}}
+                {{form.title(class='form-control', placeholder='Enter Title')}}
+                
+                {% if form.title.errors %}
+                <ul class="errors bg-danger text-white">
+                    {% for error in form.title.errors %}
+                        <li class="p-1 mb-1">{{ error }}</li>
+                    {% endfor %}
+                </ul>
+                {% endif %}
+              </div>
+              <div class="form-group">
+                {{form.num_of_listings.label}}
+                {{form.num_of_listings(class='form-control', placeholder='Total Listings', title='this number can changed when async dashboard')}}
+                
+                {% if form.num_of_listings.errors %}
+                <ul class="errors bg-danger text-white">
+                    {% for error in form.num_of_listings.errors %}
+                        <li class="p-1 mb-1">{{ error }}</li>
+                    {% endfor %}
+                </ul>
+                {% endif %}
+              </div>
+              <div class="form-group">
+                {{form.num_of_orders.label}}
+                {{form.num_of_orders(class='form-control', placeholder='Total Orders', title='this number can changed when async dashboard')}}
+                
+                {% if form.num_of_orders.errors %}
+                <ul class="errors bg-danger text-white">
+                    {% for error in form.num_of_orders.errors %}
+                        <li class="p-1 mb-1">{{ error }}</li>
+                    {% endfor %}
+                </ul>
+                {% endif %}
+              </div>
+              <div class="form-group">
+                {{form.sum_of_monthly_purchases.label}}
+                {{form.sum_of_monthly_purchases(class='form-control', placeholder='Total Monthly Purchases', title='this number can changed when async dashboard')}}
+                
+                {% if form.sum_of_monthly_purchases.errors %}
+                <ul class="errors bg-danger text-white">
+                    {% for error in form.sum_of_monthly_purchases.errors %}
+                        <li class="p-1 mb-1">{{ error }}</li>
+                    {% endfor %}
+                </ul>
+                {% endif %}
+              </div>
+
+              <!--  redirect optional input -->
+              {% if request.args and request.args.redirect and form.redirect %}
+              {{form.redirect(value=request.args.redirect)}}
+              {% endif %}
+
+              <div class="d-flex justify-content-center align-items-center w-50 mx-auto">
+                {{form.add(class='btn btn-success w-50')}}
+                <a href="{{url_for('routes.index')}}" class="btn btn-primary w-50">Cancel</a>
+              </div>
+            </form>
+        </div>
+      </div>
+      {% else %}
+      <div class="alert alert-danger">Unable to Display Add Dashboards form right now.</div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+
+{% endblock %}
+
+
+

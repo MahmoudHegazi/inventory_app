@@ -1,0 +1,197 @@
+{% extends 'base.html' %}
+{% block title %}Catalogues{% endblock %}
+{% block page_description %}this is catalogues page, you can view/edit and add new catalogue{% endblock %}
+{% block body %}
+<div class="container border rounded p-3">
+  {% include 'messages.html' %}
+  <img src="{{url_for('static', filename='assets/images/loading_circle.gif')}}" class="loading_circle" style="display:none;" />
+
+  <div class="container-fluid content_container">
+    <!-- settings menu-->
+    <div id="settings_toast_cont">
+      <button type="button" class="btn btn-outline-primary mb-1" id="open_settings">Settings</button>
+      <div id="settings_toast" class="toast shadow" data-autohide="false" style="display:none">
+         <div class="toast-header bg-dark text-white">
+            <span><i class="fa fa-gear"></i> Settings</span>
+         </div>
+         <div class="toast-body">
+            <div class="row">
+               <div class="col-sm-12 d-flex justify-content-start align-items-center">
+                  <label>Display: </label>
+                  <select class="form-control ml-2" id="switch_display">
+                     <option value="table" selected="selected">Table</option>
+                     <option value="card">Card</option>                     
+                  </select>
+               </div>
+            </div>
+         </div>
+      </div>
+    </div>
+    <!-- settings end -->    
+    <div class="d-flex justify-content-end align-items-center">
+      <!-- Button to Open the Modal for add new dashboard -->
+      <a href="{{url_for('routes.add_catalogue')}}" type="button" class="btn btn-primary btn-sm">
+        Add Catalogue
+      </a>
+      <button type="buttom" data-target="#importExcelCatalogues" data-toggle="modal" class="ml-1 btn btn-warning btn-sm">
+        Import Catalogue From Excel
+      </button>
+      
+    </div>
+    {% if catalogues is defined %}
+    <!-- search component -->
+    <div class="row mt-2 mb-2">
+      <div class="col-sm-11 mx-auto" title="search by id, sku, price, location">
+        <form id="search_form" class="row">
+          <input class="form-control col-sm-5" type="text" name="search_value" id="search_value" placeholder="search by id, sku, price, location" value=""/>
+          <select class="form-control col-sm-4" name="search_by" id="search_by">
+            <option value="">Search BY</option>
+            <option class="search_column" value="id">ID</option>
+            <option class="search_column" value="sku">SKU</option>
+            <option class="search_column" value="product_name">Product Name</option>
+            <option class="search_column" value="price">Price</option>
+            <option class="search_column" value="location">location</option>
+          </select>
+          <button type="button" id="cancel_search" class="btn btn-sm col-sm-1 btn-danger" style="display:none;"><i class="fa fa-close"></i></button>
+          <button type="submit" class="btn btn-success col-sm-2">Search</button>
+        </form>
+      </div>
+    </div>
+    <!-- search component end -->
+    <!-- catalogues Pagination start -->
+    <div id="catalogues_pag1" class="d-flex justify-content-center align-items-center mt-2"></div>
+    <!-- Pagination end-->
+
+    <!-- Card Display -->
+    <div class="row" id="card_display" style="display:none;">      
+      {% for catalogue in catalogues %}
+      <div class="searching_card col-4 p-3 d-flex justify-content-center align-items-center cursor-pointer text-decoration-none text-dark media_small_width_100"
+      data-search-id="{{catalogue.id}}" data-search-sku="{{catalogue.sku}}" data-search-product_name="{{catalogue.product_name}}"
+      data-search-price="{{catalogue.price}}"  data-search-location="{{catalogue.location}}">
+
+        <div class="hover_shadow row container border rounded shadow p-3" id="products_container">
+          <div class="col-sm-12 mb-3 text-center">
+            <img src="{{url_for('static', filename='assets/images/'~catalogue.product_image)}}" alt="catalogue icon" width="150"class="mxwidth-150" />
+          </div>
+          <div class="col-sm-12">
+            <p class="overflow_within text-center"><strong>{{catalogue.product_name}}</strong></p>
+          </div>
+          <div class="col-sm-12">
+            <p class="overflow_within">Id: <span>{{catalogue.id}}</span></p>
+          </div>
+          <div class="col-sm-12">
+            <p class="overflow_within">SKU: <span>{{catalogue.sku}}</span></p>
+          </div>
+          <div class="col-sm-12">
+            <p class="overflow_within">Price: <span>{{catalogue.price}}</span></p>
+          </div>
+          <div class="col-sm-12">
+            <p class="overflow_within">Location: <span>{{catalogue.location}}</span></p>
+          </div>
+          <div class="col-sm-12 row">
+            <div class="col-sm-6">
+              <a href="{{url_for('routes.view_catalogue', catalogue_id=catalogue.id)}}" class="btn btn-primary btn-block">View</a>
+            </div>
+            <div class="col-sm-6">
+              <a href="{{url_for('routes.edit_catalogue', catalogue_id=catalogue.id)}}" class="btn btn-secondary btn-block">Edit</a>
+            </div>            
+          </div>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+    <!-- Card Display End -->
+
+    <!-- Table Display -->
+    <div class="row" id="table_display">
+      <!-- table display -->
+      <div class="col-sm-12">         
+        <table class="table table-hover">
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Icon</th>
+              <th>Product Name</th>
+              <th>Catalogue ID</th>
+              <th>SKU</th>              
+              <th>Price</th>
+              <th>Location</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for catalogue in catalogues %}
+            <tr class="searching_card"
+            data-search-id="{{catalogue.id}}" data-search-sku="{{catalogue.sku}}" data-search-product_name="{{catalogue.product_name}}"
+            data-search-price="{{catalogue.price}}"  data-search-location="{{catalogue.location}}">
+              <td>
+                <p class="overflow_within">{{catalogue.id}}</p>
+              </td>
+              <td>
+                <p class="overflow_within"><img src="{{url_for('static', filename='assets/images/'~catalogue.product_image)}}" alt="listing icon" width="50" class="mxwidth-50" /></p>
+              </td>                
+              <td>
+                <p class="overflow_within">{{catalogue.product_name}}</p>
+              </td>
+              <td>
+                <p class="overflow_within">{{catalogue.catalogue_id}}</p>
+              </td>
+              <td>
+                <p class="overflow_within">{{catalogue.sku}}</p>
+              </td>
+              <td>
+                <p class="overflow_within">{{catalogue.price}}</p>
+              </td>
+              <td>
+                <p class="overflow_within">{{catalogue.location}}</p>
+              </td>                                          
+              <td>
+                <div class="col-sm-12 row">
+                  <div class="col-sm-12 d-flex justify-content-around align-items-center">
+                    <div>
+                      <a href="{{url_for('routes.view_catalogue', catalogue_id=catalogue.id)}}" class="btn btn-primary btn-block">View</a>
+                    </div>
+                    <div>
+                      <a href="{{url_for('routes.edit_catalogue', catalogue_id=catalogue.id)}}" class="btn btn-secondary btn-block">Edit</a>
+                    </div>              
+                  </div>                               
+                </div>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>      
+    </div>
+    <!-- Table Display End -->
+
+    <!-- catalogues Pagination start -->
+    <div id="catalogues_pag2" class="d-flex justify-content-center align-items-center mt-2"></div>
+    <!-- Pagination end-->
+      
+    {% else %}
+    <div class="alert alert-danger">Unable to Display Catalogue right now.</div>
+    {% endif %}    
+  </div>
+</div>
+
+{% import 'forms.html' as forms %}
+{{ forms.catalogues_forms(catalogues_excel=catalogues_excel) }}
+{% endblock %}
+
+
+{% block page_scripts %}
+<script>
+// noEffects = true;
+
+/* Add Pagination component*/
+const paginationBtns = {% if pagination_btns %}{{pagination_btns|tojson|safe}}{% else %}[]{% endif %};
+const paginationPage = {{ request.args.get('page', 1) }};
+displayPaginationComponent(paginationBtns, paginationPage, ['catalogues_pag1', 'catalogues_pag2']);
+
+toggleSettingsToast();
+
+searchComponent('mid', 'swing');
+
+
+</script>
+{% endblock page_scripts %}

@@ -1,0 +1,25 @@
+{% extends 'admin/master.html' %}
+
+{% block body %}
+<style>
+.header_bg {
+    background-attachment: fixed;
+    background-repeat: no-repeat;
+    background-position-x: center;
+    background-position-y: revert;
+    background-image: url('/static/assets/images/header_bg.jpg');
+    color: white;
+    text-shadow: 0px 1px darkorange;
+    font-family: monospace;
+}
+</style>
+<div class="container">
+  <div class="jumbotron text-center header_bg">
+    <h1>Inventory Admin Dashboard</h1>
+    <p>Here You can control the full application models, create new user and products and edit all data in the system, and control the existing files in the system and upload new files.</p>
+  </div>
+  <div class="d-flex justify-content-center align-items-center">
+    <img src="{{url_for('static', filename='assets/images/admin_bg.png')}}" height="500">
+  </div>
+</div>
+{% endblock %}

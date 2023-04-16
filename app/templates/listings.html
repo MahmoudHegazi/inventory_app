@@ -1,0 +1,202 @@
+{% extends 'base.html' %}
+{% block title %}Listings{% endblock %}
+{% block page_description %}this is listing page, can view/edit and add new listings {% endblock %}
+{% block body %}
+<div class="container border rounded p-3">
+  {% include 'messages.html' %}
+  <img src="{{url_for('static', filename='assets/images/loading_circle.gif')}}" class="loading_circle" style="display:none;" />    
+  <div class="container-fluid content_container">
+    {% if dashboard_id and listings is defined %} 
+    <!-- settings menu-->
+    <div id="settings_toast_cont">
+      <button type="button" class="btn btn-outline-primary mb-1" id="open_settings">Settings</button>
+      <div id="settings_toast" class="toast shadow" data-autohide="false" style="display:none">
+         <div class="toast-header bg-dark text-white">
+            <span><i class="fa fa-gear"></i> Settings</span>
+         </div>
+         <div class="toast-body">
+            <div class="row">
+               <div class="col-sm-12 d-flex justify-content-start align-items-center">
+                  <label>Display: </label>
+                  <select class="form-control ml-2" id="switch_display">
+                     <option value="table" selected="selected">Table</option>
+                     <option value="card">Card</option>                     
+                  </select>
+               </div>
+            </div>
+         </div>
+      </div>
+    </div>
+    <!-- settings end -->
+    <div class="d-flex justify-content-end align-items-center flex-wrap">
+      <a href="{{url_for('routes.add_listing', dashboard_id=dashboard_id)}}" class="ml-2 btn btn-primary">
+        Add Listing
+      </a>
+      <a href="{{url_for('routes.view_dashboard', dashboard_id=dashboard_id)}}" class="ml-2 btn btn-success">
+        Back to Dashboard ({{dashboard_id}})
+      </a>
+    </div>
+    <!-- search component -->
+    <div class="row mt-2 mb-2">
+      <div class="col-sm-11 mx-auto" title="search by id, catalogue_id, sku, price, sale_price, quantity, plateform">
+        <form id="search_form" class="row">
+          <input class="form-control col-sm-5" type="text" name="search_value" id="search_value" placeholder="search by id, catalogue_id, sku, price, sale_price, quantity, plateform" value=""/>
+          <select class="form-control col-sm-4" name="search_by" id="search_by">
+            <option value="">Search BY</option>
+            <option class="search_column" value="id">ID</option>
+            <option class="search_column" value="catalogue_id">Catalogue ID</option>
+            <option class="search_column" value="sku">SKU</option>
+            <option class="search_column" value="product_name">Product Name</option>
+            <option class="search_column" value="price">Price</option>
+            <option class="search_column" value="sale_price">Sale Price</option>
+            <option class="search_column" value="quantity">Quantity</option>
+            <option class="search_column" value="platform">Platform</option>
+          </select>
+          <button type="button" id="cancel_search" class="btn btn-sm col-sm-1 btn-danger" style="display:none;"><i class="fa fa-close"></i></button>
+          <button type="submit" class="btn btn-success col-sm-2">Search</button>
+        </form>
+      </div>
+    </div>
+    <!-- search component end -->
+
+    <!-- listings Pagination start -->
+    <div id="listings_pag1" class="d-flex justify-content-center align-items-center mt-2"></div>
+    <!-- Pagination end-->
+
+    <!-- card display -->
+    <div class="row" id="card_display" style="display:none;">
+      {% for listing in listings %}
+      <div class="searching_card col-4 p-3 d-flex justify-content-center align-items-stretch cursor-pointer text-decoration-none text-dark media_small_width_100"
+      data-search-id="{{listing.id}}" data-search-catalogueid="{{listing.catalogue_id}}" data-search-sku="{{listing.sku}}"
+      data-search-product_name="{{listing.product_name}}" data-search-price="{{listing.price}}" 
+      data-search-sale_price="{{listing.sale_price}}" data-search-quantity="{{listing.quantity}}" data-search-platform="{{listing.platform}}">
+
+      <div class="hover_shadow row container border rounded shadow p-3">
+          <div class="col-sm-12 mb-3 text-center">
+            <img src="{{url_for('static', filename='assets/images/'~listing.image)}}" alt="listing icon yellow box" width="100" class="mxwidth-100" />
+          </div>
+          <div class="col-sm-12 p-3">
+            <div class="overflow_within text-center"><strong>{{listing.product_name}}</strong></div>
+            <div class="overflow_within">Id: <span>{{listing.id}}</span></div>
+            <div class="overflow_within">Catalogue ID: <span>{{listing.catalogue_id}}</span></div>
+            <div class="overflow_within">SKU: <span>{{listing.sku}}</span></div>
+            <div class="overflow_within">Price: <span>{{listing.price}}</span></div>
+            <div class="overflow_within">Sale Price: <span>{{listing.sale_price}}</span></div>
+            <div class="overflow_within">Quantity: <span>{{listing.quantity}}</span></div>
+            <div class="overflow_within">Platform: <span>{{listing.platform}}</span></div>
+          </div>
+          <div class="col-sm-12 row">
+            <div class="col-sm-6">
+              <a href="{{url_for('routes.view_listing', dashboard_id=listing.dashboard.id, listing_id=listing.id)}}" class="btn btn-primary btn-block">View</a>
+            </div>
+            <div class="col-sm-6">
+              <a href="{{url_for('routes.edit_listing', dashboard_id=listing.dashboard.id, listing_id=listing.id)}}" class="btn btn-secondary btn-block">Edit</a>
+            </div>            
+          </div>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+    <!-- Card display End -->
+    
+    <!-- Table Display -->
+    <div class="row" id="table_display">
+      <!-- table display -->
+      <div class="col-sm-12">         
+        <table class="table table-hover">
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Icon</th>
+              <th>Product Name</th>
+              <th>Catalogue ID</th>
+              <th>SKU</th>              
+              <th>Price</th>
+              <th>Sale Price</th>
+              <th>Quantity</th>
+              <th>Platform</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for listing in listings %}
+            <tr class="searching_card" data-search-id="{{listing.id}}" data-search-catalogueid="{{listing.catalogue_id}}" data-search-sku="{{listing.sku}}"
+            data-search-product_name="{{listing.product_name}}" data-search-price="{{listing.price}}" 
+            data-search-sale_price="{{listing.sale_price}}" data-search-quantity="{{listing.quantity}}" data-search-platform="{{listing.platform}}">
+              <td>
+                <p class="overflow_within">{{listing.id}}</p>
+              </td>
+              <td>
+                <p class="overflow_within"><img src="{{url_for('static', filename='assets/images/'~listing.image)}}" alt="listing icon" width="50" class="mxwidth-50" /></p>
+              </td>                
+              <td>
+                <p class="overflow_within">{{listing.product_name}}</p>
+              </td>
+              <td>
+                <p class="overflow_within">{{listing.catalogue_id}}</p>
+              </td>
+              <td>
+                <p class="overflow_within">{{listing.sku}}</p>
+              </td>
+              <td>
+                <p class="overflow_within">{{listing.price}}</p>
+              </td>
+              <td>
+                <p class="overflow_within">{{listing.sale_price}}</p>
+              </td>
+              <td>
+                <p class="overflow_within">{{listing.quantity}}</p>
+              </td>
+              <td>
+                <p class="overflow_within">{{listing.platform}}</p>
+              </td>                                          
+              <td>
+                <div class="col-sm-12 row">
+                  <div class="col-sm-12 d-flex justify-content-around align-items-center">
+                    <div>
+                      <a href="{{url_for('routes.view_listing', dashboard_id=listing.dashboard.id, listing_id=listing.id)}}" class="btn btn-primary btn-block">View</a>
+                    </div>
+                    <div>
+                      <a href="{{url_for('routes.edit_listing', dashboard_id=listing.dashboard.id, listing_id=listing.id)}}" class="btn btn-secondary btn-block">Edit</a>
+                    </div>              
+                  </div>                               
+                </div>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>      
+    </div>
+    <!-- Table Display End -->    
+
+    <!-- listings Pagination start -->
+    <div id="listings_pag2" class="d-flex justify-content-center align-items-center mt-2"></div>
+    <!-- Pagination end-->
+
+    {% else %}
+    <div class="alert alert-danger">Unable to Display Listings right now.</div>
+    {% endif %}
+  </div>
+
+
+</div>
+{% import 'forms.html' as forms %}
+{{ forms.listings_forms() }}
+{% endblock %}
+
+
+{% block page_scripts %}
+<script>
+//noEffects = true;
+
+/* Add Pagination component*/
+const paginationBtns = {% if pagination_btns %}{{pagination_btns|tojson|safe}}{% else %}[]{% endif %};
+const paginationPage = {{ request.args.get('page', 1) }};
+displayPaginationComponent(paginationBtns, paginationPage, ['listings_pag1', 'listings_pag2']);
+
+/* add search component to the page */
+searchComponent('mid', 'swing');
+
+toggleSettingsToast();
+</script>
+{% endblock page_scripts %}

@@ -1,0 +1,170 @@
+{% extends 'base.html' %}
+{% block title %}Suppliers{% endblock %}
+{% block page_description %}this is suppliers page for logged users to display and manage suppliers{% endblock %}
+{% block body %}
+
+<div class="container border rounded p-3">
+  {% include 'messages.html' %}
+  <img src="{{url_for('static', filename='assets/images/loading_circle.gif')}}" class="loading_circle" style="display:none;" />
+
+  <div class="container-fluid content_container">
+    <div class="row">
+        <div class="col-sm-4 border rounded shadow d-flex flex-column">
+            <div class="bg-primary text-white p-3 text-center">
+                <h5>Existing Suppliers</h5>
+                <div class="mt-3 d-flex justify-content-center align-items-center">
+                    <!-- Button to Open the Modal for add new dashboard -->
+                    <button type="button" id="add_supplier_btn" class="add_supplier btn btn-success" 
+                    data-toggle="modal" data-logged-id="1" data-target="#addSupplierModal" onclick="toggleLoadingCircle(true, 'block')">
+                      Add Supplier
+                    </button>
+                </div>
+                <div class="pr-1 pl-1 mt-2 d-flex justify-content-center align-items-center">
+                    <input id="search_supplier" type="text" class="form-control" placeholder="search suppliers" />
+                    <button id="search_supplier_click" class="ml-2 btn btn-sm btn-outline-light"><i class="fa fa-search"></i></button>
+                </div>
+            </div>
+            <div class="d-block p-3 overflow-350">
+                {% if suppliers %}
+                {% for supplier in suppliers %}
+                <div onclick="displaySupplierData(event)" data-id="{{supplier.id | safe}}" data-supplier="{{supplier.name | safe}}" data-createdat="{{supplier.created_date|safe}}" data-updatedat="{% if supplier.updated_date %}{{supplier.updated_date|safe}}{% endif %}" data-search-supplier="{{ supplier.name | lower | safe }}" class="mt-3 container shadow border rounded p-3 cursor-pointer hover_shadow suppliers"
+                data-edit-url="{{url_for('routes.edit_supplier', supplier_id=supplier.id)}}" 
+                data-delete-url="{{url_for('routes.delete_supplier', supplier_id=supplier.id)}}"
+                data-view-url="{{url_for('routes.view_supplier', supplier_id=supplier.id)}}"
+                data-purchase-url="{{url_for('routes.add_purchase_supplier', supplier_id=supplier.id)}}">
+                <img src="{{url_for('static', filename='assets/images/default_supplier.png')}}" alt="supplier icon" width="50" class="mxwidth-50" />
+                <span>{{supplier.name}}</span>
+                </div>
+                {% endfor %}
+                {% endif %}
+            </div>
+        </div>
+        <div class="col-sm-8 border shadow p-3 text-secondary">
+            <div class="container shadow" id="suppliers_container" style="display:none;">
+              <div class="d-flex justify-content-center align-items-center">
+                  <h5 class="badge badge-primary">ID: <span id="supplier_id"></span></h5>
+              </div>
+              <h5>Supplier: <span id="supplier_name"></span></h5>
+              <h5>Created At: <span id="supplier_createdat"></span></h5>
+              <h5>Last Update: <span id="supplier_updatedat"></span></h5>
+              <div class="mt-2 d-flex justify-content-around align-items-center p-3">
+                  <a href="#" id="view_supplier" class="btn btn-outline-primary">View</a>
+                  <button id="edit_supplier" data-edit-url="" data-supplier="" class="btn btn-outline-warning" data-toggle="modal" data-target="#editSupplierModal" onclick="toggleLoadingCircle(true, 'block')">Edit</button>
+                  <button id="delete_supplier" data-delete-url="" data-id="" class="btn btn-outline-danger" data-toggle="modal" data-target="#deleteSupplierModal" onclick="toggleLoadingCircle(true, 'block')">Remove</button>
+                  <a href="#" id="create_purchase" class="btn btn-outline-primary">Create Purchases Request</a>
+                </div>
+            </div>
+        </div>
+    </div>
+  </div>
+</div>
+{% from 'forms.html' import suppliers_forms %}
+{{ 
+    suppliers_forms(
+    addform=addform,
+    editform=editform,
+    deleteform=deleteform)
+}}
+{% endblock %}
+
+  
+{% block page_scripts %}
+<script>
+// noEffects = true;
+$('#addSupplierModal').on('shown.bs.modal', ()=>{toggleLoadingCircle(false, 'block');});
+$('#editSupplierModal').on('shown.bs.modal', ()=>{toggleLoadingCircle(false, 'block');});
+$('#deleteSupplierModal').on('shown.bs.modal', ()=>{toggleLoadingCircle(false, 'block');});
+
+
+function searchByNameEvents(callback){
+    $("#search_supplier").on('change', callback);
+    $("#search_supplier").on('input', callback);
+    $("#search_supplier_click").on('click', callback);
+}
+/* add Search By Name Feature */
+SearchByJS('.suppliers', '#search_supplier', 'data-search-supplier', '*=', searchByNameEvents);
+
+
+/* display each supplier when click on the supplier name */
+function displaySupplierData(event){
+    if (
+        $(event.currentTarget).length && $(event.currentTarget).attr('data-id') && $(event.currentTarget).attr('data-supplier') && 
+        $(event.currentTarget).attr('data-createdat') && $(event.currentTarget).attr('data-delete-url') &&
+        $(event.currentTarget).attr('data-edit-url') && $(event.currentTarget).attr('data-view-url') && 
+        $(event.currentTarget).attr('data-purchase-url') && $("#supplier_id").length &&  $("#edit_supplier").length && 
+        $("#delete_supplier").length && $("#suppliers_container").length
+    ){
+
+        $("#suppliers_container").hide();
+
+        const supplierId = $(event.currentTarget).attr('data-id');
+        const supplierName = $(event.currentTarget).attr('data-supplier');
+        const editSupplierURL = $(event.currentTarget).attr('data-edit-url');
+        const deleteSupplierURL = $(event.currentTarget).attr('data-delete-url');
+        const viewSupplierURL = $(event.currentTarget).attr('data-view-url');
+        const purchaseSupplierURL = $(event.currentTarget).attr('data-purchase-url');
+
+        $("#supplier_id").text(supplierId);
+        $("#supplier_name").text(supplierName);
+        $("#supplier_createdat").text($(event.currentTarget).attr('data-createdat'));
+        $("#supplier_updatedat").text($(event.currentTarget).attr('data-createdat'));
+
+        $("#edit_supplier").attr('data-supplier', supplierName);
+        $("#edit_supplier").attr('data-edit-url', editSupplierURL);
+
+        $("#delete_supplier").attr('data-id', supplierId);
+        $("#delete_supplier").attr('data-delete-url', deleteSupplierURL);
+
+        $("#view_supplier").attr('href', viewSupplierURL);
+        $("#create_purchase").attr('href', purchaseSupplierURL);
+          
+        $("#suppliers_container").show('fast');
+        return true;
+    }
+}
+
+
+/* Supplier Edit Modal */
+function displayEditSupplierModal(event){
+    if (
+        $(event.currentTarget).length && $(event.currentTarget).attr('data-edit-url') && ($(event.currentTarget).attr('data-supplier')) &&
+        $("#edit_supplier_form input#name").length && $("#edit_supplier_form").length
+       ){
+        
+        $("#edit_supplier_form input#name").val($(event.currentTarget).attr('data-supplier'));
+        $("#edit_supplier_form").attr('action', $(event.currentTarget).attr('data-edit-url'));
+    }
+}
+
+function clearEditSupplierModal(){
+    if ($("#edit_supplier_form input#name").length && $("#edit_supplier_form").length){
+        $("#edit_supplier_form input#name").val('');
+        $("#edit_supplier_form").attr('action', '');
+    }
+}
+
+$("#edit_supplier").on('click', displayEditSupplierModal);
+$('#editSupplierModal').on('hidden.bs.modal', clearEditSupplierModal);
+
+
+/* supplier delete form */
+function displayRemoveSupplierModal(event){
+    if ($(event.currentTarget).length && $(event.currentTarget).attr('data-id') && $(event.currentTarget).attr('data-delete-url') &&
+    $("#delete_supplier_form input#supplier_id")
+    ){
+        $("#delete_supplier_form").attr('action', $(event.currentTarget).attr('data-delete-url'));
+        $("#delete_supplier_form input#supplier_id").val($(event.currentTarget).attr('data-id'));
+        return true;
+    }
+}
+function clearRemoveSupplierModal(event){
+    if ($("#delete_supplier_form input#supplier_id").length){
+        $("#delete_supplier_form").attr('action', '');
+        $("#delete_supplier_form input#supplier_id").val('');
+    }
+}
+$("#delete_supplier").on('click', displayRemoveSupplierModal);
+$('#deleteSupplierModal').on('hidden.bs.modal', clearRemoveSupplierModal);
+
+</script>
+{% endblock page_scripts %}

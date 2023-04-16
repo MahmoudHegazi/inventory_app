@@ -1,0 +1,83 @@
+{% extends 'base.html' %}
+{% block title %}Signup{% endblock %}
+{% block page_description %}this is signup page for not logged users, to create new users{% endblock %}
+
+{% block body %}
+<div class="container">
+    {% include 'messages.html' %}
+    <div class="row container">
+        <div class="col-sm-12 d-flex">
+            <a href="{{url_for('auth.login')}}" class="w-50 border text-center p-3 text-decoration-none cursor-pointer hover_shadow">Login</a>
+            <a href="{{url_for('auth.signup')}}" class="w-50 border text-center p-3 text-decoration-none cursor-pointer hover_shadow bg-primary text-white">Signup</a>
+        </div>
+        <div class="col-sm-12 border row p-3">
+        <form action="{{url_for('auth.submit_signup')}}" method="post" enctype="multipart/form-data" class="col-sm-6 p-3 mx-auto shadow mt-3 mb-3">
+            {{ form.hidden_tag() }}
+            <div class="p-1 form-group">
+                {{ form.name.label }}
+                {{ form.name(class='form-control', placeholder='Enter Name') }}
+
+                {% if form.name.errors %}
+                <ul class="errors bg-danger text-white">
+                    {% for error in form.name.errors %}
+                        <li class="p-1 mb-1">{{ error }}</li>
+                    {% endfor %}
+                </ul>
+                {% endif %}
+            </div>
+            <div class="p-1 form-group{% if form.username.errors %} shadow-danger{% endif %}">
+                {{ form.username.label }}
+                {{ form.username(class='form-control', placeholder='Enter Username', autocomplete='new-username') }}
+
+                {% if form.username.errors %}
+                <ul class="errors bg-danger text-white">
+                    {% for error in form.username.errors %}
+                        <li class="p-1 mb-1">{{ error }}</li>
+                    {% endfor %}
+                </ul>
+                {% endif %}
+            </div>
+            <div class="p-1 form-group{% if form.pwd.errors %} shadow-danger{% endif %}">
+                {{ form.pwd.label }}
+                {{ form.pwd(class='form-control', placeholder='Enter password', autocomplete='new-password') }}
+
+                {% if form.pwd.errors %}
+                <ul class="errors bg-danger text-white">
+                    {% for error in form.pwd.errors %}
+                        <l class="p-1 mb-1">{{ error }}</li>
+                    {% endfor %}
+                </ul>
+                {% endif %}
+            </div>
+            
+            <div class="p-1 form-group">
+                {{ form.pwd_confirm.label }}
+                {{ form.pwd_confirm(class='form-control', placeholder='Confirm password', autocomplete='new-password') }}
+  
+                {% if form.pwd_confirm.errors %}
+                <ul class="errors bg-danger text-white">
+                    {% for error in form.pwd_confirm.errors %}
+                        <li class="p-1 mb-1">{{ error }}</li>
+                    {% endfor %}
+                </ul>
+                {% endif %}
+            </div>
+
+            <div class="p-1 form-group{% if form.email.errors %} shadow-danger{% endif %}">
+                {{ form.email.label }}
+                {{ form.email(class='form-control', placeholder='Enter Email') }}
+  
+                {% if form.email.errors %}
+                <ul class="errors bg-danger text-white">
+                    {% for error in form.email.errors %}
+                        <li class="p-1 mb-1">{{ error }}</li>
+                    {% endfor %}
+                </ul>
+                {% endif %}
+            </div>
+            <button type="submit" class="btn btn-primary btn-block">Signup</button>
+        </form>
+        </div>
+    </div>
+</div>
+{% endblock body %}

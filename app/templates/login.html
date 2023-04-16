@@ -1,0 +1,38 @@
+{% extends 'base.html' %}
+{% block title %}Login{% endblock %}
+{% block page_description %}this is Login page for not logged users, use it to login into application{% endblock %}
+
+{% block body %}
+<div class="container">
+    {% include 'messages.html' %}
+    <div class="row container">
+        <div class="col-sm-12 d-flex">
+            <a href="{{url_for('auth.login')}}" class="w-50 border text-center p-3 text-decoration-none cursor-pointer hover_shadow bg-primary text-white">Login</a>
+            <a href="{{url_for('auth.signup')}}" class="w-50 border text-center p-3 text-decoration-none cursor-pointer hover_shadow">Signup</a>
+        </div>
+        <div class="col-sm-12 border p-3 row">
+          {% if form and form.username and form.pwd and form.remember %}
+          <form action="{{url_for('auth.login')}}" method="post" enctype="multipart/form-data" class="col-sm-6 p-3 mx-auto shadow mt-3 mb-3">
+            {{form.hidden_tag()}}
+            <div class="form-group">
+              {{form.username.label}}
+              {{form.username(class='form-control', autocomplete='username', placeholder='Enter Username')}}
+            </div>
+            <div class="form-group">
+                {{ form.pwd.label }}
+                {{ form.pwd(class='form-control', placeholder='Enter password', autocomplete='new-password') }}
+            </div>
+            <div class="form-group form-check">
+                <label class="form-check-label">
+                  {{ form.remember(class='form-check-input') }} <span>Remeber Me</span>
+                </label>
+            </div>
+            <button type="submit" class="btn btn-primary btn-block">Login</button>
+          </form>
+          {% else %}
+          <div class="alert alert-danger">Unable to login right no please refresh the page and try again later.</div>
+          {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock body %}

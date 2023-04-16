@@ -1,0 +1,122 @@
+{% extends 'base.html' %}
+{% block title %}Catalogue{% if catalogue %}: {{catalogue.product_name}}{% endif %}{% endblock %}
+{% block page_description %}this is Catalogue page, can view/edit/delete Catalogue and view/add/edit it's listings {% endblock %}
+{% block body %}
+<div class="container border rounded p-3">
+  {% include 'messages.html' %}
+  <img src="{{url_for('static', filename='assets/images/loading_circle.gif')}}" class="loading_circle" style="display:none;" />
+
+  <div class="container-fluid content_container">
+    <!-- settings menu-->
+    <div id="settings_toast_cont">
+      <button type="button" class="btn btn-outline-primary mb-1" id="open_settings">Settings</button>
+      <div id="settings_toast" class="toast shadow" data-autohide="false" style="display:none">
+         <div class="toast-header bg-dark text-white">
+            <span><i class="fa fa-gear"></i> Settings</span>
+         </div>
+         <div class="toast-body">
+            <div class="row">
+               <div class="col-sm-12 d-flex justify-content-start align-items-center">
+                  <label>Color Mode: </label>
+                  <select class="form-control ml-2 w-50" id="switch_color_mode">
+                     <option value="white">White</option>
+                     <option value="dark">Dark</option>
+                  </select>
+               </div>
+            </div>
+         </div>
+      </div>
+    </div>
+    <!-- settings end --> 
+        
+    <a href="{{url_for('routes.catalogues')}}" class="btn btn-light">
+      Back to Catalogues
+    </a>
+    {% if catalogue %}
+    <div class="d-flex justify-content-end align-items-center flex-wrap">
+      <a href="{{url_for('routes.edit_catalogue', catalogue_id=catalogue.id)}}" class="btn btn-primary">
+        Edit Catalogue
+      </a>
+      <a href="{{url_for('routes.add_catalogue', redirect=url_for('routes.view_catalogue', catalogue_id=catalogue.id))}}" class="ml-2 btn btn-warning">
+        Add New Catalogue
+      </a>
+    </div>
+    <div class="row mt-2">
+      <div class="border rounded col-4 p-3 d-flex justify-content-center align-items-center cursor-pointer text-decoration-none text-dark media_small_width_100">
+        <div class="hover_shadow row container shadow p-3">
+            <div class="col-sm-12 mb-3 text-center">
+                <img src="{{url_for('static', filename='assets/images/'~catalogue.product_image)}}" alt="catalogue icon" width="150"class="mxwidth-150" />
+                <h3 class="overflow_within title"><span class="badge badge-dark">Id: </span><span> {{catalogue.id}}</span></h3>
+            </div>
+            <div class="col-sm-12">
+              <p class="overflow_within"><span class="badge badge-info">SKU: </span><span> {{catalogue.sku}}</span></p>
+            </div>
+            <div class="col-sm-12">
+              <p class="overflow_within"><span class="badge badge-dark">Price: </span><span> {{catalogue.price}}</span></p>
+            </div>
+            <div class="col-sm-12">
+              <p class="overflow_within"><span class="badge badge-info">Sale Price: </span><span> {{catalogue.sale_price}}</span></p>
+            </div>
+            <div class="col-sm-12">
+              <p class="overflow_within"><span class="badge badge-dark">Product Name: </span><span class="p-1 shadow break_word"> {{catalogue.product_name}}</span></p>
+            </div>
+            <div class="col-sm-12">
+              <p class="overflow_within"><span class="badge badge-info">Location: </span><span class="p-1 shadow break_word"> {{catalogue.location}}</span></p>
+            </div>
+            <div class="col-sm-12">
+              <p class="overflow_within"><span class="badge badge-dark">Product Model: </span><span class="p-1 shadow break_word"> {{catalogue.product_model}}</span></p>
+            </div>
+            <div class="col-sm-12">
+              <div class="overflow_within"><span class="badge badge-info">Product Description: </span>
+                <p class="p-1 shadow break_word overflow-350"> {{catalogue.product_description}}</p>
+              </div>
+            </div> 
+            <div class="col-sm-12">
+              <p class="overflow_within"><span class="badge badge-dark">UPC: </span><span class="p-1 shadow"> {{catalogue.upc}}</span></p>
+            </div>
+            <div class="col-sm-12">
+                <p class="overflow_within"><span class="badge badge-dark">Condition: </span><span class="p-1 shadow"> {{catalogue.condition}}</span></p>
+            </div>            
+            <div class="col-sm-12">
+              <div class="overflow_within"><span class="badge badge-info">Created At: </span>
+                <p class="p-1 shadow"> {{catalogue.created_date}}</p>
+              </div>
+            </div>
+            <div class="col-sm-12">
+              <div class="overflow_within"><p><span class="badge badge-dark">Updated At: </span>
+                <p class="p-1 shadow"> {% if catalogue.updated_date %}{{catalogue.updated_date}}{% endif %}</p>
+              </div>
+              </p>
+            </div>
+            <div class="col-sm-12 row">
+              <div class="col-sm-6">
+                <button data-url="{{url_for('routes.delete_catalogue', catalogue_id=catalogue.id)}}" data-toggle="modal" 
+                  data-target="#deleteCatalogueModal" data-catalogue-id="{{catalogue.id}}" onclick="toggleLoadingCircle(true, 'block')" 
+                  class="wtform_modal_deletebtn btn btn-danger btn-block">Delete
+                </button>
+             </div>
+            </div>
+        </div>
+      </div>
+    </div>
+    {% else %}
+    <div class="alert alert-danger">Unable to Display Catalogue right now.</div>
+    {% endif %}
+  </div>
+</div>
+{% from 'forms.html' import catalogue_forms %}
+{{ catalogue_forms(deleteform=deleteform) }}
+
+{% endblock body %}
+
+
+{% block page_scripts %}
+<script>
+// noEffects = true;
+$('#deleteCatalogueModal').on('shown.bs.modal', ()=>{toggleLoadingCircle(false, 'block');});
+/* function to dynamic fill wtform for delete any model using it's id and set dynamic url for form aswell (can used in any page) */
+deleteWtformsModalProccess(dataAttId='data-catalogue-id', formId='remove_catalogue', idInputId='catalogue_id', modalId='deleteCatalogueModal');
+
+toggleSettingsToast();
+</script>
+{% endblock page_scripts %}

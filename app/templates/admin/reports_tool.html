@@ -1,0 +1,55 @@
+{% extends 'base.html' %}
+{% block title %}Report Creator Tool{% endblock %}
+{% block page_description %}Create Custom Reports/Charts and render them for users{% endblock %}
+
+
+{% block body %}
+<div class="container">
+  <h5>Create Dynamic Report <a class="text-decoration-none text-dark" href="#" data-toggle="popover" data-placement="bottom" title="What this tool do?" data-content="You can use this admin tool to create dynamic secure custom reports/charts and display this reports/charts to the users, by using this tool you are sure 100% no secuirty issues while create the reports becuase users idintifed automatic and the tool guide you to make valid quires that not effect secuirties"><i class="fa fa-question-circle"></i></a></h5>
+  
+  
+
+  <div id="stages" class="container container border shadow p-3">
+    <div class="container stages" id="chart_selection">
+     <h5><span class="badge badge-primary">1</span> Select Chart Type: </h5>
+     <div class="d-flex justify-content-center align-items-center">
+       <button type="button" class="btn btn-primary btn-sm" onclick="goToStage('chart_queries')">Next</button>
+     </div>
+    </div>
+    <div class="container stages" style="display:none;" id="chart_queries">
+     <h5><span class="badge badge-primary">2</span> Create Dynamic Data Queries: </h5>
+     <div class="d-flex justify-content-center align-items-center">
+       <button type="button" class="btn btn-danger btn-sm" onclick="goToStage('chart_selection')">Back</button>
+       <button type="button" class="btn btn-primary btn-sm ml-1"  onclick="goToStage('chart_mapping')">Next</button>
+     </div>
+    </div>
+    <div class="container stages" style="display:none;" id="chart_mapping">
+     <h5><span class="badge badge-primary">3</span> Map Data to Selected chart: </h5>
+     <div class="d-flex justify-content-center align-items-center">
+       <button type="button" class="btn btn-danger btn-sm" onclick="goToStage('chart_queries')">Back</button>
+       <button type="submit" class="btn btn-success btn-sm ml-1" id="report_create" style="display:none;">Create</button>
+     </div>
+    </div>
+  </div>
+</div>
+
+{% endblock %}
+{% block page_scripts %}
+<script>
+  function resetStagesData(){
+  
+  }
+  
+  function goToStage(stageId){
+    if (stageId && $(`#${stageId}`).length){
+      $('.stages').hide();
+      $(`#${stageId}`).show('mid');
+    }
+  }
+  
+  $(document).ready(function(){
+    $('[data-toggle="popover"]').popover();   
+  });
+  
+  </script>
+{% endblock %}

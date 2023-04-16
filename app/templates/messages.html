@@ -1,0 +1,13 @@
+{%- with messages = get_flashed_messages(with_categories=true) -%}
+  {% if messages %}
+    <div class="container flashes">
+      {% for category, message in messages %}
+      <div class="alert alert-{% if category in ['success', 'danger', 'warning', 'info', 'primary', 'secondary', 'dark', 'light'] %}{{category}}{% else %}success{% endif %} alert-dismissible fade show">
+        <button type="button" class="close" data-dismiss="alert">&times;</button>
+        <div style="word-break:break-word;" class="text-center p-2">{{ message }}</div>
+      </div>
+      {% endfor %}
+    </div>
+  {% endif %}
+{%- endwith %}
+<div id="ajax_flashes" class="container"></div>

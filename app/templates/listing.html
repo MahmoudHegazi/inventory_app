@@ -1,0 +1,197 @@
+{% extends 'base.html' %}
+{% block title %}Listing: {% if listing %}: {{listing.product_name}}{% endif %}{% endblock %}
+{% block page_description %}this is Listing page, can view/edit/delete listing and view/add/edit it's Purchases and Orders {% endblock %}
+{% block body %}
+<div class="container border rounded p-3">
+  {% include 'messages.html' %}
+  <img src="{{url_for('static', filename='assets/images/loading_circle.gif')}}" class="loading_circle" style="display:none;" />
+
+  <div class="container-fluid content_container">
+    {% if listing and dashboard_id %}
+    <a href="{{url_for('routes.view_dashboard', dashboard_id=dashboard_id)}}" class="ml-2 btn btn-light">
+        Back To Dashboard ({{dashboard_id}})
+    </a>
+    <div class="d-flex justify-content-end align-items-center flex-wrap">
+      <a href="{{url_for('routes.listings', dashboard_id=dashboard_id)}}" class="ml-2 btn btn-success">
+        Back To Listings
+      </a>
+      <a href="{{url_for('routes.edit_listing', dashboard_id=dashboard_id, listing_id=listing.id)}}" class="ml-2 btn btn-primary">
+        Edit Listing
+      </a>
+      <!-- need action-->
+      <a href="{{url_for('routes.add_listing', dashboard_id=dashboard_id)}}" class="ml-2 btn btn-warning">
+        Add New Listing
+      </a>
+      <a href="{{url_for('routes.view_catalogue', catalogue_id=listing.catalogue_id)}}" class="ml-2 btn btn-info">
+        View Catalogue
+      </a>
+    </div>
+    <div class="row mt-2">
+      <div class="border rounded col-sm-4 p-3 d-flex justify-content-center align-items-start cursor-pointer text-decoration-none text-dark media_small_width_100">
+        <div class="hover_shadow row container shadow p-3">
+            <div class="col-sm-12 mb-3 text-center">                
+                <img src="{{url_for('static', filename='assets/images/'~listing.image)}}" alt="listing icon yellow box" width="150" class="mxwidth-150" />
+                <h3 class="overflow_within title"><span class="badge badge-dark">Id: </span><span> {{listing.id}}</span></h3>
+            </div>
+            <div class="col-sm-12">
+              <p class="overflow_within"><span class="badge badge-info">SKU: </span><span> {{listing.sku}}</span></p>
+            </div>
+            <div class="col-sm-12">
+              <p class="overflow_within"><span class="badge badge-dark">Price: </span><span> {{listing.price}}</span></p>
+            </div>
+            <div class="col-sm-12">
+              <p class="overflow_within"><span class="badge badge-info">Sale Price: </span><span> {{listing.sale_price}}</span></p>
+            </div>
+            <div class="col-sm-12">
+              <p class="overflow_within"><span class="badge badge-dark">Product Name: </span><span class="p-1 shadow break_word"> {{listing.product_name}}</span></p>
+            </div>
+            <div class="col-sm-12">
+              <div class="overflow_within"><span class="badge badge-info">Product Description: </span>
+                <p class="p-1 shadow break_word overflow-350"> {{listing.product_description}}</p>
+              </div>
+            </div>
+            <div class="col-sm-12">
+              <p class="overflow_within"><span class="badge badge-dark">Brand: </span><span class="p-1 shadow"> {{listing.brand}}</span></p>
+            </div>
+            <div class="col-sm-12">
+              <p class="overflow_within"><span class="badge badge-dark">Category: </span><span class="p-1 shadow"> {{listing.category}}</span></p>
+            </div>
+            <div class="col-sm-12">
+              <p class="overflow_within"><span class="badge badge-dark">Plateform: </span><span class="p-1 shadow"> {{listing.plateform}}</span></p>
+            </div>  
+            <div class="col-sm-12">
+              <div class="overflow_within"><span class="badge badge-info">Created At: </span>
+                <p class="p-1 shadow"> {{listing.created_date}}</p>
+              </div>
+            </div>
+            <div class="col-sm-12">
+              <div class="overflow_within"><p><span class="badge badge-dark">Updated At: </span>
+                <p class="p-1 shadow"> {% if listing.updated_date %}{{listing.updated_date}}{% endif %}</p>
+              </div>
+              </p>
+            </div>
+            <div class="col-sm-12 row">
+              <div class="col-sm-6">
+                <button data-url="{{url_for('routes.delete_listing', dashboard_id=dashboard_id, listing_id=listing.id)}}" data-toggle="modal" 
+                  data-target="#deleteListingModal" data-listing-id="{{listing.id}}" onclick="toggleLoadingCircle(true, 'block')" 
+                  class="wtform_modal_deletebtn btn btn-danger btn-block">Delete
+                </button>
+             </div>
+            </div>
+        </div>
+      </div>
+      <div class="col-sm-8 p-3 row border rounded mx-auto d-flex justify-content-center align-items-center media_small_width_100">
+        <!-- Purchases-->
+        <div class="container">
+          <div class="mt-1 mb-2 d-flex justify-content-between align-items-center">
+            <h4>Purchases</h4>
+            <div>
+              <a href="{{url_for('routes.add_purchase_listing', dashboard_id=dashboard_id, listing_id=listing.id)}}" class="btn btn-outline-success">Add Purchase</a>
+            </div>
+          </div>
+          <div class="overflow-350">
+              <table class="table table-bordered">
+                <thead>
+                  <tr>
+                    <th>Id</th>
+                    <th>Quantity</th>
+                    <th>Supplier Name</th>
+                    <th>Action</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {% if listing.purchases %}
+                  {% for purchase in listing.purchases %}
+                  <tr>
+                    <td title="{{purchase.date}}" class="cursor-pointer">{{purchase.id}}</td>
+                    <td>{{purchase.quantity}}</td>
+                    <td>{{purchase.supplier.name}}</td>
+                    <td>
+                      <div class="d-flex justify-content-around align-items-center">
+                        <a href="{{url_for('routes.view_purchase_listing', dashboard_id=dashboard_id, listing_id=listing.id, purchase_id=purchase.id)}}" class="btn btn-primary btn-sm"><i class="fa fa-eye"></i></a>
+                        <a href="{{url_for('routes.edit_purchase_listing', dashboard_id=dashboard_id, listing_id=listing.id, purchase_id=purchase.id)}}" class="btn btn-secondary btn-sm"><i class="fa fa-edit" ></i></a>
+                        <button data-url="{{url_for('routes.delete_purchase_listing', dashboard_id=dashboard_id, listing_id=listing.id, purchase_id=purchase.id)}}" data-toggle="modal" 
+                        data-target="#deletePurchaseModal" data-purchase-id="{{purchase.id}}" onclick="toggleLoadingCircle(true, 'block')" 
+                        class="wtform_modal_deletebtn btn btn-danger btn-sm"><i class="fa fa-trash"></i></button>
+                        </div>
+                      </div>
+                    </td>
+                  </tr>
+                  {% endfor %}
+                  {% endif %}
+                </tbody>
+              </table>
+          </div>
+        </div>
+        <!-- Orders-->
+        <div class="container">
+            <div class="mt-1 mb-2 d-flex justify-content-between align-items-center">
+              <h4>Orders</h4>
+              <div>
+                <a href="{{url_for('routes.add_order', dashboard_id=dashboard_id, listing_id=listing.id)}}" class="btn btn-outline-success">Add Order</a>
+              </div>
+            </div>
+            <div class="overflow-350">
+                <table class="table table-bordered">
+                  <thead>
+                    <tr>
+                      <th>Id</th>
+                      <th>Quantity</th>
+                      <th>Full Name</th>
+                      <th>Action</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {% if listing.orders %}
+                    {% for order in listing.orders %}
+                    <tr>
+                      <td title="{{order.date}}" class="cursor-pointer">{{order.id}}</td>
+                      <td>{{order.quantity}}</td>                      
+                      <td>{{order.customer_firstname}} {{order.customer_lastname}}</td>
+                      <td>
+                        <div class="d-flex justify-content-around align-items-center">
+                          <a href="{{url_for('routes.view_order', dashboard_id=dashboard_id, listing_id=listing.id, order_id=order.id)}}" class="btn btn-primary btn-sm"><i class="fa fa-eye"></i></a>
+                          <a href="{{url_for('routes.edit_order', dashboard_id=dashboard_id, listing_id=listing.id, order_id=order.id)}}" class="btn btn-secondary btn-sm"><i class="fa fa-edit"></i></a>
+
+                          <button data-url="{{url_for('routes.delete_order', dashboard_id=dashboard_id, listing_id=listing.id, order_id=order.id)}}" data-toggle="modal" 
+                          data-target="#deleteOrderModal" data-order-id="{{order.id}}" onclick="toggleLoadingCircle(true, 'block')" 
+                          class="wtform_modal_deletebtn btn btn-danger btn-sm"><i class="fa fa-trash"></i></button>
+                          </div>
+
+                        </div>
+                      </td>
+                    </tr>
+                    {% endfor %}
+                    {% endif %}
+                  </tbody>
+                </table>
+            </div>
+          </div>        
+      </div>      
+    </div>
+    {% else %}
+    <div class="alert alert-danger">Unable to Display Listing right now.</div>
+    {% endif %}
+  </div>
+</div>
+{% from 'forms.html' import listing_forms %}
+{{ listing_forms(deleteform=deleteform, delete_purchase=delete_purchase, delete_order=delete_order) }}
+{% endblock body %}
+
+
+{% block page_scripts %}
+<script>
+// noEffects = true;
+$('#deleteListingModal').on('shown.bs.modal', ()=>{toggleLoadingCircle(false, 'block');});
+$('#deletePurchaseModal').on('shown.bs.modal', ()=>{toggleLoadingCircle(false, 'block');});
+$('#deleteOrderModal').on('shown.bs.modal', ()=>{toggleLoadingCircle(false, 'block');});
+
+/* function to dynamic fill wtform for delete any model using it's id and set dynamic url for form aswell (can used in any page) */
+deleteWtformsModalProccess(dataAttId='data-listing-id', formId='remove_listing', idInputId='listing_id', modalId='deleteListingModal');
+
+deleteWtformsModalProccess(dataAttId='data-purchase-id', formId='remove_purchase', idInputId='purchase_id', modalId='deletePurchaseModal');
+
+deleteWtformsModalProccess(dataAttId='data-order-id', formId='remove_order', idInputId='order_id', modalId='deleteOrderModal');
+
+</script>
+{% endblock page_scripts %}

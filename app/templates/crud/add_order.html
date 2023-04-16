@@ -1,0 +1,129 @@
+{% extends 'base.html' %}
+{% block title %}Add Order{% endblock %}
+{% block page_description %}This is form to Add New order for a listing with id{% if listing_id %} : ({{listing_id}}){% endif %}{% if dashboard_id %} and dashboard id: ({{dashboard_id}}){% endif %} {% endblock %}
+{% block body %}
+<div class="container border rounded p-3">
+  {% include 'messages.html' %}
+  {% if dashboard_id %}
+  <a href="{{url_for('routes.listings', dashboard_id=dashboard_id)}}" type="button" class="btn btn-light">
+    Back To Listings
+  </a>
+  {% endif %}
+  {% if form and dashboard_id and listing_id %}
+  <div class="d-flex justify-content-end align-items-center">    
+    <a href="{{url_for('routes.view_listing', dashboard_id=dashboard_id, listing_id=listing_id)}}" type="button" class="btn btn-outline-warning">
+      Back To Listing ({{listing_id}})
+    </a>
+    <a href="{{url_for('routes.view_dashboard', dashboard_id=dashboard_id)}}" type="button" class="btn btn-outline-success">
+        Back To Dashboard ({{dashboard_id}})
+    </a>
+  </div>
+  <div class="container-fluid content_container">
+    <div class="row">
+      <!-- Logged User Dashboards  -->
+      <div class="col-12 p-3 d-flex justify-content-center align-items-center cursor-pointer text-decoration-none text-dark media_small_width_100">
+        <div class="container">
+            <form action="{{url_for('routes.add_order', dashboard_id=dashboard_id,listing_id=listing_id)}}" method="POST">          
+              {{form.hidden_tag()}}
+              <div class="form-group">
+                {{form.listing_id.label}}
+                {{form.listing_id(class='form-control', placeholder='Listing')}}
+                
+                {% if form.listing_id.errors %}
+                <ul class="errors bg-danger text-white">
+                    {% for error in form.listing_id.errors %}
+                        <li class="p-1 mb-1">{{ error }}</li>
+                    {% endfor %}
+                </ul>
+                {% endif %}
+              </div>
+              <div class="form-group">
+                {{form.quantity.label}}
+                {{form.quantity(class='form-control', placeholder='Quantity')}}
+                
+                {% if form.quantity.errors %}
+                <ul class="errors bg-danger text-white">
+                    {% for error in form.quantity.errors %}
+                        <li class="p-1 mb-1">{{ error }}</li>
+                    {% endfor %}
+                </ul>
+                {% endif %}
+              </div>
+              <div class="form-group">
+                {{form.date.label}}
+                {{form.date(class='form-control', placeholder='Date')}}
+                
+                {% if form.date.errors %}
+                <ul class="errors bg-danger text-white">
+                    {% for error in form.date.errors %}
+                        <li class="p-1 mb-1">{{ error }}</li>
+                    {% endfor %}
+                </ul>
+                {% endif %}
+              </div>
+              <div class="form-group">
+                {{form.customer_firstname.label}}
+                {{form.customer_firstname(class='form-control', placeholder='First Name')}}
+                
+                {% if form.customer_firstname.errors %}
+                <ul class="errors bg-danger text-white">
+                    {% for error in form.customer_firstname.errors %}
+                        <li class="p-1 mb-1">{{ error }}</li>
+                    {% endfor %}
+                </ul>
+                {% endif %}
+              </div>
+              <div class="form-group">
+                {{form.customer_lastname.label}}
+                {{form.customer_lastname(class='form-control', placeholder='Last Name')}}
+                
+                {% if form.customer_lastname.errors %}
+                <ul class="errors bg-danger text-white">
+                    {% for error in form.customer_lastname.errors %}
+                        <li class="p-1 mb-1">{{ error }}</li>
+                    {% endfor %}
+                </ul>
+                {% endif %}
+              </div>
+              <div class="d-flex justify-content-center align-items-center w-50 mx-auto">
+                {{form.add(class='btn btn-success w-50')}}
+                <a href="{{url_for('routes.view_listing', dashboard_id=dashboard_id, listing_id=listing_id)}}" class="btn btn-primary w-50">Cancel</a>
+              </div>
+            </form>
+        </div>
+      </div>
+    </div>
+  </div>
+  {% else %}
+  <div class="alert alert-danger">Unable to Display Add Order form right now.</div>
+  {% endif %}
+</div>
+
+{% endblock %}
+
+{% block page_scripts %}
+<script>
+    /* order page redirected from a speacfic listing, for flex form allow user to select diffrent listing, this function to inform user if value changed and clear when value back as inital when page started*/
+    function displayUpdateOrderAlert(){
+        if ($("#listing_id").length){
+            const listingIdVal = $("#listing_id").val();
+            $("#listing_id").on('change', (event)=>{
+                if ($(event.currentTarget).length){
+                    if ($(event.currentTarget).val() != listingIdVal){
+                        displayAjaxError('Please Note if you change the listing id this order will added for diffrent listing', 'warning');
+                    } else {
+                        /* clear ajax message */
+                        displayAjaxError(null, null);
+                    }
+                }
+            });
+            return true;
+        } else {
+            console.log('unable to display update order alert listing_id input not found');
+        }
+    }
+    displayUpdateOrderAlert();
+</script>
+{% endblock page_scripts %}
+
+

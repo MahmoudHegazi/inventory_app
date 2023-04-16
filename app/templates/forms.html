@@ -1,0 +1,429 @@
+{% macro suppliers_forms(addform, editform, deleteform) %}
+<div class="modal fade" id="addSupplierModal">
+    <div class="modal-dialog">
+      <div class="modal-content">
+        <!-- Modal Header -->
+        <div class="modal-header">
+          <h4 class="modal-title">Add Supplier</h4>
+          <button type="button" class="close" data-dismiss="modal">&times;</button>
+        </div>
+        <!-- Modal body -->
+        <div class="modal-body">
+            {% if addform %}
+            <form id="add_supplier_form" method="post" action="{{url_for('routes.add_supplier')}}">
+                {{addform.hidden_tag()}}
+                <div class="form-group">
+                  {{addform.name.label}}
+                  {{addform.name(class='form-control', placeholder='Enter Supplier Name', maxlength='80')}}
+                </div>
+                {{addform.add(class='btn btn-success')}}
+            </form>
+            {% else %}
+            <div class="alert-danger">Unable to Display Add Supplier form right now.</div>
+            {% endif %}
+        </div>
+        <!-- Modal footer -->
+        <div class="modal-footer">
+          <button type="button" class="btn btn-danger" data-dismiss="modal">Close</button>
+        </div>
+        
+      </div>
+    </div>
+</div>
+<div class="modal fade" id="editSupplierModal">
+    <div class="modal-dialog">
+      <div class="modal-content">
+      
+        <!-- Modal Header -->
+        <div class="modal-header">
+          <h4 class="modal-title">Edit Supplier</h4>
+          <button type="button" class="close" data-dismiss="modal">&times;</button>
+        </div>
+        
+        <!-- Modal body -->
+        <div class="modal-body">
+            {% if editform %}
+            <form id="edit_supplier_form" method="post" action="">
+                {{editform.hidden_tag()}}
+                <div class="form-group">
+                  {{editform.name.label}}
+                  {{editform.name(class='form-control', placeholder='Enter Supplier Name', maxlength='80')}}
+                </div>
+                {{editform.edit(class='btn btn-success')}}
+            </form>
+            {% else %}
+            <div class="alert-danger">Unable to Display Edit Supplier form right now.</div>
+            {% endif %}
+        </div>
+        <!-- Modal footer -->
+        <div class="modal-footer">
+          <button type="button" class="btn btn-danger" data-dismiss="modal">Close</button>
+        </div>
+        
+      </div>
+    </div>
+</div>
+
+<div class="modal fade" id="deleteSupplierModal">
+    <div class="modal-dialog">
+      <div class="modal-content">
+      
+        <!-- Modal Header -->
+        <div class="modal-header">
+          <h4 class="modal-title">Remove Supplier</h4>
+          <button type="button" class="close" data-dismiss="modal">&times;</button>
+        </div>
+        
+        <!-- Modal body -->
+        <div class="modal-body">
+            {% if deleteform %}
+            <form id="delete_supplier_form" method="post" action="">
+                {{deleteform.hidden_tag()}}
+                <p>Are you Sure you want remove supplier</p>
+                {{deleteform.delete(class='btn btn-danger')}}
+            </form>
+            {% else %}
+            <div class="alert-danger">Unable to Display Delete Supplier form right now.</div>
+            {% endif %}
+        </div>
+        
+        <!-- Modal footer -->
+        <div class="modal-footer">
+          <button type="button" class="btn btn-danger" data-dismiss="modal">Close</button>
+        </div>
+        
+      </div>
+    </div>
+</div>
+{% endmacro %}
+
+
+{% macro dashboard_forms(deleteform) %}
+<div class="modal fade" id="deleteDashboardModal">
+  <div class="modal-dialog">
+    <div class="modal-content">
+    
+      <!-- Modal Header -->
+      <div class="modal-header">
+        <h4 class="modal-title">Delete Dashboard</h4>
+        <button type="button" class="close" data-dismiss="modal">&times;</button>
+      </div>
+      
+      <!-- Modal body -->
+      <div class="modal-body">
+         {% if deleteform and deleteform.dashboard_id %}
+         <form id="remove_dashboard" method="post" action="">
+          {{deleteform.hidden_tag()}}
+          <p>Are you Sure you want remove dashboard</p>
+          {{deleteform.delete(class='btn btn-danger')}}
+         </form>
+         {% else %}
+         <div class="alert-danger">Unable to Display Remove Dashboard form right now.</div>
+         {% endif %}
+      </div>
+      <!-- Modal footer -->
+      <div class="modal-footer">
+        <button type="button" class="btn btn-danger" data-dismiss="modal">Close</button>
+      </div>
+      
+    </div>
+  </div>
+</div>
+{% endmacro %}
+
+{% macro listings_forms() %}
+{% endmacro %}
+
+{% macro catalogues_forms(catalogues_excel) %}
+<div class="modal fade" id="importExcelCatalogues">
+  <div class="modal-dialog">
+    <div class="modal-content">
+    
+      <!-- Modal Header -->
+      <div class="modal-header">
+        <h4 class="modal-title">Import Catalogues From Excel</h4>
+        <button type="button" class="close" data-dismiss="modal">&times;</button>
+      </div>
+      
+      <!-- Modal body -->
+      <div class="modal-body">
+        {% if catalogues_excel and catalogues_excel.excel_file %}
+        <p>Please Upload Excel File, contains valid column tiltes.</p>
+        <form action="{{url_for('main.import_catalogues_excel')}}" method="post" enctype="multipart/form-data">
+            {{catalogues_excel.hidden_tag()}}
+            {{catalogues_excel.excel_file(class='form-control')}}
+            {{catalogues_excel.submit(class='btn btn-success btn-sm mt-3 btn-block')}}
+        </form>
+        {% else %}
+        <div class="alert-danger">Unable to Display Upload Catalogues Excel Upload form right now.</div>
+        {% endif %}
+      </div>
+      
+      <!-- Modal footer -->
+      <div class="modal-footer">
+        <button type="button" class="btn btn-danger" data-dismiss="modal">Close</button>
+      </div>
+      
+    </div>
+  </div>
+</div>
+{% endmacro %}
+
+
+{% macro catalogue_forms(deleteform) %}
+<div class="modal fade" id="deleteCatalogueModal">
+  <div class="modal-dialog">
+    <div class="modal-content">
+    
+      <!-- Modal Header -->
+      <div class="modal-header">
+        <h4 class="modal-title">Delete Dashboard</h4>
+        <button type="button" class="close" data-dismiss="modal">&times;</button>
+      </div>
+      
+      <!-- Modal body -->
+      <div class="modal-body">
+         {% if deleteform and deleteform.catalogue_id %}
+         <form id="remove_catalogue" method="post" action="">
+          {{deleteform.hidden_tag()}}
+          <p>Are you Sure you want remove catalogue</p>
+          {{deleteform.delete(class='btn btn-danger')}}
+         </form>
+         {% else %}
+         <div class="alert-danger">Unable to Display Remove Catalogue form right now.</div>
+         {% endif %}
+      </div>
+      <!-- Modal footer -->
+      <div class="modal-footer">
+        <button type="button" class="btn btn-danger" data-dismiss="modal">Close</button>
+      </div>
+      
+    </div>
+  </div>
+</div>
+{% endmacro %}
+
+
+{% macro listing_forms(deleteform, delete_purchase, delete_order) %}
+<div class="modal fade" id="deleteListingModal">
+  <div class="modal-dialog">
+    <div class="modal-content">
+    
+      <!-- Modal Header -->
+      <div class="modal-header">
+        <h4 class="modal-title">Delete Dashboard</h4>
+        <button type="button" class="close" data-dismiss="modal">&times;</button>
+      </div>
+      
+      <!-- Modal body -->
+      <div class="modal-body">
+         {% if deleteform and deleteform.listing_id %}
+         <form id="remove_listing" method="post" action="">
+          {{deleteform.hidden_tag()}}
+          <p>Are you Sure you want remove listing</p>
+          {{deleteform.delete(class='btn btn-danger')}}
+         </form>
+         {% else %}
+         <div class="alert-danger">Unable to Display Remove Listing form right now.</div>
+         {% endif %}
+      </div>
+      <!-- Modal footer -->
+      <div class="modal-footer">
+        <button type="button" class="btn btn-danger" data-dismiss="modal">Close</button>
+      </div>
+      
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="deletePurchaseModal">
+  <div class="modal-dialog">
+    <div class="modal-content">
+    
+      <!-- Modal Header -->
+      <div class="modal-header">
+        <h4 class="modal-title">Delete Purchase</h4>
+        <button type="button" class="close" data-dismiss="modal">&times;</button>
+      </div>
+      
+      <!-- Modal body -->
+      <div class="modal-body">
+         {% if delete_purchase and delete_purchase.purchase_id %}
+         <form id="remove_purchase" method="post" action="">
+          {{delete_purchase.hidden_tag()}}
+          <p>Are you Sure you want remove purchase</p>
+          {{delete_purchase.delete(class='btn btn-danger')}}
+         </form>
+         {% else %}
+         <div class="alert-danger">Unable to Display Remove Purchase form right now.</div>
+         {% endif %}
+      </div>
+      <!-- Modal footer -->
+      <div class="modal-footer">
+        <button type="button" class="btn btn-danger" data-dismiss="modal">Close</button>
+      </div>
+      
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="deleteOrderModal">
+  <div class="modal-dialog">
+    <div class="modal-content">
+    
+      <!-- Modal Header -->
+      <div class="modal-header">
+        <h4 class="modal-title">Delete Order</h4>
+        <button type="button" class="close" data-dismiss="modal">&times;</button>
+      </div>
+      <!-- Modal body -->
+      <div class="modal-body">
+         {% if delete_order and delete_order.order_id %}
+         <form id="remove_order" method="post" action="">
+          {{delete_order.hidden_tag()}}
+          <p>Are you Sure you want remove order</p>
+          {{delete_order.delete(class='btn btn-danger')}}
+         </form>
+         {% else %}
+         <div class="alert-danger">Unable to Display Remove Order form right now.</div>
+         {% endif %}
+      </div>
+      <!-- Modal footer -->
+      <div class="modal-footer">
+        <button type="button" class="btn btn-danger" data-dismiss="modal">Close</button>
+      </div>
+      
+    </div>
+  </div>
+</div>
+
+
+{% endmacro %}
+
+{% macro order_forms(deleteform) %}
+<div class="modal fade" id="deleteOrderModal">
+  <div class="modal-dialog">
+    <div class="modal-content">
+    
+      <!-- Modal Header -->
+      <div class="modal-header">
+        <h4 class="modal-title">Delete Order</h4>
+        <button type="button" class="close" data-dismiss="modal">&times;</button>
+      </div>
+      <!-- Modal body -->
+      <div class="modal-body">
+         {% if deleteform and deleteform.order_id %}
+         <form id="remove_order" method="post" action="">
+          {{deleteform.hidden_tag()}}
+          <p>Are you Sure you want remove order</p>
+          {{deleteform.delete(class='btn btn-danger')}}
+         </form>
+         {% else %}
+         <div class="alert-danger">Unable to Display Remove Order form right now.</div>
+         {% endif %}
+      </div>
+      <!-- Modal footer -->
+      <div class="modal-footer">
+        <button type="button" class="btn btn-danger" data-dismiss="modal">Close</button>
+      </div>
+      
+    </div>
+  </div>
+</div>
+{% endmacro %}
+
+{% macro purchase_forms(deleteform) %}
+<div class="modal fade" id="deletePurchaseModal">
+  <div class="modal-dialog">
+    <div class="modal-content">
+    
+      <!-- Modal Header -->
+      <div class="modal-header">
+        <h4 class="modal-title">Delete Purchase</h4>
+        <button type="button" class="close" data-dismiss="modal">&times;</button>
+      </div>
+      <!-- Modal body -->
+      <div class="modal-body">
+         {% if deleteform and deleteform.purchase_id %}
+         <form id="remove_purchase" method="post" action="">
+          {{deleteform.hidden_tag()}}
+          <p>Are you Sure you want remove purchase</p>
+          {{deleteform.delete(class='btn btn-danger')}}
+         </form>
+         {% else %}
+         <div class="alert-danger">Unable to Display Remove Purchase form right now.</div>
+         {% endif %}
+      </div>
+      <!-- Modal footer -->
+      <div class="modal-footer">
+        <button type="button" class="btn btn-danger" data-dismiss="modal">Close</button>
+      </div>
+      
+    </div>
+  </div>
+</div>
+{% endmacro %}
+
+{% macro supplier_forms(deleteform, delete_purchase_form) %}
+<div class="modal fade" id="deleteSupplierModal">
+  <div class="modal-dialog">
+    <div class="modal-content">
+    
+      <!-- Modal Header -->
+      <div class="modal-header">
+        <h4 class="modal-title">Delete Supplier</h4>
+        <button type="button" class="close" data-dismiss="modal">&times;</button>
+      </div>
+      
+      <!-- Modal body -->
+      <div class="modal-body">
+         {% if deleteform and deleteform.supplier_id %}
+         <form id="remove_supplier" method="post" action="">
+          {{deleteform.hidden_tag()}}
+          <p>Are you Sure you want remove supplier</p>
+          {{deleteform.delete(class='btn btn-danger')}}
+         </form>
+         {% else %}
+         <div class="alert-danger">Unable to Display Remove Supplier form right now.</div>
+         {% endif %}
+      </div>
+      <!-- Modal footer -->
+      <div class="modal-footer">
+        <button type="button" class="btn btn-danger" data-dismiss="modal">Close</button>
+      </div>
+      
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="deletePurchaseModal">
+  <div class="modal-dialog">
+    <div class="modal-content">
+    
+      <!-- Modal Header -->
+      <div class="modal-header">
+        <h4 class="modal-title">Delete Purchase</h4>
+        <button type="button" class="close" data-dismiss="modal">&times;</button>
+      </div>
+      
+      <!-- Modal body -->
+      <div class="modal-body">
+         {% if delete_purchase_form and delete_purchase_form.purchase_id %}
+         <form id="remove_purchase" method="post" action="">
+          {{delete_purchase_form.hidden_tag()}}
+          <p>Are you Sure you want remove purchase</p>
+          {{delete_purchase_form.delete(class='btn btn-danger')}}
+         </form>
+         {% else %}
+         <div class="alert-danger">Unable to Display Remove Purchase form right now.</div>
+         {% endif %}
+      </div>
+      <!-- Modal footer -->
+      <div class="modal-footer">
+        <button type="button" class="btn btn-danger" data-dismiss="modal">Close</button>
+      </div>
+      
+    </div>
+  </div>
+</div>
+{% endmacro %}

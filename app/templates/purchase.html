@@ -1,0 +1,171 @@
+{% extends 'base.html' %}
+{% block title %}Purchase{% if purchase %}: {{purchase.id}}{% endif %}{% endblock %}
+{% block page_description %}this is Purchase page, can view/edit/delete purchase and view it's Listing and supplier {% endblock %}
+{% block body %}
+<div class="container border rounded p-3">
+  {% include 'messages.html' %}
+  <img src="{{url_for('static', filename='assets/images/loading_circle.gif')}}" class="loading_circle" style="display:none;" />
+
+  <div class="container-fluid content_container">
+    <a href="{{url_for('routes.index')}}" class="ml-2 btn btn-light">
+      Back To Dashboards
+    </a>
+    {% if purchase and dashboard_id and listing_id %}
+    <div class="d-flex justify-content-end align-items-center flex-wrap">
+      <a href="{{url_for('routes.edit_purchase_listing', dashboard_id=dashboard_id, listing_id=listing_id, purchase_id=purchase.id)}}" class="ml-2 btn btn-primary">
+          Edit Purchase
+      </a>
+      <a href="{{url_for('routes.view_listing', dashboard_id=dashboard_id, listing_id=listing_id)}}" class="ml-2 btn btn-success">
+        Back to Listing ({{listing_id}})
+      </a>
+      <a href="{{url_for('routes.view_supplier', supplier_id=purchase.supplier_id)}}" class="ml-2 btn btn-warning">
+        Back to Supplier {{(purchase.supplier_id)}}
+      </a>
+    </div>
+    <div class="row mt-2">
+      <div class="border rounded col-4 p-3 d-flex justify-content-center align-items-start cursor-pointer text-decoration-none text-dark media_small_width_100">
+        <div class="hover_shadow row container shadow p-3">
+            <div class="col-sm-12 mb-3 text-center">
+                <img src="{{url_for('static', filename='assets/images/default_purchase.png')}}" alt="dashboard icon" width="150" class="mxwidth-150" />
+                <h3 class="overflow_within title"><span class="badge badge-primary">{{purchase.id}}</span></h3>
+            </div>
+            <div class="col-sm-12">
+              <p class="overflow_within">Listing: <span>{{purchase.listing.product_name}} - ({{purchase.listing_id}})</span></p>
+            </div>
+            <div class="col-sm-12">
+                <p class="overflow_within">Supplier: <span>{{purchase.supplier.name}} - ({{purchase.supplier_id}})</span></p>
+            </div>
+            <div class="col-sm-12">
+              <p class="overflow_within">Quantity: <span>{{purchase.quantity}}</span></p>
+            </div>
+            <div class="col-sm-12">
+              <p class="overflow_within">Date: <span>{{purchase.date}}</span></p>
+            </div>            
+            <div class="col-sm-12">
+              <p class="overflow_within">Created At: <span>{{purchase.created_date}}</span></p>
+            </div>
+            <div class="col-sm-12">
+              <p class="overflow_within">Updated At: 
+                <span class="monthly_purchases">{% if purchase.updated_date %}{{purchase.updated_date}}{% endif %}</span>
+              </p>
+            </div>
+            <div class="col-sm-12 row">
+              <div class="col-sm-6">
+                <button data-url="{{url_for('routes.delete_purchase_listing', dashboard_id=dashboard_id, listing_id=listing_id, purchase_id=purchase.id)}}" data-toggle="modal" 
+                  data-target="#deletePurchaseModal" data-purchase-id="{{purchase.id}}" onclick="toggleLoadingCircle(true, 'block')" 
+                  class="wtform_modal_deletebtn btn btn-danger btn-block">Delete
+                </button>
+             </div>
+            </div>
+        </div>
+      </div>
+
+      <div class="col-sm-8 p-3 row border rounded">
+
+        <!-- Listing -->
+        <div class="container shadow-lg p-3">
+          <div class="mt-1 mb-2 d-flex justify-content-between align-items-center">
+            <h4>Listing</h4>
+            <div>
+              <a href="{{url_for('routes.listings', dashboard_id=dashboard_id)}}" class="btn btn-outline-primary">Go to Listing ({{listing_id}})</a>
+            </div>
+          </div>
+          <div class="container">
+            <div class="row">
+                <div class="col-sm-12 mb-3 text-center">                
+                    <img src="{{url_for('static', filename='assets/images/'~purchase.listing.image)}}" alt="listing icon yellow box" width="150" class="mxwidth-150" />
+                    <h3 class="overflow_within title"><span class="badge badge-dark">Id: </span><span> {{purchase.listing.id}}</span></h3>
+                </div>
+                <div class="col-sm-12">
+                  <p class="overflow_within"><span class="badge badge-info">SKU: </span><span> {{purchase.listing.sku}}</span></p>
+                </div>
+                <div class="col-sm-12">
+                  <p class="overflow_within"><span class="badge badge-dark">Price: </span><span> {{purchase.listing.price}}</span></p>
+                </div>
+                <div class="col-sm-12">
+                  <p class="overflow_within"><span class="badge badge-info">Sale Price: </span><span> {{purchase.listing.sale_price}}</span></p>
+                </div>
+                <div class="col-sm-12">
+                  <p class="overflow_within"><span class="badge badge-dark">Product Name: </span><span class="p-1 shadow break_word"> {{purchase.listing.product_name}}</span></p>
+                </div>
+                <div class="col-sm-12">
+                  <div class="overflow_within"><span class="badge badge-info">Product Description: </span>
+                    <p class="p-1 shadow break_word overflow-350"> {{purchase.listing.product_description}}</p>
+                  </div>
+                </div> 
+                <div class="col-sm-12">
+                    <p class="overflow_within"><span class="badge badge-dark">Brand: </span><span class="p-1 shadow"> {{purchase.listing.brand}}</span></p>
+                  </div>
+                  <div class="col-sm-12">
+                    <p class="overflow_within"><span class="badge badge-dark">Category: </span><span class="p-1 shadow"> {{purchase.listing.category}}</span></p>
+                  </div>                
+                <div class="col-sm-12">
+                  <p class="overflow_within"><span class="badge badge-dark">Plateform: </span><span class="p-1 shadow"> {{purchase.listing.plateform}}</span></p>
+                </div>
+                <div class="col-sm-12">
+                  <div class="overflow_within"><span class="badge badge-info">Created At: </span>
+                    <p class="p-1 shadow"> {{purchase.listing.created_date}}</p>
+                  </div>
+                </div>
+                <div class="col-sm-12">
+                  <div class="overflow_within"><p><span class="badge badge-dark">Updated At: </span>
+                    <p class="p-1 shadow"> {% if purchase.listing.updated_date %}{{purchase.listing.updated_date}}{% endif %}</p>
+                  </div>
+                  </p>
+                </div>
+            </div>
+          </div>          
+        </div>
+
+        <!-- Supplier -->
+        <div class="container mt-3 shadow-lg p-3">
+            <div class="mt-1 mb-2 d-flex justify-content-between align-items-center">
+              <h4>Supplier</h4>
+              <div>
+                <a href="{{url_for('routes.view_supplier', supplier_id=purchase.supplier_id)}}" class="btn btn-outline-primary">Go to Supplier ({{purchase.supplier_id}})</a>
+              </div>
+            </div>
+            <div class="container">
+              <div class="row">
+                  <div class="col-sm-12 mb-3 text-center">
+                      <img src="{{url_for('static', filename='assets/images/'~purchase.listing.image)}}" alt="listing icon yellow box" width="150" class="mxwidth-150" />
+                      <h3 class="overflow_within title"><span class="badge badge-dark">Id: </span><span> {{purchase.supplier.id}}</span></h3>
+                  </div>
+                  <div class="col-sm-12">
+                    <p class="overflow_within"><span class="badge badge-info">Supplier Name: </span><span> {{purchase.supplier.name}}</span></p>
+                  </div>
+                  <div class="col-sm-12">
+                    <div class="overflow_within"><span class="badge badge-info">Created At: </span>
+                      <p class="p-1 shadow"> {{purchase.supplier.created_date}}</p>
+                    </div>
+                  </div>
+                  <div class="col-sm-12">
+                    <div class="overflow_within"><p><span class="badge badge-dark">Updated At: </span>
+                      <p class="p-1 shadow"> {% if purchase.supplier.updated_date %}{{purchase.supplier.updated_date}}{% endif %}</p>
+                    </div>
+                    </p>
+                  </div>
+              </div>
+            </div>
+        </div>
+
+      </div>
+    </div>
+    {% else %}
+    <div class="alert alert-danger">Unable to Display Purchase right now.</div>
+    {% endif %}
+  </div>
+</div>
+{% from 'forms.html' import purchase_forms %}
+{{ purchase_forms(deleteform=deleteform) }}
+{% endblock body %}
+
+
+{% block page_scripts %}
+<script>
+// noEffects = true;
+$('#deletePurchaseModal').on('shown.bs.modal', ()=>{toggleLoadingCircle(false, 'block');});
+deleteWtformsModalProccess(dataAttId='data-purchase-id', formId='remove_purchase', idInputId='purchase_id', modalId='deletePurchaseModal');
+
+</script>
+{% endblock page_scripts %}

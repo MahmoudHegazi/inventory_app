@@ -1,0 +1,174 @@
+{% extends 'base.html' %}
+{% block title %}Edit Catalogue{% endblock %}
+{% block page_description %}This is form to add Edit Catalogue{% endblock %}
+{% block body %}
+<div class="container border rounded p-3">
+  {% include 'messages.html' %}
+  {% if form and catalogue_id %}
+  <div class="d-flex justify-content-end align-items-center flex-wrap">
+    <a href="{{url_for('routes.view_catalogue', catalogue_id=catalogue_id)}}" type="button" class="btn btn-primary">
+        Back To Catalogue ({{catalogue_id}})
+    </a>
+    <a href="{{url_for('routes.catalogues')}}" type="button" class="ml-2 btn btn-success">
+      Back To Catalogues
+    </a>
+  </div>
+  <div class="container-fluid content_container">
+    <div class="row">
+      <div class="col-12 p-3 d-flex justify-content-center align-items-center cursor-pointer text-decoration-none text-dark media_small_width_100">
+        <div class="container">
+            <form action="{{url_for('routes.edit_catalogue', catalogue_id=catalogue_id)}}" method="POST">          
+              {{form.hidden_tag()}}
+              <div class="form-group">
+                {{form.sku.label}}
+                {{form.sku(class='form-control', placeholder='SKU')}}
+                
+                {% if form.sku.errors %}
+                <ul class="errors bg-danger text-white">
+                    {% for error in form.sku.errors %}
+                        <li class="p-1 mb-1">{{ error }}</li>
+                    {% endfor %}
+                </ul>
+                {% endif %}
+              </div>
+              <div class="form-group">
+                {{form.product_name.label}}
+                {{form.product_name(class='form-control', placeholder='Product Name')}}
+                
+                {% if form.product_name.errors %}
+                <ul class="errors bg-danger text-white">
+                    {% for error in form.product_name.errors %}
+                        <li class="p-1 mb-1">{{ error }}</li>
+                    {% endfor %}
+                </ul>
+                {% endif %}
+              </div>
+              <div class="form-group">
+                {{form.brand.label}}
+                {{form.brand(class='form-control', placeholder='Brand')}}
+                
+                {% if form.brand.errors %}
+                <ul class="errors bg-danger text-white">
+                    {% for error in form.brand.errors %}
+                        <li class="p-1 mb-1">{{ error }}</li>
+                    {% endfor %}
+                </ul>
+                {% endif %}
+              </div>
+              <div class="form-group">
+                {{form.category.label}}
+                {{form.category(class='form-control', placeholder='Category')}}
+                
+                {% if form.category.errors %}
+                <ul class="errors bg-danger text-white">
+                    {% for error in form.category.errors %}
+                        <li class="p-1 mb-1">{{ error }}</li>
+                    {% endfor %}
+                </ul>
+                {% endif %}
+              </div>              
+              <div class="form-group">
+                {{form.price.label}}
+                {{form.price(class='form-control', placeholder='Price')}}
+
+                {% if form.price.errors %}
+                <ul class="errors bg-danger text-white">
+                    {% for error in form.price.errors %}
+                        <li class="p-1 mb-1">{{ error }}</li>
+                    {% endfor %}
+                </ul>
+                {% endif %}
+              </div>
+
+              <div class="form-group">
+                {{form.sale_price.label}}
+                {{form.sale_price(class='form-control', placeholder='Sale Price')}}
+
+                {% if form.sale_price.errors %}
+                <ul class="errors bg-danger text-white">
+                    {% for error in form.sale_price.errors %}
+                        <li class="p-1 mb-1">{{ error }}</li>
+                    {% endfor %}
+                </ul>
+                {% endif %}
+              </div>
+
+              <div class="form-group">
+                {{form.quantity.label}}
+                {{form.quantity(class='form-control', placeholder='Quantity')}}
+
+                {% if form.quantity.errors %}
+                <ul class="errors bg-danger text-white">
+                    {% for error in form.quantity.errors %}
+                        <li class="p-1 mb-1">{{ error }}</li>
+                    {% endfor %}
+                </ul>
+                {% endif %}
+              </div>
+                 
+              <div class="form-group">
+                {{form.product_model.label}}
+                {{form.product_model(class='form-control', placeholder='Product Model')}}
+
+                {% if form.product_model.errors %}
+                <ul class="errors bg-danger text-white">
+                    {% for error in form.product_model.errors %}
+                        <li class="p-1 mb-1">{{ error }}</li>
+                    {% endfor %}
+                </ul>
+                {% endif %}
+              </div>
+              <div class="form-group">
+                {{form.upc.label}}
+                {{form.upc(class='form-control', placeholder='UPC')}}
+
+                {% if form.upc.errors %}
+                <ul class="errors bg-danger text-white">
+                    {% for error in form.upc.errors %}
+                        <li class="p-1 mb-1">{{ error }}</li>
+                    {% endfor %}
+                </ul>
+                {% endif %}
+              </div>
+              <div class="form-group">
+                {{form.condition.label}}
+                {{form.condition(class='form-control', placeholder='Condition')}}
+
+                {% if form.condition.errors %}
+                <ul class="errors bg-danger text-white">
+                    {% for error in form.condition.errors %}
+                        <li class="p-1 mb-1">{{ error }}</li>
+                    {% endfor %}
+                </ul>
+                {% endif %}
+              </div>
+              <div class="form-group">
+                {{form.location.label}}
+                {{form.location(class='form-control', placeholder='Location')}}
+
+                {% if form.location.errors %}
+                <ul class="errors bg-danger text-white">
+                    {% for error in form.location.errors %}
+                        <li class="p-1 mb-1">{{ error }}</li>
+                    {% endfor %}
+                </ul>
+                {% endif %}
+              </div>                           
+              <div class="d-flex justify-content-center align-items-center w-50 mx-auto">
+                {{form.edit(class='btn btn-success w-50')}}
+                <a href="{{url_for('routes.catalogues')}}" class="btn btn-primary w-50">Cancel</a>
+              </div>
+            </form>
+        </div>
+      </div>
+    </div>
+  </div>
+  {% else %}
+  <div class="alert alert-danger">Unable to Display Edit Catalogue form right now.</div>
+  {% endif %}
+</div>
+
+{% endblock %}
+
+
+

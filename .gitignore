@@ -1,2 +1,2 @@
 ./data
-./app/templates
+./app/__pycache__

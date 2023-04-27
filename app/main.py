@@ -110,5 +110,5 @@ def reports_tool():
     from sqlalchemy.inspection import inspect
     thing_relations = inspect(User).relationships.items()
 
-    return str(thing_relations)
+    #return str(thing_relations)
     return render_template('admin/reports_tool.html')

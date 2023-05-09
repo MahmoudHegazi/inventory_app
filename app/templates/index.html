@@ -64,9 +64,12 @@
       <!-- Logged User Dashboards  -->
       {% if dashboards is defined %}
       {% for dashboard in dashboards %}
-      <div class="searching_card col-4 p-3 d-flex justify-content-center align-items-center cursor-pointer text-decoration-none text-dark media_small_width_100"
+      <div class="searching_card col-4 p-3 d-flex justify-content-center align-items-center cursor-pointer text-decoration-none text-dark media_small_width_100 d_relative"
       data-search-id="{{dashboard.id}}" data-search-title="{{dashboard.title}}" data-search-num_of_listings="{{dashboard.num_of_listings}}"
       data-search-num_of_orders="{{dashboard.num_of_orders}}" data-search-sum_of_monthly_purchases="{{dashboard.sum_of_monthly_purchases}}">
+        {% if dashboard.default %}
+        <img src="https://static.nike.com/a/images/t_default/f3b16365-9455-4023-9030-84f447fcc8c8/hair-bow-lfVBML.png" width="100" title="This dashboard is the default dashboard" class="default_icon_card">
+        {% endif %}
         <!-- Card Display -->
         <div class="hover_shadow row container border rounded shadow p-3">
           <div class="col-sm-12 mb-3 text-center">
@@ -94,7 +97,16 @@
               </div>
               <div>
                 <a href="{{url_for('routes.edit_dashboard', dashboard_id=dashboard.id)}}" class="btn btn-secondary"><i class="fa fa-edit"></i></a>
-              </div>      
+              </div>
+              {% if dashboard.default == 0 %}
+              <div>
+                <button data-url="{{url_for('main.set_default_dashboard', dashboard_id=dashboard.id)}}" data-toggle="modal" 
+                data-target="#setDefaultDashboard" data-dashboard-id="{{dashboard.id}}" onclick="toggleLoadingCircle(true, 'block')" 
+                class="wtform_modal_deletebtn btn btn-warning" title="Set this dashboard as the default dashboard, so you can see it on the home page.">
+                <i class="fa fa-check-square"></i>
+                </button>
+              </div>
+              {% endif %}
               <div>
                 <a href="{{url_for('routes.listings', dashboard_id=dashboard.id)}}" class="btn btn-success">Listings</a>
               </div>                      
@@ -130,8 +142,13 @@
               {% for dashboard in dashboards %}
               <tr class="searching_card" data-search-id="{{dashboard.id}}" data-search-title="{{dashboard.title}}" data-search-num_of_listings="{{dashboard.num_of_listings}}"
               data-search-num_of_orders="{{dashboard.num_of_orders}}" data-search-sum_of_monthly_purchases="{{dashboard.sum_of_monthly_purchases}}">
-                <td>
-                  <p class="overflow_within">{{dashboard.id}}</p>
+                <td>                  
+                  <p class="overflow_within d_relative">
+                    {% if dashboard.default %}
+                    <img src="{{url_for('static', filename='assets/images/bow_default_icon.png')}}" title="This dashboard is the default dashboard" class="default_icon_table" width="50">
+                    {% endif %}
+                    {{dashboard.id}}
+                  </p>
                 </td>
                 <td>
                   <p class="overflow_within"><img src="{{url_for('static', filename='assets/images/default_dashboard.png')}}" alt="dashboard icon" width="50" class="mxwidth-50" /></p>
@@ -156,7 +173,16 @@
                       </div>
                       <div>
                         <a href="{{url_for('routes.edit_dashboard', dashboard_id=dashboard.id)}}" class="btn btn-secondary btn-sm"><i class="fa fa-edit"></i></a>
-                      </div>      
+                      </div>
+                      {% if dashboard.default == 0 %}
+                      <div>
+                        <button data-url="{{url_for('main.set_default_dashboard', dashboard_id=dashboard.id)}}" data-toggle="modal" 
+                          data-target="#setDefaultDashboard" data-dashboard-id="{{dashboard.id}}" onclick="toggleLoadingCircle(true, 'block')" 
+                          class="wtform_modal_deletebtn btn btn-warning btn-sm" title="Set this dashboard as the default dashboard, so you can see it on the home page.">
+                          <i class="fa fa-check-square"></i>
+                        </button>
+                      </div>
+                      {% endif %}
                       <div>
                         <a href="{{url_for('routes.listings', dashboard_id=dashboard.id)}}" class="btn btn-success btn-sm">Listings</a>
                       </div>                              
@@ -177,6 +203,8 @@
 
   </div>
 </div>
+{% from 'forms.html' import dashboards_forms %}
+{{dashboards_forms(default_form)}}
 {% endblock %}
 
 
@@ -194,5 +222,10 @@ displayPaginationComponent(paginationBtns, paginationPage, ['dashboard_pag1', 'd
 toggleSettingsToast();
 
 searchComponent('mid', 'swing');
+
+/* set Default dashboard (close) */
+$('#setDefaultDashboard').on('shown.bs.modal', ()=>{toggleLoadingCircle(false, 'block');});
+deleteWtformsModalProccess(dataAttId='data-dashboard-id', formId='set_default_dashboard', idInputId='default_dashboard_id', modalId='setDefaultDashboard');
+
 </script>
 {% endblock page_scripts %}

@@ -151,14 +151,18 @@ class Supplier(db.Model):
     __tablename__ = 'supplier'
     id = db.Column(db.Integer, primary_key=True, nullable=False)
     name = db.Column(db.String(80), nullable=False)
+    phone = db.Column(db.String(45), nullable=False)
+    address = db.Column(db.String(125), nullable=False)
     user_id = db.Column(db.Integer, db.ForeignKey('user.id', ondelete="CASCADE", onupdate="CASCADE"), nullable=False)
     created_date = db.Column(DateTime, nullable=False, default=datetime.datetime.utcnow)
     updated_date = db.Column(DateTime, nullable=True, default=None, onupdate=datetime.datetime.utcnow)
     purchases = db.relationship("Purchase", backref="supplier", cascade="all, delete", passive_deletes=True)
     
-    def __init__(self, name, user_id):
+    def __init__(self, name, user_id, phone, address):
         self.name = name
         self.user_id = user_id
+        self.phone = phone
+        self.address = address
 
     def __repr__(self):
         return f'{self.name}'
@@ -179,6 +183,8 @@ class Supplier(db.Model):
         'id': self.id,
         'name': self.name,
         'user_id': self.user_id,
+        'phone': self.phone,
+        'address': self.address,
         'created_date': self.created_date,
         'updated_date': self.updated_date
         }
@@ -191,16 +197,19 @@ class Dashboard(db.Model):
     num_of_orders = db.Column(db.Integer, nullable=True, default=0)
     sum_of_monthly_purchases = db.Column(db.DECIMAL(precision=12, scale=2, asdecimal=True), nullable=True, default=0.00)
     user_id = db.Column(db.Integer, db.ForeignKey('user.id', ondelete="CASCADE", onupdate="CASCADE"), nullable=False)
+    default = db.Column(db.Boolean, nullable=True, default=0)
     created_date = db.Column(db.DateTime, nullable=False, default=datetime.datetime.utcnow)
     updated_date = db.Column(db.DateTime, nullable=True, default=None, onupdate=datetime.datetime.utcnow)
     listings = db.relationship("Listing", backref="dashboard", cascade="all, delete", passive_deletes=True)
 
-    def __init__(self, user_id, title='New Dashboard', num_of_listings=0, num_of_orders=0, sum_of_monthly_purchases=0.00):
+
+    def __init__(self, user_id, title='New Dashboard', num_of_listings=0, num_of_orders=0, sum_of_monthly_purchases=0.00, default=0):
         self.user_id = user_id
         self.title = title
         self.num_of_listings = num_of_listings
         self.num_of_orders = num_of_orders
-        self.sum_of_monthly_purchases = sum_of_monthly_purchases
+        self.sum_of_monthly_purchases = sum_of_monthly_purchases        
+        self.default = default
 
     def insert(self):
         db.session.add(self)

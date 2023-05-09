@@ -66,7 +66,7 @@ def login():
                 identity_changed.send(current_app._get_current_object(),
                                       identity=Identity(user.id))
                                   
-                return redirect(url_for('routes.index'))
+                return redirect(url_for('main.home'))
 
             else:
                 return redirect(url_for('auth.login'))

@@ -8,7 +8,6 @@ function toggleLoadingCircle(on=false, displayCSS='', containerSelector='.conten
         if ($(imageSelector).length && $(containerSelector).length) {
             /* start gif from begning */
             $(imageSelector).attr('src', $(imageSelector).attr('src'));
-            console.log("hi");
             if (on === true){
                 $(containerSelector).hide();
                 $(imageSelector).show();
@@ -81,10 +80,11 @@ function SearchByJS(
 /* (searchComponent) simple full jquery/html dom function that can complete search for any number of database columns 
 eg:99m and html cards search done using DOM so it speed after setup like DOM selector (no css required and work with bs4 and not remove elements or styles)
 */
-function searchComponent(speed='slow',easing='swing', cp=function(){return true;}){
+/* this addon used to enable calling this function multiple times to handle the selectors */
+function searchComponent(speed='slow',easing='swing', cp=function(){return true;}, addon=''){
     const stopSearchForm = function(){
-        if ($("form#search_form").length){
-            $("form#search_form").on('submit', (ev)=>{
+        if ($(`form#search_form${addon}`).length){
+            $(`form#search_form${addon}`).on('submit', (ev)=>{
               ev.preventDefault();
               return false;
             });
@@ -101,12 +101,12 @@ function searchComponent(speed='slow',easing='swing', cp=function(){return true;
     /* Full JQuery component */
     const dataSearchAttrs = {};
     let searchColumnsIndex = 0;
-    if ($("body").length && $("form#search_form").length && $("#cancel_search[type='button']").length && $("#search_value").length &&
-    $("#search_by option.search_column").length && typeof(cp) == 'function'){
+    if ($("body").length && $(`form#search_form${addon}`).length && $(`#cancel_search${addon}[type='button']`).length && $(`#search_value${addon}`).length &&
+    $(`#search_by${addon} option.search_column${addon}`).length && typeof(cp) == 'function'){
       
-      $("#cancel_search").hide();
+      $(`#cancel_search${addon}`).hide();
       /*get dynamic data-search attributes and options value for column name*/
-      $("#search_by option.search_column").each( (_i, dataSearchAttr)=>{
+      $(`#search_by${addon} option.search_column${addon}`).each( (_i, dataSearchAttr)=>{
           const columnName = $(dataSearchAttr).val().trim();
           if (columnName){
             dataSearchAttrs[columnName] = `data-search-${columnName}`;
@@ -121,13 +121,13 @@ function searchComponent(speed='slow',easing='swing', cp=function(){return true;
       }
   
       /* add class css to overide bs, and added to card after hide effect completed in callback */
-      $("body").append('<style>.hidden_search_card{ display: none !important }</style>');
+      $("body").append(`<style>.hidden_search_card${addon}{ display: none !important; }</style>`);
 
       /* function to remove hidden cards with same effect and callback */
       function cancelSearch(speed, easing, cp){
         /* this for jquery works with bs4 becuase added css class with display:none !important so remove it and start make jquery effect that will run even if bs display element as it slow eg can not after display use: $(oldHidden).hide();*/
-        const oldHidden = $(".hidden_search_card");
-        $('.hidden_search_card').removeClass('hidden_search_card');
+        const oldHidden = $(`.hidden_search_card${addon}`);
+        $(`.hidden_search_card${addon}`).removeClass(`hidden_search_card${addon}`);
         /* to apply the user provided cb after complete last action for example display alert or empty cells etc */
         $(oldHidden).each( (hi, elm)=>{
           if (hi+1 == $(oldHidden).length){
@@ -139,40 +139,40 @@ function searchComponent(speed='slow',easing='swing', cp=function(){return true;
       };
 
       /* event listener for search (all hide actions) */
-      $("form#search_form").on('submit', (event)=>{        
+      $(`form#search_form${addon}`).on('submit', (event)=>{
         event.preventDefault();
         /* to allow reaserch not pass cp (clean and old search which hide cards, before start new search) */
         cancelSearch(speed, easing, ()=>{});
-        const searchValue = $("#search_value").val().trim();
-        const searchColumn = $("#search_by").val().trim();
+        const searchValue = $(`#search_value${addon}`).val().trim();
+        const searchColumn = $(`#search_by${addon}`).val().trim();
         const dataAttrName = dataSearchAttrs[searchColumn];
         if (dataAttrName && searchValue){
-          const targetCards = $(`.searching_card[${dataAttrName}='${searchValue}']`);
+          const targetCards = $(`.searching_card${addon}[${dataAttrName}='${searchValue}']`);
           const targetCardsArr = $(targetCards).toArray();
-          $(".searching_card").each( (s, searchingCard)=>{
+          $(`.searching_card${addon}`).each( (s, searchingCard)=>{
             if (!targetCardsArr.includes($(searchingCard)[0])){
               /* this is how hide any bs4 (d-flex, row) with jquery effect css + callback*/
               $(searchingCard).hide(speed, easing, ()=>{
-                $(searchingCard).addClass('hidden_search_card');
+                $(searchingCard).addClass(`hidden_search_card${addon}`);
                 /* call usercb */
-                if (s+1 == $(".searching_card").length){
+                if (s+1 == $(`.searching_card${addon}`).length){
                   cp();                  
                 }
               });
             }
           });
-          $("#cancel_search").show();
+          $(`#cancel_search${addon}`).show();
         } else {
           cancelSearch(speed, easing, cp);
-          $("#cancel_search").hide();
+          $(`#cancel_search${addon}`).hide();
         }
       });
 
       /* cancel search event */
-      $("#cancel_search").on('click', ()=>{
+      $(`#cancel_search${addon}`).on('click', ()=>{
         cancelSearch(speed, easing, cp);
-        $("#cancel_search").hide();
-        $("#search_value").val('');
+        $(`#cancel_search${addon}`).hide();
+        $(`#search_value${addon}`).val('');
         
       });      
       return true;
@@ -378,11 +378,20 @@ function displayPaginationComponent(paginationBtns, paginationPage, containerIDs
 
   });
 
-
-
-
-
 }
+
+/* get the redirect_url query parameter and update the form action_redirect input */
+function setFormRedirectByUrl(){
+  if ($("#action_redirect").length){
+    const params = new Proxy(new URLSearchParams(window.location.search), {
+      get: (searchParams, prop) => searchParams.get(prop),
+    });
+    if (params.redirect_url){
+      $("#action_redirect").val(params.redirect_url);
+    }
+  }
+}
+
 
 $(document).ready(async function(){
     applyHoverEffect();

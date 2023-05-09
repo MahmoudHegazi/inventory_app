@@ -89,6 +89,24 @@
               <a href="{{url_for('routes.add_purchase_listing', dashboard_id=dashboard_id, listing_id=listing.id)}}" class="btn btn-outline-success">Add Purchase</a>
             </div>
           </div>
+
+          <!-- search component -->
+          <div class="row mt-2 mb-2">
+            <div class="col-sm-11 mx-auto" title="search by id, quantity, Supplier Name">
+              <form id="search_form" class="row">
+                <input class="form-control col-sm-5" type="text" name="search_value" id="search_value" placeholder="search by id, quantity, Supplier Name" value=""/>
+                <select class="form-control col-sm-4" name="search_by" id="search_by">
+                  <option value="">Search BY</option>
+                  <option class="search_column" value="id">ID</option>
+                  <option class="search_column" value="quantity">Quantity</option>
+                  <option class="search_column" value="supplier_name">Supplier Name</option>
+                </select>
+                <button type="button" id="cancel_search" class="btn btn-sm col-sm-1 btn-danger" style="display:none;"><i class="fa fa-close"></i></button>
+                <button type="submit" class="btn btn-success col-sm-2">Search</button>
+              </form>
+            </div>
+          </div>
+          <!-- search component end -->
           <div class="overflow-350">
               <table class="table table-bordered">
                 <thead>
@@ -102,7 +120,8 @@
                 <tbody>
                   {% if listing.purchases %}
                   {% for purchase in listing.purchases %}
-                  <tr>
+                  <tr class="searching_card"
+                  data-search-id="{{purchase.id}}" data-search-quantity="{{purchase.quantity}}" data-search-supplier_name="{{purchase.supplier.name}}">
                     <td title="{{purchase.date}}" class="cursor-pointer">{{purchase.id}}</td>
                     <td>{{purchase.quantity}}</td>
                     <td>{{purchase.supplier.name}}</td>
@@ -131,6 +150,24 @@
                 <a href="{{url_for('routes.add_order', dashboard_id=dashboard_id, listing_id=listing.id)}}" class="btn btn-outline-success">Add Order</a>
               </div>
             </div>
+            <!-- search component -->
+            <div class="row mt-2 mb-2">
+              <div class="col-sm-11 mx-auto" title="search by id, quantity, First Name, Last Name">
+                <form id="search_form2" class="row">
+                  <input class="form-control col-sm-5" type="text" name="search_value" id="search_value2" placeholder="search by id, quantity, First Name, Last Name" value=""/>
+                  <select class="form-control col-sm-4" name="search_by2" id="search_by2">
+                    <option value="">Search BY</option>
+                    <option class="search_column2" value="id">ID</option>
+                    <option class="search_column2" value="quantity">Quantity</option>
+                    <option class="search_column2" value="first_name">First Name</option>
+                    <option class="search_column2" value="last_name">Last Name</option>
+                  </select>
+                  <button type="button" id="cancel_search2" class="btn btn-sm col-sm-1 btn-danger" style="display:none;"><i class="fa fa-close"></i></button>
+                  <button type="submit" class="btn btn-success col-sm-2">Search</button>
+                </form>
+              </div>
+            </div>
+            <!-- search component end -->            
             <div class="overflow-350">
                 <table class="table table-bordered">
                   <thead>
@@ -144,7 +181,10 @@
                   <tbody>
                     {% if listing.orders %}
                     {% for order in listing.orders %}
-                    <tr>
+                    <tr class="searching_card2"
+                    data-search-id="{{order.id}}" data-search-quantity="{{order.quantity}}" data-search-first_name="{{order.customer_firstname}}"
+                    data-search-last_name="{{order.customer_lastname}}">
+
                       <td title="{{order.date}}" class="cursor-pointer">{{order.id}}</td>
                       <td>{{order.quantity}}</td>                      
                       <td>{{order.customer_firstname}} {{order.customer_lastname}}</td>
@@ -193,5 +233,7 @@ deleteWtformsModalProccess(dataAttId='data-purchase-id', formId='remove_purchase
 
 deleteWtformsModalProccess(dataAttId='data-order-id', formId='remove_order', idInputId='order_id', modalId='deleteOrderModal');
 
+searchComponent('mid', 'swing');
+searchComponent('mid', 'swing', ()=>{return true;}, '2');
 </script>
 {% endblock page_scripts %}

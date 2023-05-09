@@ -1,5 +1,5 @@
 {% extends 'base.html' %}
-{% block title %}Add Order{% endblock %}
+{% block title %}Edit Order{% endblock %}
 {% block page_description %}This is form to Edit order for a listing with id{% if listing_id %} : ({{listing_id}}){% endif %}{% if dashboard_id %} and dashboard id: ({{dashboard_id}}){% endif %} {% endblock %}
 {% block body %}
 <div class="container border rounded p-3">
@@ -28,6 +28,7 @@
         <div class="container">
             <form action="{{url_for('routes.edit_order', dashboard_id=dashboard_id, listing_id=listing_id, order_id=order_id)}}" method="POST">          
               {{form.hidden_tag()}}
+              {{form.action_redirect}}
               <div class="form-group">
                 {{form.listing_id.label}}
                 {{form.listing_id(class='form-control', placeholder='Listing')}}
@@ -87,7 +88,7 @@
                     {% endfor %}
                 </ul>
                 {% endif %}
-              </div>
+              </div>              
               <div class="d-flex justify-content-center align-items-center w-50 mx-auto">
                 {{form.edit(class='btn btn-success w-50')}}
                 <a href="{{url_for('routes.view_listing', dashboard_id=dashboard_id, listing_id=listing_id)}}" class="btn btn-primary w-50">Cancel</a>
@@ -126,6 +127,9 @@
         }
     }
     displayUpdateOrderAlert();
+
+    /* get the redirect_url query parameter and update the form action_redirect input */
+    setFormRedirectByUrl();
 </script>
 {% endblock page_scripts %}
 

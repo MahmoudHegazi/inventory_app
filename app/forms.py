@@ -4,8 +4,8 @@ from wtforms import (StringField, TextAreaField, IntegerField, BooleanField,Hidd
 from wtforms.validators import InputRequired, Length, Email, NumberRange, ValidationError
 from wtforms.fields import DateTimeLocalField
 from wtforms.widgets import NumberInput
-
 from flask_wtf.file import FileField, FileAllowed, FileRequired
+import phonenumbers
 
 def FileSizeLimit(max_size_in_mb):
     
@@ -76,6 +76,10 @@ class removeDashboardForm(FlaskForm):
     delete = SubmitField('Delete Dashboard')
 
 
+class defaultDashboardForm(DashboardForm):
+    default_dashboard_id = HiddenField()
+    submit = SubmitField('Set As Default')
+
 
 # Listings Forms
 class listingForm(FlaskForm):
@@ -133,14 +137,37 @@ class removeCatalogueForm(FlaskForm):
 
 # Supplier Forms
 class supplierForm(FlaskForm):
-    name = StringField('Name', validators=[InputRequired(), Length(max=80)])
+    name = StringField('Name', validators=[InputRequired(), Length(max=80)])    
+    address = StringField('Address', validators=[InputRequired(), Length(max=125)])
 
 class addSupplierForm(supplierForm):
+    phone_add = StringField('Phone', validators=[InputRequired(), Length(max=45)], render_kw={'type': 'tel'})
+    # as the fronend lib kind of broken return number without country code and only added flags image add another input to fix this flags images lib
+    full_phone_add = HiddenField(validators=[InputRequired(), Length(max=45)])
     add = SubmitField('Add')
 
-class editSupplierForm(supplierForm):
-    edit = SubmitField('Edit')
+    def validate_full_phone_add(self, full_phone_add):
+        try:
+            parsed_phone = phonenumbers.parse(full_phone_add.data)
+            valid_number = phonenumbers.is_valid_number(parsed_phone)
+            if not valid_number:
+                raise ValidationError("{} is Invalid Phone Number.".format(full_phone_add.data))
+        except:
+            raise ValidationError("{} is Invalid Phone Number.".format(full_phone_add.data))
 
+
+class editSupplierForm(supplierForm):
+    phone_edit = StringField('Phone', validators=[InputRequired(), Length(max=45)], render_kw={'type': 'tel'})
+    full_phone_edit = HiddenField('Phone', validators=[InputRequired(), Length(max=45)])
+    edit = SubmitField('Edit')
+    def validate_full_phone_edit(self, full_phone_edit):
+        try:
+            parsed_phone = phonenumbers.parse(full_phone_edit.data)
+            valid_number = phonenumbers.is_valid_number(parsed_phone)
+            if not valid_number:
+                raise ValidationError("{} is Invalid Phone Number.".format(full_phone_edit.data))
+        except:
+            raise ValidationError("{} is Invalid Phone Number.".format(full_phone_edit.data))
 
 class removeSupplierForm(FlaskForm):
     supplier_id = HiddenField(validators=[InputRequired()])
@@ -168,7 +195,7 @@ class removePurchaseForm(FlaskForm):
 # Orders Forms
 class OrderForm(FlaskForm):
     listing_id = SelectField('Listing',choices=[], validators=[InputRequired()], coerce=int, validate_choice=True)
-    quantity = IntegerField('Quantity', validators=[InputRequired()], default=0)
+    quantity = IntegerField('Quantity', validators=[InputRequired(), NumberRange(min=0)], default=0)
     date = DateTimeLocalField('Date', validators=[InputRequired()], format="%Y-%m-%dT%H:%M")
     customer_firstname = StringField('Customer Name Name', validators=[Length(max=50)])
     customer_lastname = StringField('Customer Last Name', validators=[Length(max=50)])
@@ -177,19 +204,16 @@ class addOrderForm(OrderForm):
     add = SubmitField('Add')
 
 class editOrderForm(OrderForm):
+    action_redirect = StringField(render_kw={'type': 'hidden'})
+    action_redirect = HiddenField()
     edit = SubmitField('Edit')
 
 class removeOrderForm(FlaskForm):
+    action_redirect = StringField(render_kw={'type': 'hidden'})
     order_id = HiddenField(validators=[InputRequired()])
     delete = SubmitField('Delete Order')
 
-class addDashboardForm(DashboardForm):
-    redirect = HiddenField()
-    add = SubmitField('Add')
-
-
 ###############################  main Forms ###############################################
-
 class CatalogueExcelForm(FlaskForm):
     excel_file = FileField('Catalogues Excel File', validators=[FileAllowed(['csv', 'tsv', 'xls', 'xlsx'], 'Please Upload Valid Excel File'), FileSizeLimit(20)])
     submit = SubmitField('Import Data')

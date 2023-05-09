@@ -37,6 +37,28 @@
     color: white !important;
 }
 
+.d_relative {
+    position: relative !important;
+}
+.d_absolute {
+    position: absolute;
+}
+
+.default_icon_table {
+    transform: rotate(-45deg);
+    position: absolute;
+    left: -30px;
+    top: -30px;
+}
+.default_icon_card {
+    transform: rotate(-45deg);
+    position: absolute;
+    transform: rotate(-45deg);
+    position: absolute;
+    left: -20px;
+    top: -23px;
+}
+
 .overflow_within {
     max-width: 100% !important;
     word-wrap: break-word !important;

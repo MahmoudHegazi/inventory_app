@@ -1,0 +1,214 @@
+{% extends 'base.html' %}
+{% block title %}Orders{% endblock %}
+{% block page_description %}this is orders page, can view/edit all of your orders.{% endblock %}
+{% block body %}
+<div class="container border rounded p-3">
+  {% include 'messages.html' %}
+  <img src="{{url_for('static', filename='assets/images/loading_circle.gif')}}" class="loading_circle" style="display:none;" />
+
+  <div class="container-fluid content_container">
+    <!-- settings menu-->
+    <div id="settings_toast_cont">
+      <button type="button" class="btn btn-outline-primary mb-1" id="open_settings">Settings</button>
+      <div id="settings_toast" class="toast shadow" data-autohide="false" style="display:none">
+         <div class="toast-header bg-dark text-white">
+            <span><i class="fa fa-gear"></i> Settings</span>
+         </div>
+         <div class="toast-body">
+            <div class="row">
+               <div class="col-sm-12 d-flex justify-content-start align-items-center">
+                  <label>Display: </label>
+                  <select class="form-control ml-2" id="switch_display">
+                     <option value="table" selected="selected">Table</option>
+                     <option value="card">Card</option>                     
+                  </select>
+               </div>
+            </div>
+         </div>
+      </div>
+    </div>
+    <!-- settings end -->    
+    <div class="d-flex justify-content-end align-items-center">
+      <!-- Button to Open the Modal for add new dashboard -->      
+    </div>
+    {% if orders is defined %}
+    <!-- search component -->
+    <div class="row mt-2 mb-2">
+      <div class="col-sm-11 mx-auto" title="search by id, quantity, date, listing id, customer firstname, customer lastname">
+        <form id="search_form" class="row">
+          <input class="form-control col-sm-5" type="text" name="search_value" id="search_value" placeholder="search by id, quantity, date, listing id, customer firstname, customer lastname" value=""/>
+          <select class="form-control col-sm-4" name="search_by" id="search_by">
+            <option value="">Search BY</option>
+            <option class="search_column" value="id">ID</option>
+            <option class="search_column" value="quantity">Quantity</option>
+            <option class="search_column" value="date">Date</option>
+            <option class="search_column" value="listing_id">Listing ID</option>
+            <option class="search_column" value="customer_firstname">Customer first name</option>
+            <option class="search_column" value="customer_lastname">Customer last name</option>
+          </select>
+          <button type="button" id="cancel_search" class="btn btn-sm col-sm-1 btn-danger" style="display:none;"><i class="fa fa-close"></i></button>
+          <button type="submit" class="btn btn-success col-sm-2">Search</button>
+        </form>
+      </div>
+    </div>
+
+    <!-- search component end -->
+    <!-- catalogues Pagination start -->
+    <div id="orders_pag1" class="d-flex justify-content-center align-items-center mt-2"></div>
+    <!-- Pagination end-->
+
+    <!-- Card Display -->
+    <div class="row" id="card_display" style="display:none;">      
+      {% for order in orders %}
+      <div class="searching_card col-4 p-3 d-flex justify-content-center align-items-center cursor-pointer text-decoration-none text-dark media_small_width_100"
+      data-search-id="{{order.id}}" data-search-quantity="{{order.quantity}}" data-search-date="{{order.date}}"
+      data-search-listing_id="{{order.listing_id}}"  data-search-customer_firstname="{{order.customer_firstname}}" data-search-customer_lastname="{{order.customer_lastname}}">
+
+        <div class="hover_shadow row container border rounded shadow p-3" id="products_container">
+          <div class="col-sm-12 mb-3 text-center">
+            <img src="{{url_for('static', filename='assets/images/default_order.png')}}" alt="catalogue icon" width="150"class="mxwidth-150" />
+          </div>
+          <div class="col-sm-12">
+            <p class="overflow_within">Id: <span>{{order.id}}</span></p>
+          </div>
+          <div class="col-sm-12">
+            <p class="overflow_within">Quantity: <span>{{order.quantity}}</span></p>
+          </div>
+          <div class="col-sm-12">
+            <p class="overflow_within">Date: <span>{{order.date}}</span></p>
+          </div>
+          <div class="col-sm-12">
+            <p class="overflow_within">Listing ID: <span>{{order.listing_id}}</span></p>
+          </div>
+          <div class="col-sm-12">
+            <p class="overflow_within">Customer First Name: <span>{{order.customer_firstname}}</span></p>
+          </div>
+          <div class="col-sm-12">
+            <p class="overflow_within">Customer Last Name: <span>{{order.customer_lastname}}</span></p>
+          </div>
+          <div class="col-sm-12 row">
+            <div class="col-sm-6">
+              <a href="{{url_for('routes.view_order', dashboard_id=order.listing.dashboard_id, listing_id=order.listing_id, order_id=order.id)}}" class="btn btn-primary btn-block">View</a>
+            </div>
+            <div class="col-sm-6 text-center">
+              <a href="{{url_for('routes.edit_order', dashboard_id=order.listing.dashboard_id, listing_id=order.listing_id, order_id=order.id)}}" class="btn btn-secondary btn-block">Edit</a>
+            </div>
+          </div>
+          <div class="col-sm-12 row mt-1">
+            <div class="col-sm-12">
+                <button data-url="{{url_for('routes.delete_order', dashboard_id=order.listing.dashboard_id, listing_id=order.listing_id, order_id=order.id)}}" data-toggle="modal" 
+                  data-target="#removeOrderModal" data-order-id="{{order.id}}" onclick="toggleLoadingCircle(true, 'block')" 
+                  class="wtform_modal_deletebtn btn btn-danger btn-block">Delete
+                </button>
+            </div>
+          </div>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+    <!-- Card Display End -->
+
+    <!-- Table Display -->
+    <div class="row" id="table_display">
+      <!-- table display -->
+      <div class="col-sm-12">         
+        <table class="table table-hover">
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Icon</th>
+              <th>Quantity</th>
+              <th>Date</th>
+              <th>Listing ID</th>
+              <th>Firstname</th>   
+              <th>Lastname</th>
+              <th>Action</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for order in orders %}
+            <tr class="searching_card" data-search-id="{{order.id}}" data-search-quantity="{{order.quantity}}" data-search-date="{{order.date}}"
+              data-search-listing_id="{{order.listing_id}}"  data-search-customer_firstname="{{order.customer_firstname}}" data-search-customer_lastname="{{order.customer_lastname}}">
+              <td>
+                <p class="overflow_within">{{order.id}}</p>
+              </td>
+              <td>
+                <p class="overflow_within"><img src="{{url_for('static', filename='assets/images/default_order.png')}}" alt="listing icon" width="50" class="mxwidth-50" /></p>
+              </td>                
+              <td>
+                <p class="overflow_within">{{order.quantity}}</p>
+              </td>
+              <td>
+                <p class="overflow_within">{{order.date}}</p>
+              </td>
+              <td>
+                <p class="overflow_within">{{order.listing_id}}</p>
+              </td>
+              <td>
+                <p class="overflow_within">{{order.customer_firstname}}</p>
+              </td>
+              <td>
+                <p class="overflow_within">{{order.customer_lastname}}</p>
+              </td>                                          
+              <td>
+                <div class="col-sm-12 row">
+                  <div class="col-sm-12 d-flex justify-content-around align-items-center">
+                    <div>
+                      <a href="{{url_for('routes.view_order', dashboard_id=order.listing.dashboard_id, listing_id=order.listing_id, order_id=order.id)}}" class="btn btn-primary btn-block">View</a>
+                    </div>
+                    <div>
+                      <a href="{{url_for('routes.edit_order', dashboard_id=order.listing.dashboard_id, listing_id=order.listing_id, order_id=order.id, redirect_url=action_redirect)}}" class="btn btn-secondary btn-block">Edit</a>
+                    </div>
+                    <div>
+                        <button data-url="{{url_for('routes.delete_order', dashboard_id=order.listing.dashboard_id, listing_id=order.listing_id, order_id=order.id)}}" data-toggle="modal" 
+                          data-target="#removeOrderModal" data-order-id="{{order.id}}" onclick="toggleLoadingCircle(true, 'block')" 
+                          class="wtform_modal_deletebtn btn btn-danger">Delete
+                        </button>                        
+                    </div>
+                  </div>              
+                </div>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>      
+    </div>
+    <!-- Table Display End -->
+
+    <!-- catalogues Pagination start -->
+    <div id="orders_pag2" class="d-flex justify-content-center align-items-center mt-2"></div>
+    <!-- Pagination end-->
+      
+    {% else %}
+    <div class="alert alert-danger">Unable to Display Orders right now.</div>
+    {% endif %}    
+  </div>
+</div>
+
+{% import 'forms.html' as forms %}
+{{ forms.orders_forms(remove_order=order_remove, action_redirect=action_redirect) }}
+{% endblock %}
+
+
+{% block page_scripts %}
+<script>
+// noEffects = true;
+
+/* Add Pagination component*/
+
+const paginationBtns = {% if pagination_btns %}{{pagination_btns|tojson|safe}}{% else %}[]{% endif %};
+const paginationPage = {{ request.args.get('page', 1) }};
+displayPaginationComponent(paginationBtns, paginationPage, ['orders_pag1', 'orders_pag2']);
+
+toggleSettingsToast();
+
+searchComponent('mid', 'swing');
+
+
+$('#removeOrderModal').on('shown.bs.modal', ()=>{toggleLoadingCircle(false, 'block');});
+deleteWtformsModalProccess(dataAttId='data-order-id', formId='remove_order_form', idInputId='order_id', modalId='removeOrderModal');
+
+
+</script>
+{% endblock page_scripts %}

@@ -11,12 +11,20 @@
         <div class="modal-body">
             {% if addform %}
             <form id="add_supplier_form" method="post" action="{{url_for('routes.add_supplier')}}">
-                {{addform.hidden_tag()}}
+                {{addform.hidden_tag()}}                
                 <div class="form-group">
                   {{addform.name.label}}
                   {{addform.name(class='form-control', placeholder='Enter Supplier Name', maxlength='80')}}
                 </div>
-                {{addform.add(class='btn btn-success')}}
+                <div class="form-group">
+                  {{addform.address.label}}
+                  {{addform.address(class='form-control', placeholder='Enter Supplier Address', maxlength='125')}}
+                </div>
+                <div class="form-group">
+                  {{addform.phone_add.label(class="d-block")}}
+                  {{addform.phone_add(class='form-control', maxlength='45')}}
+                </div>
+                {{addform.add(class='btn btn-success btn-block')}}
             </form>
             {% else %}
             <div class="alert-danger">Unable to Display Add Supplier form right now.</div>
@@ -49,6 +57,14 @@
                   {{editform.name.label}}
                   {{editform.name(class='form-control', placeholder='Enter Supplier Name', maxlength='80')}}
                 </div>
+                <div class="form-group">
+                  {{editform.address.label}}
+                  {{editform.address(class='form-control', placeholder='Enter Supplier Address', maxlength='125')}}
+                </div>
+                <div class="form-group">
+                  {{editform.phone_edit.label(class="d-block")}}
+                  {{editform.phone_edit(class='form-control', maxlength='45')}}
+                </div>                         
                 {{editform.edit(class='btn btn-success')}}
             </form>
             {% else %}
@@ -427,3 +443,68 @@
   </div>
 </div>
 {% endmacro %}
+
+{% macro dashboards_forms(default_form) %}
+<div class="modal fade" id="setDefaultDashboard">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <!-- Modal Header -->
+      <div class="modal-header">
+        <h4 class="modal-title">Set Default Dashboard</h4>
+        <button type="button" class="close" data-dismiss="modal">&times;</button>
+      </div>
+      
+      <!-- Modal body -->
+      <div class="modal-body">
+        {% if default_form %}
+        <form id="set_default_dashboard" method="post" action="">
+         {{default_form.hidden_tag()}}
+         <p>Are you sure you want to set the selected dashboard as default?</p>
+         {{default_form.submit(class='btn btn-success')}}
+        </form>
+        {% else %}
+        <div class="alert-danger">Unable to Display Set Default Dashboard form right now.</div>
+        {% endif %}
+      </div>
+      <!-- Modal footer -->
+      <div class="modal-footer">
+        <button type="button" class="btn btn-danger" data-dismiss="modal">Close</button>
+      </div>
+    </div>
+  </div>
+</div>
+{% endmacro %}
+
+
+{% macro orders_forms(remove_order, action_redirect) %}
+<div class="modal fade" id="removeOrderModal">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <!-- Modal Header -->
+      <div class="modal-header">
+        <h4 class="modal-title">Remove Order</h4>
+        <button type="button" class="close" data-dismiss="modal">&times;</button>
+      </div>
+      
+      <!-- Modal body -->
+      <div class="modal-body">
+        {% if remove_order and action_redirect %}
+        <form id="remove_order_form" method="post" action="">
+         {{remove_order.hidden_tag()}}
+         <p>Are you Sure you want remove order</p>         
+         {{remove_order.action_redirect(value=action_redirect, style='display:none !important;')}}
+         {{remove_order.delete(class='btn btn-danger')}}
+        </form>
+        {% else %}
+        <div class="alert-danger">Unable to Display Remove order form right now.</div>
+        {% endif %}
+      </div>
+      <!-- Modal footer -->
+      <div class="modal-footer">
+        <button type="button" class="btn btn-danger" data-dismiss="modal">Close</button>
+      </div>
+    </div>
+  </div>
+</div>
+{% endmacro %}
+

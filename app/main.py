@@ -2,8 +2,8 @@ import json
 import sys
 import os
 from flask import Flask, Blueprint, session, redirect, url_for, flash, Response, request, render_template, jsonify, Request
-from .models import User, Dashboard, Catalogue
-from .forms import CatalogueExcelForm
+from .models import User, Dashboard, Catalogue, Listing
+from .forms import CatalogueExcelForm, defaultDashboardForm
 from . import vendor_permission, admin_permission, db, excel
 from .functions import get_mapped_catalogues_dicts
 from flask_login import login_required, current_user
@@ -13,6 +13,24 @@ import pyexcel
 
 
 main = Blueprint('main', __name__, template_folder='templates', static_folder='static')
+
+
+# this bridge route to redirect to the default dashboard if any else it return to dashboards page to let user create new dashboard, and it will set as default by default
+@main.route('/home', methods=['GET'])
+@login_required
+@vendor_permission.require()
+def home():
+    default_dashboard = None
+    try:
+        default_dashboard = Dashboard.query.filter_by(default=True, user_id=current_user.id).first()
+    except Exception as e:
+        print('System Error home: {} , info: {}'.format(e, sys.exc_info()))
+    finally:
+        if default_dashboard is not None:
+            return redirect(url_for('routes.view_dashboard', dashboard_id=default_dashboard.id))
+        else:
+            flash('Unable To find the Default Dashboard, Please Add New Dashboard', 'info')
+            return redirect(url_for('routes.index'))
 
 
 
@@ -102,6 +120,65 @@ def import_catalogues_excel():
         flash(message, status)
         return redirect(url_for('routes.catalogues'))
     
+# export listing
+@main.route('/export_listings/<string:dashboard_id>', methods=['GET'])
+@login_required
+@vendor_permission.require()
+def listing_export(dashboard_id):
+    try:
+        selected_listings = db.session.query(Listing).join(Dashboard).filter(Listing.dashboard_id==dashboard_id, Dashboard.user_id==current_user.id).all()
+        # this do 2 things, incase there are no data error may raised, also for performance as there no data no need call this heavy function
+        if selected_listings:
+            column_names = Listing.__table__.columns.keys()
+            # column_names also used to exclude names for example you may not need id, so if not provided will not exported
+            excel_response = flask_excel.make_response_from_query_sets(selected_listings, column_names, 'csv', file_name='inventory_listings')
+            return excel_response
+        else:
+            flash('There is no data to be exported.', 'warning')
+            return redirect(url_for('routes.view_dashboard', dashboard_id=dashboard_id))
+    except Exception as e:
+        # redirect used to display the flash message incase of error , becuase this GET request and it processed in the same rendered page (so flash can not displayed without refresh)
+        print('System Error listing_export: {} , info: {}'.format(e, sys.exc_info()))
+        flash('Unknown error Your request could not be processed right now, please try again later.', 'danger')
+        return redirect(url_for('routes.view_dashboard', dashboard_id=dashboard_id))
+
+# make dashboard default
+@main.route('/default_dashboard/<string:dashboard_id>', methods=['POST'])
+@login_required
+@vendor_permission.require()
+def set_default_dashboard(dashboard_id):
+    message = ''
+    success = False
+    try:
+        default_form = defaultDashboardForm()
+        if default_form.validate_on_submit():
+            selected_dashboard = Dashboard.query.filter_by(id=dashboard_id, user_id=current_user.id).one_or_none()
+            if selected_dashboard is not None:
+                # it always will be 1 default dashboard, but this action can fix the app if more than dashboard seleected by db or somethign
+                default_dashboards = Dashboard.query.filter_by(default=True, user_id=current_user.id).all()
+                for default_bashboard in default_dashboards:
+                    default_bashboard.default = False
+                    default_bashboard.update()
+                # update selected dashboard default status
+                selected_dashboard.default = True
+                selected_dashboard.update()
+                message = 'Dashboard with ID: {} has been successfully set as the default dashboard.'.format(dashboard_id)
+                success = True
+            else:
+                message = 'The specified dashboard was not found, it may have been deleted.'
+                success = False
+        else:
+            message = 'Unable to process your Request.'
+            success = False   
+    except Exception as e:
+        print('System Error set_default_dashboard: {} , info: {}'.format(e, sys.exc_info()))
+        message = 'Unknown error Your request could not be processed right now, please try again later.'
+        success = False
+    finally:
+        message_status = 'success' if success else 'danger'
+        flash(message, message_status)
+        return redirect(url_for('routes.index'))
+
 
 @main.route('/reports_tool', methods=['POST', 'GET'])
 @login_required

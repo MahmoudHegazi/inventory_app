@@ -150,7 +150,19 @@
                     {% endfor %}
                 </ul>
                 {% endif %}
-              </div>                           
+              </div>
+              <div class="form-group">
+                {{form.product_description.label}}
+                {{form.product_description(class='form-control', placeholder='Product Description')}}
+
+                {% if form.product_description.errors %}
+                <ul class="errors bg-danger text-white">
+                    {% for error in form.product_description.errors %}
+                        <li class="p-1 mb-1">{{ error }}</li>
+                    {% endfor %}
+                </ul>
+                {% endif %}
+              </div>                                        
               <div class="d-flex justify-content-center align-items-center w-50 mx-auto">
                 {{form.add(class='btn btn-success w-50')}}
                 <a href="{{url_for('routes.catalogues')}}" class="btn btn-primary w-50">Cancel</a>

@@ -1,6 +1,10 @@
 {% extends 'base.html' %}
 {% block title %}Edit Purchase{% endblock %}
 {% block page_description %}This is form to Edit Purchase{% if purchase_id %} ID: ({{purchase_id}}){% endif %}{% endblock %}
+{% block head_data %}
+  <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
+  <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+{% endblock %}
 {% block body %}
 <div class="container border rounded p-3">
   {% include 'messages.html' %}
@@ -77,6 +81,21 @@
             </form>
         </div>
       </div>
+      <script>
+        /* add search select input */
+        $(document).ready(function() {
+            $('#supplier_id').select2({  // init Select2 on form's name field
+                placeholder: "{{ form.supplier_id.label.text }}",
+                allowClear: true,
+                "width": "100%"
+            });
+            $('#listing_id').select2({  // init Select2 on form's name field
+                placeholder: "{{ form.listing_id.label.text }}",
+                allowClear: true,
+                "width": "100%"
+            });
+        });
+      </script>
       {% else %}
       <div class="alert alert-danger">Unable to Display Edit Purchase form right now.</div>
       {% endif %}

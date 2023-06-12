@@ -58,6 +58,21 @@
     left: -20px;
     top: -23px;
 }
+color_lightblue {
+  background:#869be8 !important;
+}
+color_lightblue1 {
+    background:#8196e2 !important;
+}
+color_lightgreen {
+    background:#9dcd9ff7 !important
+}
+color_lightgreen1 {
+    background:#85c596 !important;
+}
+color_lightpink {
+    background:#f5b8ee !important;
+}
 
 .overflow_within {
     max-width: 100% !important;

@@ -88,15 +88,15 @@
           </div>
           <div class="col-sm-12 row">
             <div class="col-sm-6">
-              <a href="{{url_for('routes.view_order', dashboard_id=order.listing.dashboard_id, listing_id=order.listing_id, order_id=order.id)}}" class="btn btn-primary btn-block">View</a>
+              <a href="{{url_for('routes.view_order', listing_id=order.listing_id, order_id=order.id)}}" class="btn btn-primary btn-block">View</a>
             </div>
             <div class="col-sm-6 text-center">
-              <a href="{{url_for('routes.edit_order', dashboard_id=order.listing.dashboard_id, listing_id=order.listing_id, order_id=order.id)}}" class="btn btn-secondary btn-block">Edit</a>
+              <a href="{{url_for('routes.edit_order', listing_id=order.listing_id, order_id=order.id)}}" class="btn btn-secondary btn-block">Edit</a>
             </div>
           </div>
           <div class="col-sm-12 row mt-1">
             <div class="col-sm-12">
-                <button data-url="{{url_for('routes.delete_order', dashboard_id=order.listing.dashboard_id, listing_id=order.listing_id, order_id=order.id)}}" data-toggle="modal" 
+                <button data-url="{{url_for('routes.delete_order', listing_id=order.listing_id, order_id=order.id)}}" data-toggle="modal" 
                   data-target="#removeOrderModal" data-order-id="{{order.id}}" onclick="toggleLoadingCircle(true, 'block')" 
                   class="wtform_modal_deletebtn btn btn-danger btn-block">Delete
                 </button>
@@ -154,13 +154,13 @@
                 <div class="col-sm-12 row">
                   <div class="col-sm-12 d-flex justify-content-around align-items-center">
                     <div>
-                      <a href="{{url_for('routes.view_order', dashboard_id=order.listing.dashboard_id, listing_id=order.listing_id, order_id=order.id)}}" class="btn btn-primary btn-block">View</a>
+                      <a href="{{url_for('routes.view_order', listing_id=order.listing_id, order_id=order.id)}}" class="btn btn-primary btn-block">View</a>
                     </div>
                     <div>
-                      <a href="{{url_for('routes.edit_order', dashboard_id=order.listing.dashboard_id, listing_id=order.listing_id, order_id=order.id, redirect_url=action_redirect)}}" class="btn btn-secondary btn-block">Edit</a>
+                      <a href="{{url_for('routes.edit_order', listing_id=order.listing_id, order_id=order.id, redirect_url=action_redirect)}}" class="btn btn-secondary btn-block">Edit</a>
                     </div>
                     <div>
-                        <button data-url="{{url_for('routes.delete_order', dashboard_id=order.listing.dashboard_id, listing_id=order.listing_id, order_id=order.id)}}" data-toggle="modal" 
+                        <button data-url="{{url_for('routes.delete_order', listing_id=order.listing_id, order_id=order.id)}}" data-toggle="modal" 
                           data-target="#removeOrderModal" data-order-id="{{order.id}}" onclick="toggleLoadingCircle(true, 'block')" 
                           class="wtform_modal_deletebtn btn btn-danger">Delete
                         </button>                        

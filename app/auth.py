@@ -5,7 +5,7 @@ from flask import Blueprint, session, render_template, request, redirect, url_fo
 from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.utils import secure_filename
 from flask_login import login_user, logout_user, current_user
-from .models import User, Role, UserRoles
+from .models import User, Role, UserRoles, Dashboard
 from .forms import SignupForm, LoginForm
 from . import login_manager, bcrypt, app, db
 from markupsafe import escape
@@ -66,7 +66,7 @@ def login():
                 identity_changed.send(current_app._get_current_object(),
                                       identity=Identity(user.id))
                                   
-                return redirect(url_for('main.home'))
+                return redirect(url_for('routes.index'))
 
             else:
                 return redirect(url_for('auth.login'))
@@ -97,7 +97,9 @@ def submit_signup():
             user_exist = User.query.filter_by(uname=form.username.data).one_or_none()
             email_exist = User.query.filter_by(email=form.email.data).one_or_none()
             if user_exist is None and email_exist is None:
-                new_user = User(name=form.name.data, uname=form.username.data, upass=bcrypt.generate_password_hash(form.pwd.data), email=form.email.data)
+                user_dashboard = Dashboard()
+                user_dashboard.insert()
+                new_user = User(name=form.name.data, uname=form.username.data, upass=bcrypt.generate_password_hash(form.pwd.data), email=form.email.data, dashboard_id=user_dashboard.id)
                 new_user.insert()
                 # create new vendor default role for the user
                 new_user_role = UserRoles(user_id=new_user.id, role_id=vendor_role.id)

@@ -114,39 +114,6 @@
 {% endmacro %}
 
 
-{% macro dashboard_forms(deleteform) %}
-<div class="modal fade" id="deleteDashboardModal">
-  <div class="modal-dialog">
-    <div class="modal-content">
-    
-      <!-- Modal Header -->
-      <div class="modal-header">
-        <h4 class="modal-title">Delete Dashboard</h4>
-        <button type="button" class="close" data-dismiss="modal">&times;</button>
-      </div>
-      
-      <!-- Modal body -->
-      <div class="modal-body">
-         {% if deleteform and deleteform.dashboard_id %}
-         <form id="remove_dashboard" method="post" action="">
-          {{deleteform.hidden_tag()}}
-          <p>Are you Sure you want remove dashboard</p>
-          {{deleteform.delete(class='btn btn-danger')}}
-         </form>
-         {% else %}
-         <div class="alert-danger">Unable to Display Remove Dashboard form right now.</div>
-         {% endif %}
-      </div>
-      <!-- Modal footer -->
-      <div class="modal-footer">
-        <button type="button" class="btn btn-danger" data-dismiss="modal">Close</button>
-      </div>
-      
-    </div>
-  </div>
-</div>
-{% endmacro %}
-
 {% macro listings_forms() %}
 {% endmacro %}
 
@@ -444,37 +411,6 @@
 </div>
 {% endmacro %}
 
-{% macro dashboards_forms(default_form) %}
-<div class="modal fade" id="setDefaultDashboard">
-  <div class="modal-dialog">
-    <div class="modal-content">
-      <!-- Modal Header -->
-      <div class="modal-header">
-        <h4 class="modal-title">Set Default Dashboard</h4>
-        <button type="button" class="close" data-dismiss="modal">&times;</button>
-      </div>
-      
-      <!-- Modal body -->
-      <div class="modal-body">
-        {% if default_form %}
-        <form id="set_default_dashboard" method="post" action="">
-         {{default_form.hidden_tag()}}
-         <p>Are you sure you want to set the selected dashboard as default?</p>
-         {{default_form.submit(class='btn btn-success')}}
-        </form>
-        {% else %}
-        <div class="alert-danger">Unable to Display Set Default Dashboard form right now.</div>
-        {% endif %}
-      </div>
-      <!-- Modal footer -->
-      <div class="modal-footer">
-        <button type="button" class="btn btn-danger" data-dismiss="modal">Close</button>
-      </div>
-    </div>
-  </div>
-</div>
-{% endmacro %}
-
 
 {% macro orders_forms(remove_order, action_redirect) %}
 <div class="modal fade" id="removeOrderModal">
@@ -508,3 +444,149 @@
 </div>
 {% endmacro %}
 
+
+
+{% macro reports_forms(export_form, action_url) %}
+<div class="modal fade" id="filterModal">
+  <div class="modal-dialog modal-lg">
+    <div id="export_modal_content" class="modal-content" style="background: #3c5268e8 !important;">
+      <!-- #869be8 !important #8196e2 !important;  #9dcd9ff7 !important #85c596 !important #f5b8ee !important -->
+    
+      <!-- Modal Header -->
+      <div class="modal-header">
+        <h4 class="modal-title"><span class="badge badge-secondary shadow p-2">Export <strong id="filter_table_name"></strong></span></h4>
+        <button type="button" class="close" data-dismiss="modal">&times;</button>
+      </div>
+      
+      <!-- Modal body -->
+      <div class="modal-body">
+        <div id="filter_loading_circle">
+          <img src="{{url_for('static', filename='assets/images/loading_circle.gif')}}" alt="loading-circle" border="0" class="loading_circle" style="width:100%;">
+        </div>        
+        <div class="content_container" >
+        
+          <div id="ajax_flashes"></div>
+          <div id="filter_content">
+          {% if export_form and action_url %}
+          <form id="filter_form" method="post" action="{{action_url}}">
+           {{export_form.hidden_tag()}}
+           <div class="form-group d-flex justify-content-between align-items-center">
+            {{export_form.condition.label(class='text-light')}}
+            {{export_form.condition(class='form-control ml-2 w-25')}}
+            <button type="button" class="btn btn-light ml-auto" onclick="addFilterRow()">Add Condition</button>
+           </div>
+           <div class="form-group p-2" id="filter_form_cont"></div>
+           {{export_form.export(class='btn-block mr-auto btn btn-primary mx-auto')}}           
+          </form>
+          {% else %}
+          
+          <div class="alert-danger">Unable to Display Remove order form right now.</div>
+          {% endif %}
+          
+          </div>
+        </div>
+      </div>
+      <!-- Modal footer -->
+      <div class="modal-footer">
+        <button type="button" class="btn btn-danger" data-dismiss="modal">Close</button>
+      </div>
+    </div>
+  </div>
+</div>
+</div>
+{% endmacro %}
+
+{% macro home_forms(add_platform, edit_platform, delete_platform) %}
+<div class="modal fade" id="addPlatformModal">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <!-- Modal Header -->
+      <div class="modal-header">
+        <h4 class="modal-title">Add Platform</h4>
+        <button type="button" class="close" data-dismiss="modal">&times;</button>
+      </div>
+      
+      <!-- Modal body -->
+      <div class="modal-body">
+        {% if add_platform %}
+        <form id="add_platform_form" method="post" action="{{url_for('routes.add_platform')}}">
+            {{add_platform.hidden_tag()}}                
+            <div class="form-group">
+              {{add_platform.name_add.label}}
+              {{add_platform.name_add(class='form-control', placeholder='Enter Platform Name', maxlength='100')}}
+            </div>
+            {{add_platform.add(class='btn btn-success btn-block')}}
+        </form>
+        {% else %}
+        <div class="alert-danger">Unable to Display Add Platform form right now.</div>
+        {% endif %}
+      </div>
+      <!-- Modal footer -->
+      <div class="modal-footer">
+        <button type="button" class="btn btn-danger" data-dismiss="modal">Close</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="editPlatformModal">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <!-- Modal Header -->
+      <div class="modal-header">
+        <h4 class="modal-title">Edit Platform</h4>
+        <button type="button" class="close" data-dismiss="modal">&times;</button>
+      </div>
+      
+      <!-- Modal body -->
+      <div class="modal-body">
+        {% if edit_platform %}
+        <form id="edit_platform_form" method="post" action="">
+            {{edit_platform.hidden_tag()}}                
+            <div class="form-group">
+              {{edit_platform.name_edit.label}}
+              {{edit_platform.name_edit(class='form-control', placeholder='Edit Platform Name', maxlength='100')}}
+            </div>
+            {{edit_platform.edit(class='btn btn-success btn-block')}}
+        </form>
+        {% else %}
+        <div class="alert-danger">Unable to Display Edit Platform form right now.</div>
+        {% endif %}
+      </div>
+      <!-- Modal footer -->
+      <div class="modal-footer">
+        <button type="button" class="btn btn-danger" data-dismiss="modal">Close</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="deletePlatformModal">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <!-- Modal Header -->
+      <div class="modal-header">
+        <h4 class="modal-title">Remove Platform</h4>
+        <button type="button" class="close" data-dismiss="modal">&times;</button>
+      </div>
+      
+      <!-- Modal body -->
+      <div class="modal-body">
+        {% if delete_platform %}
+        <form id="remove_platform_form" method="post" action="">
+         <p>Are you Sure you want remove Platform</p>
+         {{delete_platform.hidden_tag()}}
+         {{delete_platform.delete(class='btn btn-danger')}}
+        </form>
+        {% else %}
+        <div class="alert-danger">Unable to Display Remove Platform form right now.</div>
+        {% endif %}
+      </div>
+      <!-- Modal footer -->
+      <div class="modal-footer">
+        <button type="button" class="btn btn-danger" data-dismiss="modal">Close</button>
+      </div>
+    </div>
+  </div>
+</div>
+{% endmacro %}

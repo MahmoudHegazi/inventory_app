@@ -1,6 +1,6 @@
 from flask_wtf import FlaskForm
 from wtforms import (StringField, TextAreaField, IntegerField, BooleanField,HiddenField, DecimalField, SelectField,
-                     RadioField, SubmitField, PasswordField, validators)
+                     RadioField, SubmitField, PasswordField, validators, SelectMultipleField)
 from wtforms.validators import InputRequired, Length, Email, NumberRange, ValidationError
 from wtforms.fields import DateTimeLocalField
 from wtforms.widgets import NumberInput
@@ -51,46 +51,18 @@ class LoginForm(FlaskForm):
     login = SubmitField('Login')
 
 
-# Dashboard Forms
-class DashboardForm(FlaskForm):
-    title = StringField('Title', default='New Dashboard')
-    num_of_listings = IntegerField('Total listings', widget=NumberInput(step=1), default=0)
-    num_of_orders = IntegerField('Total Orders', widget=NumberInput(step=1), default=0)
-    sum_of_monthly_purchases = DecimalField(
-        'Total monthly purchases',
-        validators=[NumberRange(min=0, max=12)],
-        default=0.00
-    )
-
-class addDashboardForm(DashboardForm):
-    redirect = HiddenField()
-    add = SubmitField('Add')
-
-
-class editDashboardForm(DashboardForm):
-    edit = SubmitField('Edit')
-
-
-class removeDashboardForm(FlaskForm):
-    dashboard_id = HiddenField(validators=[InputRequired()])
-    delete = SubmitField('Delete Dashboard')
-
-
-class defaultDashboardForm(DashboardForm):
-    default_dashboard_id = HiddenField()
-    submit = SubmitField('Set As Default')
-
-
 # Listings Forms
 class listingForm(FlaskForm):
     catalogue_id = SelectField('Catalogue',choices=[], validators=[InputRequired()], coerce=int, validate_choice=True)
-    platform = StringField('Platform',validators=[Length(max=45)])
+
 
 class addListingForm(listingForm):
+    platforms = SelectMultipleField('Platforms', choices=[], coerce=int, validate_choice=True)
     add = SubmitField('Add')
 
 
 class editListingForm(listingForm):
+    platforms = SelectMultipleField('Platforms', choices=[], coerce=int, validate_choice=True)
     edit = SubmitField('Edit')
 
 
@@ -176,9 +148,10 @@ class removeSupplierForm(FlaskForm):
 
 # Purchases Forms
 class PurchaseForm(FlaskForm):
+    action_redirect = HiddenField()
     supplier_id = SelectField('Supplier',choices=[], validators=[InputRequired()], coerce=int, validate_choice=True)
     listing_id = SelectField('Listing',choices=[], validators=[InputRequired()], coerce=int, validate_choice=True)
-    quantity = IntegerField('Quantity', validators=[InputRequired()], default=0)
+    quantity = IntegerField('Quantity', validators=[InputRequired(), NumberRange(min=1)], default=1)
     date = DateTimeLocalField('Date', validators=[InputRequired()], format="%Y-%m-%dT%H:%M")
 
 class addPurchaseForm(PurchaseForm):
@@ -188,6 +161,7 @@ class editPurchaseForm(PurchaseForm):
     edit = SubmitField('Edit')
 
 class removePurchaseForm(FlaskForm):
+    action_redirect = HiddenField()
     purchase_id = HiddenField(validators=[InputRequired()])
     delete = SubmitField('Delete Purchase')
 
@@ -195,25 +169,51 @@ class removePurchaseForm(FlaskForm):
 # Orders Forms
 class OrderForm(FlaskForm):
     listing_id = SelectField('Listing',choices=[], validators=[InputRequired()], coerce=int, validate_choice=True)
-    quantity = IntegerField('Quantity', validators=[InputRequired(), NumberRange(min=0)], default=0)
+    quantity = IntegerField('Quantity', validators=[InputRequired(), NumberRange(min=1)], default=1)
     date = DateTimeLocalField('Date', validators=[InputRequired()], format="%Y-%m-%dT%H:%M")
     customer_firstname = StringField('Customer Name Name', validators=[Length(max=50)])
     customer_lastname = StringField('Customer Last Name', validators=[Length(max=50)])
 
 class addOrderForm(OrderForm):
+    action_redirect = HiddenField()
     add = SubmitField('Add')
 
 class editOrderForm(OrderForm):
-    action_redirect = StringField(render_kw={'type': 'hidden'})
     action_redirect = HiddenField()
     edit = SubmitField('Edit')
 
 class removeOrderForm(FlaskForm):
-    action_redirect = StringField(render_kw={'type': 'hidden'})
+    action_redirect = HiddenField()
     order_id = HiddenField(validators=[InputRequired()])
     delete = SubmitField('Delete Order')
+
+
+# Platforms Forms
+class PlatformForm(FlaskForm):    
+    action_redirect = HiddenField()
+
+class addPlatformForm(PlatformForm):
+    dashboard_id = HiddenField(validators=[InputRequired()])
+    name_add = StringField('Name', validators=[InputRequired(), Length(max=100)])
+    add = SubmitField('Add')
+
+class editPlatformForm(PlatformForm):    
+    name_edit = StringField('Name', validators=[InputRequired(), Length(max=100)])
+    platform_id_edit = HiddenField()
+    edit = SubmitField('Edit')
+
+class removePlatformForm(PlatformForm):
+    platform_id_remove = HiddenField()
+    delete = SubmitField('Delete Order')
+
 
 ###############################  main Forms ###############################################
 class CatalogueExcelForm(FlaskForm):
     excel_file = FileField('Catalogues Excel File', validators=[FileAllowed(['csv', 'tsv', 'xls', 'xlsx'], 'Please Upload Valid Excel File'), FileSizeLimit(20)])
     submit = SubmitField('Import Data')
+
+class ExportDataForm(FlaskForm):
+    table_name = HiddenField(validators=[InputRequired()])
+    condition = SelectField('Condition:',choices=['and', 'or'], validators=[InputRequired()], validate_choice=True)
+    export = SubmitField('Export')
+    

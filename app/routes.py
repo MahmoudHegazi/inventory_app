@@ -4,15 +4,17 @@ import os
 import random
 from flask import Flask, Blueprint, session, redirect, url_for, flash, Response, request, render_template, jsonify
 from flask_wtf import Form
-from .models import User, Supplier, Dashboard, Listing, Catalogue, Purchase, Order
-from .forms import addDashboardForm, editDashboardForm, removeDashboardForm, addListingForm, editListingForm, addCatalogueForm, editCatalogueForm, \
-removeDashboardForm, removeCatalogueForm, removeListingForm, addSupplierForm, editSupplierForm, removeSupplierForm, \
-addPurchaseForm, editPurchaseForm, removePurchaseForm, addOrderForm, editOrderForm, removeOrderForm, CatalogueExcelForm, defaultDashboardForm
+from .models import User, Supplier, Dashboard, Listing, Catalogue, Purchase, Order, Platform, ListingPlatform
+from .forms import addListingForm, editListingForm, addCatalogueForm, editCatalogueForm, \
+removeCatalogueForm, removeListingForm, addSupplierForm, editSupplierForm, removeSupplierForm, \
+addPurchaseForm, editPurchaseForm, removePurchaseForm, addOrderForm, editOrderForm, removeOrderForm, CatalogueExcelForm, \
+addPlatformForm, editPlatformForm, removePlatformForm
 from . import vendor_permission, db
-from .functions import get_safe_redirect
+from .functions import get_safe_redirect, updateDashboardListings, updateDashboardOrders, updateDashboardPurchasesSum, secureRedirect
 from sqlalchemy.exc import IntegrityError
 from flask_login import login_required, current_user
 import flask_excel
+from flask import request as flask_request
 
 
 routes = Blueprint('routes', __name__, template_folder='templates', static_folder='static')
@@ -56,174 +58,26 @@ def makePagination(page=1, query_obj=None, callback=()):
 
 
 # sperate secure app routes  (All Cruds, Add, View, Edit, Delete)
-################ -------------------------- Dashboards -------------------- ################
+################ -------------------------- Dashboard -------------------- ################
 @routes.route('/', methods=['GET'])
-@routes.route('/dashboards', methods=['GET'])
-@login_required
-@vendor_permission.require(http_exception=403)
-def index():
-    default_form = defaultDashboardForm()
-    # dynamic pagination anlysis (requires lazyloading for relation to work with query and set the offset and limit)
-    pagination = makePagination(
-        request.args.get('page', 1),
-        current_user.dashboards,
-        lambda total_pages: [url_for('routes.index', page=page_index) for page_index in range(1, total_pages+1)]
-    )
-    return render_template('index.html', dashboards=pagination['data'], pagination_btns=pagination['pagination_btns'], default_form=default_form)
-
-
-@routes.route('/dashboards/<int:dashboard_id>', methods=['GET'])
-@login_required
-@vendor_permission.require(http_exception=403)
-def view_dashboard(dashboard_id):
-    dashboard = None
-    deleteform = removeDashboardForm()
-    try:
-        dashboard = Dashboard.query.filter_by(id=dashboard_id, user_id=current_user.id).one_or_none()
-    except Exception as e:
-        print('System Error: {} , info: {}'.format(e, sys.exc_info()))
-        flash('Unknown error unable to view product', 'danger')
-    finally:
-        if dashboard is not None:
-            return render_template('dashboard.html', dashboard=dashboard, deleteform=deleteform)
-        else:
-            flash('Dashboard not found it maybe deleted', 'danger')
-            return redirect(url_for('routes.index'))
-
-# Create New Dashboard
-@routes.route('/dashboards/add', methods=['GET', 'POST'])
-@login_required
-@vendor_permission.require(http_exception=403)
-def add_dashboard():
-    form = addDashboardForm()
-    if request.method == 'POST':
-        success = None
-        try:
-            if form.validate_on_submit():
-                # check if no default dashboard make the new created default
-                default = 0
-                if not Dashboard.query.filter_by(default=1, user_id=current_user.id).first():
-                    default = 1
-                new_dashboard = Dashboard(
-                    user_id = current_user.id,
-                    title = form.title.data,
-                    num_of_listings = form.num_of_listings.data,
-                    num_of_orders = form.num_of_orders.data,
-                    sum_of_monthly_purchases = form.sum_of_monthly_purchases.data,
-                    default = default
-                    )
-                new_dashboard.insert()
-                success = True
-            else:
-                success = False
-
-        except Exception as e:
-            print('System Error: {} , info: {}'.format(e, sys.exc_info()))
-            success = None
-        finally:
-            if success == True:
-                flash('Successfully Created new Dashboard', 'success')
-                if form.redirect.data:
-                    safeurl = str(get_safe_redirect(form.redirect.data)).strip()
-                    if safeurl:
-                        return redirect(safeurl)
-                return redirect(url_for('routes.index'))
-            elif success == False:
-                return render_template('crud/add_dashboard.html', form=form)
-            else:
-                flash('Unknown error unable to Add Dashboard', 'danger')
-                return redirect(url_for('routes.index'))
-    else:
-        # set redirect url using flask wtforms and url_for in template (Add dashboard can done from dashboard view so redirect dynamic from which dashboard)
-        if 'redirect' in request.args:
-            # exist in same domain
-            safeurl = str(get_safe_redirect(request.args['redirect'])).strip()
-            if safeurl:
-                form.redirect.data = safeurl
-        return render_template('crud/add_dashboard.html', form=form)
-
-@routes.route('/dashboards/<int:dashboard_id>/edit', methods=['GET', 'POST'])
+@routes.route('/home', methods=['GET'])
 @login_required
 @vendor_permission.require()
-def edit_dashboard(dashboard_id):
-    if request.method == 'POST':
-        success = None
-        form = editDashboardForm()
-        try:
-            target_dashboard = Dashboard.query.filter_by(id=dashboard_id, user_id=current_user.id).one_or_none()
-            if target_dashboard is not None:
-                if form.validate_on_submit():
-                    target_dashboard.title = form.title.data
-                    target_dashboard.num_of_listings = form.num_of_listings.data
-                    target_dashboard.num_of_orders = form.num_of_orders.data
-                    target_dashboard.sum_of_monthly_purchases = form.sum_of_monthly_purchases.data
-                    target_dashboard.update()
-                    success = True
-                else:
-                    success = False
-            else:
-                flash('Unable to find target dashboard.', 'danger')
-                success = None
-
-        except Exception as e:
-            print('System Error: {} , info: {}'.format(e, sys.exc_info()))
-            flash('Unknown error unable to Add Dashboard', 'danger')
-            success = None
-        finally:
-            if success == True:
-                flash('Successfully Edited Dashboard', 'success')
-                return redirect(url_for('routes.index'))
-            elif success == False:
-                return render_template('crud/edit_dashboard.html', dashboard=target_dashboard, dashboard_id=dashboard_id, edit_dashboard_form=form)
-            else:
-                return redirect(url_for('routes.index'))
-    else:
-        # GET Requests
-        success = True
-        error_message = ''
-        try:
-            dashboard = Dashboard.query.filter_by(id=dashboard_id, user_id=current_user.id).one_or_none()
-            if dashboard is not None:
-                form = editDashboardForm(
-                    title=dashboard.title, num_of_listings=dashboard.num_of_listings,
-                    num_of_orders=dashboard.num_of_orders, sum_of_monthly_purchases=dashboard.sum_of_monthly_purchases,
-                    )
-            else:
-                error_message = 'Dashboard Not Found or deleted.'
-                success = False
-
-        except Exception as e:
-            print('System Error: {} , info: {}'.format(e, sys.exc_info()))
-            error_message = 'Unknown Error, Unable to display Edit Dashboard Form.'
-            success = False
-        finally:
-            if success == True:
-                return render_template('crud/edit_dashboard.html', dashboard=dashboard, edit_dashboard_form=form)
-            else:
-                flash(error_message, 'danger')
-                return redirect(url_for('routes.index'))
-
-
-@routes.route('/dashboards/<int:dashboard_id>/delete', methods=['POST'])
-@login_required
-@vendor_permission.require(http_exception=403)
-def delete_dashboard(dashboard_id):
+def index():
     try:
-        form = removeDashboardForm()
-        dashboard = Dashboard.query.filter_by(id=dashboard_id, user_id=current_user.id).one_or_none()
-        if dashboard is not None:
-            if form.validate_on_submit():
-                dashboard.delete()
-                flash('Successfully deleted Dashboard ID: {}'.format(dashboard_id), 'success')
-            else:
-                flash('Unable to delete dashboard ID: {}'.format(dashboard_id), 'danger')
-        else:
-            flash('Dashboard not found it maybe deleted ID: {}'.format(dashboard_id), 'danger')
+        deleteform = removeListingForm()
+        delete_purchase = removePurchaseForm(action_redirect=url_for('routes.index'))
+        delete_order =  removeOrderForm(action_redirect=url_for('routes.index'))
+
+        add_platform =  addPlatformForm(action_redirect=url_for('routes.index'), dashboard_id=current_user.dashboard.id)
+        edit_platform =  editPlatformForm(action_redirect=url_for('routes.index'))
+        delete_platform =  removePlatformForm(action_redirect=url_for('routes.index'))
+
+        return render_template('index.html', dashboard=current_user.dashboard, deleteform=deleteform, delete_purchase=delete_purchase, delete_order=delete_order, add_platform=add_platform, edit_platform=edit_platform, delete_platform=delete_platform)
     except Exception as e:
         print('System Error: {} , info: {}'.format(e, sys.exc_info()))
-        flash('Unknown error unable to delete dashboard ID: {}'.format(dashboard_id), 'danger')
-    finally:
-        return redirect(url_for('routes.index'))
+        # flash('Unknown error unable to view product', 'danger')
+        return 'system error', 500
 
 ################ -------------------------- Catalogue -------------------- ################
 @routes.route('/catalogues', methods=['GET'])
@@ -378,8 +232,12 @@ def edit_catalogue(catalogue_id):
             else:
                 # invalid wtforms form sumited in finally this will return render_template to display errors
                 success = False
+        
         except Exception as e:
             print('System Error: {} , info: {}'.format(e, sys.exc_info()))
+            # update event will done after success = True, so incase error in that event set success to False 
+            success = None
+
         finally:
             if success == True:                
                 # success 
@@ -391,6 +249,7 @@ def edit_catalogue(catalogue_id):
                 # not success system error, log error and redirect to main page
                 flash('Unknown eror, unable to edit catalogue', 'danger')
                 return redirect(url_for('routes.catalogues'))
+
     else:
         # GET Requests
         try:
@@ -422,35 +281,40 @@ def delete_catalogue(catalogue_id):
         return redirect(url_for('routes.catalogues', catalogue_id=catalogue_id))
     
 ################ -------------------------- Dashboard Listings -------------------- ################
-@routes.route('/dashboards/<int:dashboard_id>/listings', methods=['GET'])
+@routes.route('/listings', methods=['GET'])
 @login_required
 @vendor_permission.require(http_exception=403)
-def listings(dashboard_id):
-    user_dashboard_listings_q = db.session.query(
-        Listing
-    ).join(
-        Dashboard
-    ).join(
-        User
-    ).filter(
-        User.id == current_user.id,
-        Dashboard.id == dashboard_id
-    )
+def listings():    
+    try:
+        user_dashboard_listings_q = db.session.query(
+            Listing
+        ).join(
+            Dashboard
+        ).join(
+            User
+        ).filter(
+            User.id == current_user.id,
+            Dashboard.id == current_user.dashboard.id
+        )
     # total_pages + 1 (becuase range not take last number while i need it to display the last page)
-    pagination = makePagination(
-            request.args.get('page', 1),
-            user_dashboard_listings_q,
-            lambda total_pages: [url_for('routes.listings', dashboard_id=dashboard_id, page=page_index) for page_index in range(1, total_pages+1)]
-    )
-    user_dashboard_listings = pagination['data']
+        pagination = makePagination(
+                request.args.get('page', 1),
+                user_dashboard_listings_q,
+                lambda total_pages: [url_for('routes.listings', page=page_index) for page_index in range(1, total_pages+1)]
+        )
+        user_dashboard_listings = pagination['data']
 
-    return render_template('listings.html', listings=user_dashboard_listings, dashboard_id=dashboard_id, pagination_btns=pagination['pagination_btns'])
+        return render_template('listings.html', listings=user_dashboard_listings, pagination_btns=pagination['pagination_btns'])
+    except Exception as e:
+        flash('Unknown error Unable to view Listings', 'danger')
+        return redirect(url_for('routes.index'))
 
-@routes.route('/dashboards/<int:dashboard_id>/listings/<int:listing_id>', methods=['GET'])
+@routes.route('/listings/<int:listing_id>', methods=['GET'])
 @login_required
 @vendor_permission.require(http_exception=403)
-def view_listing(dashboard_id, listing_id):
-    success = True    
+def view_listing(listing_id):
+    success = True
+    message = ''
     try:
         deleteform = removeListingForm()
         delete_purchase = removePurchaseForm()
@@ -464,29 +328,34 @@ def view_listing(dashboard_id, listing_id):
         ).filter(
             Listing.id == listing_id,
             User.id == current_user.id,
-            Dashboard.id == dashboard_id
+            Dashboard.id == current_user.dashboard.id
         ).one_or_none()
-        
+        if not target_listing:
+            message = 'The listing specified with id: {} could not be found. It may be removed or deleted.'.format(listing_id)
+            success = False            
     except Exception as e:
         print('System Error: {} , info: {}'.format(e, sys.exc_info()))
+        message = 'Unknown error Unable to view Listing'
         success = False
     finally:
         if success == True:
-            return render_template('listing.html', listing=target_listing, dashboard_id=dashboard_id, deleteform=deleteform, delete_purchase=delete_purchase,delete_order=delete_order)
+            return render_template('listing.html', listing=target_listing, deleteform=deleteform, delete_purchase=delete_purchase,delete_order=delete_order)
         else:
-            flash('Unknown error Unable to view Listing', 'danger')
+            flash(message, 'danger')
             return redirect(url_for('routes.index'))
 
 
 # create new listing
-@routes.route('/dashboards/<int:dashboard_id>/listings/add', methods=['GET', 'POST'])
+@routes.route('/listings/add', methods=['GET', 'POST'])
 @login_required
 @vendor_permission.require(http_exception=403)
-def add_listing(dashboard_id):
+def add_listing():
     form = addListingForm()
+    platforms_ids = []
     try:
         user_catalogues = Catalogue.query.filter_by(user_id=current_user.id).all()
         form.catalogue_id.choices = [(catalogue.id, catalogue.product_name) for catalogue in user_catalogues]
+        form.platforms.choices = [(platform.id, platform.name) for platform in current_user.dashboard.platforms]
     except:
         flash('unable to display add listing form due to isssue in catalogues', 'danger')
         return redirect(url_for('routes.index'))
@@ -494,54 +363,68 @@ def add_listing(dashboard_id):
     if request.method == 'POST':
         success = None
         try:
-            target_dashboard = Dashboard.query.filter_by(id=dashboard_id, user_id=current_user.id).one_or_none()
-            if target_dashboard is not None:
-                if form.validate_on_submit():
-                    new_listing = Listing(dashboard_id=target_dashboard.id, catalogue_id=form.catalogue_id.data, platform=form.platform.data)
+            if form.validate_on_submit():
+                # confirm selected platforms owns by user
+                valid_platforms = True
+                current_dashboard_id = current_user.dashboard.id
+                for platform_id in form.platforms.data:
+                    target_platform = Platform.query.filter_by(id=platform_id, dashboard_id=current_dashboard_id).one_or_none()
+                    if target_platform:
+                        platforms_ids.append(target_platform.id)
+                    else:
+                        valid_platforms = False
+
+                if valid_platforms:
+                    user_dashboard = current_user.dashboard
+                    new_listing = Listing(dashboard_id=user_dashboard.id, catalogue_id=form.catalogue_id.data)
                     new_listing.insert()
+                    # add the listing platforms
+                    for platform_id in platforms_ids:
+                        new_listing_platform = ListingPlatform(listing_id=new_listing.id, platform_id=platform_id)
+                        new_listing_platform.insert()
+
+                    # set the number of total listings after adding action
+                    updateDashboardListings(user_dashboard)
                     success = True
                 else:
+                    flash('Unable to add listing invalid platforms', 'danger')
                     success = False
             else:
-                flash('Dashboard Not found or deleted', 'danger')
-                success = None
+                success = False
+                
         except Exception as e:
             print('System Error: {} , info: {}'.format(e, sys.exc_info()))
             flash('Unknown Error unable to create new Listing', 'danger')
+            success = None
+            raise e
 
+ 
         finally:
             if success == True:
                 flash('Successfully Created New Listing', 'success')
-                return redirect(url_for('routes.listings', dashboard_id=dashboard_id))
+                return redirect(url_for('routes.listings'))
             elif success == None:
-                return redirect(url_for('routes.listings', dashboard_id=dashboard_id))
+                return redirect(url_for('routes.listings'))
             else:
-                return render_template('crud/add_listing.html', dashboard_id=dashboard_id, form=form)
+                return render_template('crud/add_listing.html', form=form)
+
     else:
         # GET Requests
-        success = True
         try:
-            target_dashboard = Dashboard.query.filter_by(id=dashboard_id, user_id=current_user.id).one_or_none()
-            if target_dashboard is None:
-                flash('Dashboard Not Found or deleted', 'danger')
-                success = False
-
+            return render_template('crud/add_listing.html', form=form)
         except Exception as e:
             print('System Error: {} , info: {}'.format(e, sys.exc_info()))
-            success = False
-        finally:
-            if success == True:
-                return render_template('crud/add_listing.html', dashboard_id=dashboard_id, form=form)
-            else:
-                return redirect(url_for('routes.index'))
+            return redirect(url_for('routes.index'))
 
-@routes.route('/dashboards/<int:dashboard_id>/listings/<int:listing_id>/edit', methods=['GET', 'POST'])
+@routes.route('/listings/<int:listing_id>/edit', methods=['GET', 'POST'])
 @login_required
 @vendor_permission.require()
-def edit_listing(dashboard_id, listing_id):
+def edit_listing(listing_id):
+    
     # route setup
     form = None
     target_listing = None
+    platforms_ids = []
     try:
         target_listing = db.session.query(
             Listing
@@ -552,60 +435,130 @@ def edit_listing(dashboard_id, listing_id):
         ).filter(
             Listing.id == listing_id,
             User.id == current_user.id,
-            Dashboard.id == dashboard_id
+            Dashboard.id == current_user.dashboard.id
         ).one_or_none()
         
         if target_listing is not None:
+            listing_platforms = [listing_platform.platform.id for listing_platform in target_listing.platforms]
             form = editListingForm(
                 catalogue_id=target_listing.catalogue_id,
-                platform=target_listing.platform
+                platforms=listing_platforms
             )
             user_catalogues = Catalogue.query.filter_by(user_id=current_user.id).all()
             form.catalogue_id.choices = [(catalogue.id, catalogue.product_name) for catalogue in user_catalogues]
+            form.platforms.choices = [(platform.id, platform.name) for platform in current_user.dashboard.platforms]
         else:
             flash('Unable to display Edit listing form, target listing maybe removed', 'danger')
-            return redirect(url_for('routes.listings', dashboard_id=dashboard_id))
+            return redirect(url_for('routes.listings'))
     except Exception as e:
         print('System Error: {} , info: {}'.format(e, sys.exc_info()))
         flash('unable to display edit listing form due to issue in data collection', 'danger')
-        return redirect(url_for('routes.listings', dashboard_id=dashboard_id))
+        return redirect(url_for('routes.listings'))
     
     # Post Requests
     success = True
     error_message = ''
     if request.method == 'POST':
         try:
-            if form and form.validate_on_submit():
+            selected_catalogue = Catalogue.query.filter_by(id=form.catalogue_id.data, user_id=current_user.id).one_or_none()
+            
+            # confirm selected platforms owns by user
+            valid_platforms = True
+            current_dashboard_id = current_user.dashboard.id
+            for platform_id in form.platforms.data:
+                target_platform = Platform.query.filter_by(id=platform_id, dashboard_id=current_dashboard_id).one_or_none()
+                if target_platform:
+                    platforms_ids.append(target_platform.id)
+                else:
+                    valid_platforms = False
+
+            current_listing_platforms = [listing_platform.platform.id for listing_platform in target_listing.platforms]
+            
+            if form and form.validate_on_submit() and selected_catalogue and valid_platforms:
+
                 # update only what needed reduce db request
                 if target_listing.catalogue_id != form.catalogue_id.data:
-                    target_listing.catalogue_id = form.catalogue_id.data
+                    
+                    # back catalogue as it was before moved listing
+                    listing_purchases_quantity = sum([int(p.quantity) for p in target_listing.purchases])
+                    listing_orders_quantity = sum([int(o.quantity) for o in target_listing.orders])
+                    original_quantity = int(target_listing.catalogue.quantity) + listing_orders_quantity
+                    original_quantity = original_quantity - listing_purchases_quantity
+                    original_quantity = original_quantity if original_quantity >= 0 else 0
+                    
 
-                if target_listing.platform != form.platform.data:
-                    target_listing.platform = form.platform.data
-                target_listing.update()
+                    # new catalogue qauntity after current listing's purchases (without work with dates)
+                    new_quantity = int(selected_catalogue.quantity) + listing_purchases_quantity
+
+                    #return str(new_quantity > listing_orders_quantity)
+                    # check if new catalogue after added purchases to it accept the number of orders or not
+                    if new_quantity >= listing_orders_quantity:
+                        # new catalogue quantity after current listing's order
+                        new_quantity = new_quantity - listing_orders_quantity
+
+
+                        target_listing.catalogue_id = form.catalogue_id.data
+                        target_listing.catalogue.quantity = original_quantity
+                        selected_catalogue.quantity = new_quantity
+
+
+                        # update platforms
+                        for old_platform in target_listing.platforms:
+                            if old_platform.platform.id not in platforms_ids:
+                                old_platform.delete()
+                            
+                        for platform_id in platforms_ids:
+                            if platform_id not in current_listing_platforms:
+                                new_listing_platform = ListingPlatform(listing_id=target_listing.id,platform_id=platform_id)
+                                new_listing_platform.insert()
+
+                        target_listing.catalogue.update()
+                        target_listing.update()
+                        # listing sync with new catalogue done on catalogue after update
+                        selected_catalogue.update()
+                        target_listing.sync_listing()
+                    else:
+                        flash("Unable to edit the list, the new catalogue quantity does not accept the listing's orders, please add purchase to this listing, or edit the new catalogue quantity before editing.", "warning")
+                        success = False
+                else:
+                    # update platforms
+                    for old_platform in target_listing.platforms:
+                        if old_platform.platform.id not in platforms_ids:
+                            old_platform.delete()
+                        
+                    for platform_id in platforms_ids:
+                        if platform_id not in current_listing_platforms:
+                            new_listing_platform = ListingPlatform(listing_id=target_listing.id,platform_id=platform_id)
+                            new_listing_platform.insert()
+
+                    #target_listing.update()
             else:
                 success = False
         except Exception as e:
             print('System Error: {} , info: {}'.format(e, sys.exc_info()))
             success = None
+
         finally:
             if success == True:
                 flash('successfully edited the listing', 'success')
-                return redirect(url_for('routes.view_listing', dashboard_id=dashboard_id, listing_id=listing_id))
+                return redirect(url_for('routes.view_listing', listing_id=listing_id))
             elif success == False:
-                return render_template('crud/edit_listing.html',form=form, dashboard_id=dashboard_id, listing_id=listing_id)
+                return render_template('crud/edit_listing.html',form=form, listing_id=listing_id)
             else:
                 flash('Unknown error, Unable to edit listing', 'danger')
-                return redirect(url_for('routes.listings', dashboard_id=dashboard_id))
+                return redirect(url_for('routes.listings'))
+
     else:
         # GET requests
-        return render_template('crud/edit_listing.html', form=form, dashboard_id=dashboard_id, listing_id=listing_id)
-    
-@routes.route('/dashboards/<int:dashboard_id>/listings/<int:listing_id>/delete', methods=['POST'])
+        return render_template('crud/edit_listing.html', form=form, listing_id=listing_id)
+
+# need after_delete
+@routes.route('/listings/<int:listing_id>/delete', methods=['POST'])
 @login_required
 @vendor_permission.require(http_exception=403)
-def delete_listing(dashboard_id, listing_id):
+def delete_listing(listing_id):
     try:
+        user_dashboard = current_user.dashboard
         form = removeListingForm()
         target_listing = db.session.query(
             Listing
@@ -616,11 +569,24 @@ def delete_listing(dashboard_id, listing_id):
         ).filter(
             Listing.id == listing_id,
             User.id == current_user.id,
-            Dashboard.id == dashboard_id
+            Dashboard.id == user_dashboard.id
         ).one_or_none()
         if target_listing is not None:
             if form.validate_on_submit():
+                orders_total = sum([order.quantity for order in target_listing.orders])
+                purchases_total = sum([purchase.quantity for purchase in target_listing.purchases])
+                
+                catalogue_quantity = int(target_listing.catalogue.quantity)
+                catalogue_quantity += orders_total
+                catalogue_quantity -= purchases_total
+                catalogue_quantity = catalogue_quantity if catalogue_quantity >= 0  else 0
+                target_listing.catalogue.quantity = catalogue_quantity            
+                
                 target_listing.delete()
+                target_listing.catalogue.update()
+                
+                # update number of listings after delete action
+                updateDashboardListings(user_dashboard)
                 flash('Successfully deleted Listing ID: {}'.format(listing_id), 'success')
             else:
                 flash('Unable to delete Listing, ID: {}'.format(listing_id), 'danger')
@@ -630,16 +596,17 @@ def delete_listing(dashboard_id, listing_id):
         print('System Error: {} , info: {}'.format(e, sys.exc_info()))
         flash('Unknown error unable to delete Listing', 'danger')
     finally:
-        return redirect(url_for('routes.listings', dashboard_id=dashboard_id))
+        return redirect(url_for('routes.listings'))
 
 ################ -------------------------- Listing Purchases (this purchases based on selected listing from any supplier) -------------------- ################
-@routes.route('/dashboards/<int:dashboard_id>/listings/<int:listing_id>/purchases/<int:purchase_id>', methods=['GET', 'POST'])
+@routes.route('/listings/<int:listing_id>/purchases/<int:purchase_id>', methods=['GET', 'POST'])
 @login_required
 @vendor_permission.require()
-def view_purchase_listing(dashboard_id, listing_id, purchase_id):
+def view_purchase_listing(listing_id, purchase_id):
     success = True
     target_purchase = None
-    try:        
+    message = ''
+    try:
         deleteform = removePurchaseForm()
         # user dashboard, listing id to keep index stable and not generate invalid pages to the app (if dashboard, and listing id user can view his orders from invalid urls which not stable for indexing)
         target_purchase = db.session.query(
@@ -653,33 +620,37 @@ def view_purchase_listing(dashboard_id, listing_id, purchase_id):
         ).filter(
             Purchase.id == purchase_id,
             Listing.id == listing_id,
-            Dashboard.id == dashboard_id,
+            Dashboard.id == current_user.dashboard.id,
             User.id == current_user.id
         ).one_or_none()
 
         if target_purchase is None:
             success = False
-            flash('unable to find selected purchase with id: ({}), it maybe deleted or you use invalid url', 'danger')
+            message = 'unable to find selected purchase with id: ({}), it maybe deleted or you use invalid url'
 
     except Exception as e:
         print('System Error: {} , info: {}'.format(e, sys.exc_info()))
-        flash('Unknown error unable to display Purchase with id: {}'.format(purchase_id), 'danger')
+        message = 'Unknown error unable to display Purchase with id: {}'.format(purchase_id)
         success = False
     finally:
         if success == True:
-            return render_template('purchase.html', purchase=target_purchase, dashboard_id=dashboard_id, listing_id=listing_id, deleteform=deleteform)
+            return render_template('purchase.html', purchase=target_purchase, listing_id=listing_id, deleteform=deleteform)
         else:
-            return redirect(url_for('routes.view_listing', dashboard_id=dashboard_id, listing_id=dashboard_id))
+            flash(message, 'danger')
+            return redirect(url_for('routes.view_listing', listing_id=listing_id))
             
 
-@routes.route('/dashboards/<int:dashboard_id>/listings/<int:listing_id>/purchases/add', methods=['GET', 'POST'])
+@routes.route('/listings/<int:listing_id>/purchases/add', methods=['GET', 'POST'])
 @login_required
 @vendor_permission.require(http_exception=403)
-def add_purchase_listing(dashboard_id, listing_id):
+def add_purchase_listing(listing_id):
     form = None
     target_listing = None
     dashboard_listings = []
+    user_dashboard = None
+    redirect_url = None
     try:
+        user_dashboard = current_user.dashboard
         target_listing = db.session.query(
             Listing
         ).join(
@@ -688,12 +659,12 @@ def add_purchase_listing(dashboard_id, listing_id):
             User
         ).filter(
             Listing.id == listing_id,
-            Dashboard.id == dashboard_id,
+            Dashboard.id == user_dashboard.id,
             User.id == current_user.id            
         ).one_or_none()
         if target_listing is None:
             flash('Unable to find listing with id: ({})'.format(listing_id), 'danger')
-            return redirect(url_for('routes.listings', dashboard_id=dashboard_id))
+            return redirect(url_for('routes.listings'))
         
         form = addPurchaseForm(listing_id=target_listing.id)
         # user using this route can only use the listing of selected dashboard so not allow another dashboard's listing to be submited some how using this route as it not provided
@@ -705,7 +676,7 @@ def add_purchase_listing(dashboard_id, listing_id):
             User
         ).filter(
             User.id == current_user.id,
-            Dashboard.id == dashboard_id
+            Dashboard.id == user_dashboard.id
         ).all()
         form.listing_id.choices = [(listing.id, '{} - ({})'.format(listing.product_name, listing.sku) ) for listing in dashboard_listings]
         form.supplier_id.choices = [(supplier.id, supplier.name) for supplier in current_user.suppliers]
@@ -713,17 +684,25 @@ def add_purchase_listing(dashboard_id, listing_id):
     except Exception as e:
         print('System Error: {} , info: {}'.format(e, sys.exc_info()))
         flash('Unknown error unable to display Add Purchase form', 'danger')
-        return redirect(url_for('routes.view_listing', dashboard_id=dashboard_id, listing_id=listing_id))
+        return redirect(url_for('routes.view_listing', listing_id=listing_id))
     
     if request.method == 'POST':
         success = True
         try:
             if form.validate_on_submit():
+                # handle redirect securly
+                redirect_url = secureRedirect(form.action_redirect.data) if form.action_redirect and form.action_redirect.data else None
+
                 # confirm listing id and supplier id are in user listings and suppliers (else user can create request for other user's suppliers)
                 valid_ids = int(form.listing_id.data) in [listing.id for listing in dashboard_listings] and int(form.supplier_id.data) in [supplier.id for supplier in current_user.suppliers]
                 if valid_ids:
                     new_purchase = Purchase(quantity=form.quantity.data, date=form.date.data, supplier_id=form.supplier_id.data, listing_id=form.listing_id.data)
+                    # update sum of dashboard's purchases
                     new_purchase.insert()
+
+                    new_purchase.listing.catalogue.quantity = int(new_purchase.listing.catalogue.quantity) + int(new_purchase.quantity)                                        
+                    new_purchase.listing.catalogue.update()
+                    updateDashboardPurchasesSum(db, Purchase, Listing, user_dashboard)
                 else:
                     # invalid listing_id or supplier id, or listing_id not in selected dashboard, this should done from supplier which allow that secuirty
                     success = None
@@ -736,23 +715,32 @@ def add_purchase_listing(dashboard_id, listing_id):
             success = None
         finally:
             if success == True:
-                flash('Successfully Created New Purchase for Supplier With ID:'.format(form.supplier_id.data))
-                return redirect(url_for('routes.view_listing', dashboard_id=dashboard_id, listing_id=listing_id))
+                flash('Successfully Created New Purchase for Supplier With ID:{}'.format(form.supplier_id.data))
+                # handle diffrent redirect for better ux
+                if not redirect_url:
+                    return redirect(url_for('routes.view_listing', listing_id=listing_id))
+                else:
+                    return redirect(redirect_url)
+            
             elif success == False:
-                return render_template('crud/add_purchase_listing.html', form=form, dashboard_id=dashboard_id, listing_id=listing_id)
+                return render_template('crud/add_purchase_listing.html', form=form, listing_id=listing_id)
             else:
-                return redirect(url_for('routes.view_listing', dashboard_id=dashboard_id, listing_id=listing_id))
+                if not redirect_url:
+                    return redirect(url_for('routes.view_listing', listing_id=listing_id))
+                else:
+                    return redirect(redirect_url)
             
     else:
-        return render_template('crud/add_purchase_listing.html', form=form, dashboard_id=dashboard_id, listing_id=listing_id)
+        return render_template('crud/add_purchase_listing.html', form=form, listing_id=listing_id)
 
-@routes.route('/dashboards/<int:dashboard_id>/listings/<int:listing_id>/purchases/<int:purchase_id>/edit', methods=['GET', 'POST'])
+@routes.route('/listings/<int:listing_id>/purchases/<int:purchase_id>/edit', methods=['GET', 'POST'])
 @login_required
 @vendor_permission.require()
-def edit_purchase_listing(dashboard_id, listing_id, purchase_id):
+def edit_purchase_listing(listing_id, purchase_id):
     form = None
     target_purchase = None
     dashboard_listings = []
+    redirect_url = None
     try:
         target_purchase = db.session.query(
             Purchase
@@ -765,13 +753,13 @@ def edit_purchase_listing(dashboard_id, listing_id, purchase_id):
         ).filter(
             Purchase.id == purchase_id,
             Listing.id == listing_id,
-            Dashboard.id == dashboard_id,
+            Dashboard.id == current_user.dashboard.id,
             User.id == current_user.id
         ).one_or_none()
 
         if target_purchase is None:
             flash('Unable to find Purchase with id: ({})'.format(purchase_id), 'danger')
-            return redirect(url_for('routes.view_listing', dashboard_id=dashboard_id, listing_id=listing_id))
+            return redirect(url_for('routes.view_listing', listing_id=listing_id))
         
         form = editPurchaseForm(listing_id=target_purchase.listing_id, supplier_id=target_purchase.supplier_id, quantity=target_purchase.quantity, date=target_purchase.date)
         # user using this route can only use the listing of selected dashboard so not allow another dashboard's listing to be submited some how using this route as it not provided
@@ -783,7 +771,7 @@ def edit_purchase_listing(dashboard_id, listing_id, purchase_id):
             User
         ).filter(
             User.id == current_user.id,
-            Dashboard.id == dashboard_id
+            Dashboard.id == current_user.dashboard.id
         ).all()
         form.listing_id.choices = [(listing.id, '{} - ({})'.format(listing.product_name, listing.sku) ) for listing in dashboard_listings]
         form.supplier_id.choices = [(supplier.id, supplier.name) for supplier in current_user.suppliers]
@@ -791,27 +779,73 @@ def edit_purchase_listing(dashboard_id, listing_id, purchase_id):
     except Exception as e:
         print('System Error: {} , info: {}'.format(e, sys.exc_info()))
         flash('Unknown error unable to display Add Purchase form', 'danger')
-        return redirect(url_for('routes.view_listing', dashboard_id=dashboard_id, listing_id=listing_id))
+        return redirect(url_for('routes.view_listing', listing_id=listing_id))
     
     if request.method == 'POST':
+        redirect_url = None
         success = True
+        quantity_changed = False
         try:
             if form.validate_on_submit():
+                # handle redirect securly
+                redirect_url = secureRedirect(form.action_redirect.data) if form.action_redirect and form.action_redirect.data else None
+                selected_listing = Listing.query.filter_by(id=form.listing_id.data).one_or_none()
                 valid_ids = int(form.listing_id.data) in [listing.id for listing in dashboard_listings] and int(form.supplier_id.data) in [supplier.id for supplier in current_user.suppliers]
-                if valid_ids:
-                    if target_purchase.listing_id != form.listing_id.data:
-                        target_purchase.listing_id = form.listing_id.data
+                if valid_ids and selected_listing:
 
-                    if target_purchase.supplier_id != form.supplier_id.data:
-                        target_purchase.supplier_id = form.supplier_id.data
+                    if target_purchase.listing.catalogue.id != selected_listing.catalogue.id:
+                        #return 'here listing change to diffrent catalogue'
 
-                    if target_purchase.quantity != form.quantity.data:
-                        target_purchase.quantity = form.quantity.data
+                        original_quantity = int(target_purchase.listing.catalogue.quantity) - int(target_purchase.quantity)
+                        original_quantity = original_quantity if original_quantity >= 0 else 0
+                        new_quantity = int(selected_listing.catalogue.quantity) + int(form.quantity.data)
 
-                    if target_purchase.date != form.date.data:
-                        target_purchase.date = form.date.data
+                        if target_purchase.supplier_id != form.supplier_id.data:
+                            target_purchase.supplier_id = form.supplier_id.data                          
+    
+                        if target_purchase.date != form.date.data:
+                            target_purchase.date = form.date.data
 
-                    target_purchase.update()
+                        if target_purchase.quantity != form.quantity.data:
+                            target_purchase.quantity = form.quantity.data
+                            quantity_changed = True
+                            
+                        if target_purchase.listing_id != form.listing_id.data:
+                            target_purchase.listing_id = form.listing_id.data
+
+
+                        target_purchase.listing.catalogue.quantity = original_quantity
+                        selected_listing.catalogue.quantity = new_quantity
+
+                        target_purchase.update()
+
+                        selected_listing.catalogue.update()
+                        target_purchase.listing.catalogue.update()
+
+                    else:
+                            
+                        if target_purchase.supplier_id != form.supplier_id.data:
+                            target_purchase.supplier_id = form.supplier_id.data
+    
+                        if target_purchase.quantity != form.quantity.data:
+                            original_quantity = int(target_purchase.listing.catalogue.quantity) - int(target_purchase.quantity)
+                            original_quantity = original_quantity if original_quantity >= 0 else 0
+                            new_quantity = original_quantity + int(form.quantity.data)
+                            target_purchase.quantity = form.quantity.data
+                            selected_listing.catalogue.quantity = new_quantity
+                            quantity_changed = True
+                            
+                        if target_purchase.listing_id != form.listing_id.data:
+                            target_purchase.listing_id = form.listing_id.data
+                            # here listing id changed qauantity effect
+
+                        if target_purchase.date != form.date.data:
+                            target_purchase.date = form.date.data
+
+                        target_purchase.update()
+
+                        if quantity_changed:
+                            selected_listing.catalogue.update()
                 else:                    
                     flash('Unable to edit Purchases with ID:{}'.format(purchase_id), 'danger')
                     success = None
@@ -821,23 +855,33 @@ def edit_purchase_listing(dashboard_id, listing_id, purchase_id):
             print('System Error: {} , info: {}'.format(e, sys.exc_info()))
             flash('Unknown error unable to edit Purchase with id: {}'.format(purchase_id), 'danger')
             success = None
+
         finally:
             if success == True:
                 flash('Successfully Edited Purchases With ID:{}'.format(purchase_id), 'success')
-                return redirect(url_for('routes.view_listing', dashboard_id=dashboard_id, listing_id=listing_id))
+                if redirect_url is None:
+                    return redirect(url_for('routes.view_listing', listing_id=listing_id))
+                else:
+                    return redirect(redirect_url)
+                
             elif success == False:
-                return render_template('crud/edit_purchase_listing.html', form=form, dashboard_id=dashboard_id, listing_id=listing_id, purchase_id=purchase_id)
+                return render_template('crud/edit_purchase_listing.html', form=form, listing_id=listing_id, purchase_id=purchase_id)
             else:
-                return redirect(url_for('routes.view_listing', dashboard_id=dashboard_id, listing_id=listing_id))
+                if redirect_url is None:
+                    return redirect(url_for('routes.view_listing', listing_id=listing_id))
+                else:
+                    return redirect(redirect_url)
     else:
-        return render_template('crud/edit_purchase_listing.html', form=form, dashboard_id=dashboard_id, listing_id=listing_id, purchase_id=purchase_id)
+        return render_template('crud/edit_purchase_listing.html', form=form, listing_id=listing_id, purchase_id=purchase_id)
 
-@routes.route('/dashboards/<int:dashboard_id>/listings/<int:listing_id>/purchases/<int:purchase_id>/delete', methods=['GET', 'POST'])
+@routes.route('/listings/<int:listing_id>/purchases/<int:purchase_id>/delete', methods=['POST'])
 @login_required
 @vendor_permission.require(http_exception=403)
-def delete_purchase_listing(dashboard_id, listing_id, purchase_id):
+def delete_purchase_listing(listing_id, purchase_id):
     try:
+        user_dashboard = current_user.dashboard
         form = removePurchaseForm()
+        redirect_url = secureRedirect(form.action_redirect.data) if form.action_redirect and form.action_redirect.data else None
         # user can change url by mistake so this query prevent any invalid url not given by system (unlike supplier purchase which is global for any dashboard) (Supplier Purchase diffrent alot that listing purchase)
         target_purchase = db.session.query(
             Purchase
@@ -850,12 +894,27 @@ def delete_purchase_listing(dashboard_id, listing_id, purchase_id):
         ).filter(
             Purchase.id == purchase_id,
             Listing.id == listing_id,
-            Dashboard.id == dashboard_id,
+            Dashboard.id == user_dashboard.id,
             User.id == current_user.id
         ).one_or_none()
+        
         if target_purchase is not None:
             if form.validate_on_submit():
+
+                current_quantity = int(target_purchase.listing.catalogue.quantity)
+                purchase_quantity = int(target_purchase.quantity)
+                                
+                target_catalogue_quantity = current_quantity - purchase_quantity
+                # if target_catalogue_quantity < 0:
+                #     flash('Note, you need to delete one or more orders that created after the deleted purchase, based on it upcoming qunaity', 'danger')
+                target_catalogue_quantity = target_catalogue_quantity if target_catalogue_quantity >= 0 else 0
+                target_purchase.listing.catalogue.quantity = target_catalogue_quantity
+
                 target_purchase.delete()
+                target_purchase.listing.catalogue.update()
+                
+                # update sum of dashboard's purchases
+                updateDashboardPurchasesSum(db, Purchase, Listing, user_dashboard)
                 flash('Successfully removed purchase with ID: {}'.format(purchase_id), 'success')
             else:
                 # security wtform
@@ -865,19 +924,23 @@ def delete_purchase_listing(dashboard_id, listing_id, purchase_id):
     except Exception as e:
         print('System Error: {} , info: {}'.format(e, sys.exc_info()))
         flash('Unknown error unable to edit purchase with id: {}'.format(purchase_id), 'danger')
+        raise e
+
     finally:
-        return redirect(url_for('routes.view_listing', dashboard_id=dashboard_id, listing_id=listing_id))
+        if redirect_url:
+            return redirect(redirect_url)
+        else:
+            return redirect(url_for('routes.view_listing', listing_id=listing_id))
 
 
 ################ -------------------------- Listings Orders -------------------- ################
-
-@routes.route('/dashboards/<int:dashboard_id>/listings/<int:listing_id>/orders/<int:order_id>', methods=['GET'])
+@routes.route('/listings/<int:listing_id>/orders/<int:order_id>', methods=['GET'])
 @login_required
 @vendor_permission.require()
-def view_order(dashboard_id, listing_id, order_id):    
+def view_order(listing_id, order_id):    
     success = True
     target_order = None
-    try:        
+    try:
         deleteform = removeOrderForm()
         # user dashboard, listing id to keep index stable and not generate invalid pages to the app (if dashboard, and listing id user can view his orders from invalid urls which not stable for indexing)
         target_order = db.session.query(
@@ -891,7 +954,7 @@ def view_order(dashboard_id, listing_id, order_id):
         ).filter(
             Order.id == order_id,
             Listing.id == listing_id,
-            Dashboard.id == dashboard_id,
+            Dashboard.id == current_user.dashboard.id,
             User.id == current_user.id
         ).one_or_none()
 
@@ -905,19 +968,22 @@ def view_order(dashboard_id, listing_id, order_id):
         success = False
     finally:
         if success == True:
-            return render_template('order.html', order=target_order, dashboard_id=dashboard_id, listing_id=listing_id, deleteform=deleteform)
+            return render_template('order.html', order=target_order, listing_id=listing_id, deleteform=deleteform)
         else:
-            return redirect(url_for('routes.view_listing', dashboard_id=dashboard_id, listing_id=dashboard_id))
+            return redirect(url_for('routes.view_listing', listing_id=listing_id))
         
 
-@routes.route('/dashboards/<int:dashboard_id>/listings/<int:listing_id>/orders/add', methods=['GET', 'POST'])
+@routes.route('/listings/<int:listing_id>/orders/add', methods=['GET', 'POST'])
 @login_required
 @vendor_permission.require(http_exception=403)
-def add_order(dashboard_id, listing_id):
+def add_order(listing_id):
     form = None
     target_listing = None
     dashboard_listings = []
+    user_dashboard = None
+    redirect_url = None
     try:
+        user_dashboard = current_user.dashboard
         target_listing = db.session.query(
             Listing
         ).join(
@@ -926,12 +992,12 @@ def add_order(dashboard_id, listing_id):
             User
         ).filter(
             Listing.id == listing_id,
-            Dashboard.id == dashboard_id,
+            Dashboard.id == user_dashboard.id,
             User.id == current_user.id            
         ).one_or_none()
         if target_listing is None:
             flash('Unable to find listing with id: ({})'.format(listing_id), 'danger')
-            return redirect(url_for('routes.listings', dashboard_id=dashboard_id))
+            return redirect(url_for('routes.listings'))
         
         form = addOrderForm(listing_id=target_listing.id)
         # user using this route can only use the listing of selected dashboard so not allow another dashboard's listing to be submited some how using this route as it not provided
@@ -943,19 +1009,20 @@ def add_order(dashboard_id, listing_id):
             User
         ).filter(
             User.id == current_user.id,
-            Dashboard.id == dashboard_id
+            Dashboard.id == user_dashboard.id
         ).all()
         form.listing_id.choices = [(listing.id, '{} - ({})'.format(listing.product_name, listing.sku) ) for listing in dashboard_listings]
 
     except Exception as e:
         print('System Error: {} , info: {}'.format(e, sys.exc_info()))
         flash('Unknown error unable to display Add Order form', 'danger')
-        return redirect(url_for('routes.view_listing', dashboard_id=dashboard_id, listing_id=listing_id))
+        return redirect(url_for('routes.view_listing', listing_id=listing_id))
 
     if request.method == 'POST':
         success = True
         try:
             if form.validate_on_submit():
+                redirect_url = secureRedirect(form.action_redirect.data) if form.action_redirect and form.action_redirect.data else None 
                 valid_ids = int(form.listing_id.data) in [listing.id for listing in dashboard_listings]
                 
                 # note I allow user to change the listing in form thats why I query again  (the listing_id already vaildted in the if so it belongs to the user)
@@ -973,8 +1040,14 @@ def add_order(dashboard_id, listing_id):
                             customer_lastname=form.customer_lastname.data
                         )
                         new_order.insert()
-                        selected_listing.catalogue.quantity = int(catalogue_quantity - order_quantity)
+                        #manual
+                        new_quantity = int(catalogue_quantity - order_quantity)
+                        new_quantity = new_quantity if new_quantity >= 0 else 0
+                        selected_listing.catalogue.quantity = new_quantity
                         selected_listing.catalogue.update()
+
+                        # update dashboard orders count
+                        updateDashboardOrders(db, Order, Listing, user_dashboard)
                         flash('Successfully Created New Order', 'success')
                     else:
                         flash('Unable to add order, the order quantity is greater than the available catalog quantity', 'warning')
@@ -989,20 +1062,29 @@ def add_order(dashboard_id, listing_id):
             print('System Error: {} , info: {}'.format(e, sys.exc_info()))
             flash('Unknown error unable to create new Order', 'danger')        
             success = None
+
         finally:
             if success == True:
-                return redirect(url_for('routes.view_listing', dashboard_id=dashboard_id, listing_id=listing_id))
+                if redirect_url is not None:
+                    return redirect(redirect_url)
+                else:
+                    return redirect(url_for('routes.view_listing', listing_id=listing_id))
             elif success == False:
-                return render_template('crud/add_order.html', form=form, dashboard_id=dashboard_id, listing_id=listing_id)
+                return render_template('crud/add_order.html', form=form, listing_id=listing_id, redirect_url=redirect_url)
             else:
-                return redirect(url_for('routes.view_listing', dashboard_id=dashboard_id, listing_id=listing_id))
-    else:
-        return render_template('crud/add_order.html', form=form, dashboard_id=dashboard_id, listing_id=listing_id)
+                if redirect_url is not None:
+                    return redirect(redirect_url)
+                else:
+                    return redirect(url_for('routes.view_listing', listing_id=listing_id))
 
-@routes.route('/dashboards/<int:dashboard_id>/listings/<int:listing_id>/orders/<int:order_id>/edit', methods=['GET', 'POST'])
+    else:
+        return render_template('crud/add_order.html', form=form, listing_id=listing_id)
+
+
+@routes.route('/listings/<int:listing_id>/orders/<int:order_id>/edit', methods=['GET', 'POST'])
 @login_required
 @vendor_permission.require()
-def edit_order(dashboard_id, listing_id, order_id):
+def edit_order(listing_id, order_id):
     form = None
     target_order = None
     dashboard_listings = []
@@ -1020,13 +1102,13 @@ def edit_order(dashboard_id, listing_id, order_id):
         ).filter(
             Order.id == order_id,
             Listing.id == listing_id,
-            Dashboard.id == dashboard_id,
+            Dashboard.id == current_user.dashboard.id,
             User.id == current_user.id
         ).one_or_none()
 
         if target_order is None:
             flash('Unable to find Order with id: ({})'.format(order_id), 'danger')
-            return redirect(url_for('routes.view_listing', dashboard_id=dashboard_id, listing_id=listing_id))
+            return redirect(url_for('routes.view_listing', listing_id=listing_id))
         
         form = editOrderForm(
             listing_id=target_order.listing_id,
@@ -1044,75 +1126,123 @@ def edit_order(dashboard_id, listing_id, order_id):
             User
         ).filter(
             User.id == current_user.id,
-            Dashboard.id == dashboard_id
+            Dashboard.id == current_user.dashboard.id
         ).all()
         form.listing_id.choices = [(listing.id, '{} - ({})'.format(listing.product_name, listing.sku) ) for listing in dashboard_listings]
 
     except Exception as e:
         print('System Error: {} , info: {}'.format(e, sys.exc_info()))
         flash('Unknown error unable to display Add Order form', 'danger')
-        return redirect(url_for('routes.view_listing', dashboard_id=dashboard_id, listing_id=listing_id))
+        return redirect(url_for('routes.view_listing', listing_id=listing_id))
     
     if request.method == 'POST':
         success = True
         actions = 0
         quantity_changed = False
         current_order_quantity = 0
-        try:
+        try:            
             if form.validate_on_submit():
+                redirect_url = secureRedirect(form.action_redirect.data) if form.action_redirect and form.action_redirect.data else None
+
                 valid_ids = int(form.listing_id.data) in [listing.id for listing in dashboard_listings]
                 selected_listing = Listing.query.filter_by(id=form.listing_id.data).one_or_none()
+
+
                 if valid_ids and selected_listing:
+                    # here listing id changed, and this new listing for a diffrent catalogue (note usally every catalogue have 1 listing)
+                    if target_order.listing.catalogue.id != selected_listing.catalogue.id:
+                                            
+                        new_order_quantity0 = int(form.quantity.data)
+                        new_catalogue_quantity0 = int(selected_listing.catalogue.quantity)
+                        order_quantity0 = int(target_order.quantity)                        
+                        catalogue_quantity0 = int(target_order.listing.catalogue.quantity)
+                        orginal_quantity0 = catalogue_quantity0 + order_quantity0
 
-                    if target_order.listing_id != form.listing_id.data:
-                        target_order.listing_id = form.listing_id.data
-                        actions += 1
+                        new_quantity0 = new_catalogue_quantity0 - new_order_quantity0
+                        new_quantity0 = new_quantity0 if new_quantity0 >= 0 else new_quantity0
 
-                    if target_order.quantity != form.quantity.data:
-                        current_order_quantity = target_order.quantity
-                        target_order.quantity = form.quantity.data
-                        actions += 1
-                        quantity_changed = True
-
-                    if target_order.date != form.date.data:
-                        target_order.date = form.date.data
-                        actions += 1
-
-                    if target_order.customer_firstname != form.customer_firstname.data:
-                        target_order.customer_firstname = form.customer_firstname.data
-                        actions += 1
-
-                    if target_order.customer_lastname != form.customer_lastname.data:
-                        target_order.customer_lastname = form.customer_lastname.data
-                        actions += 1
-                    
-                
-                    if actions > 0:
-                        
-                        if quantity_changed:
-                            # this check can block the whole update action incase it fails
-                            order_quantity = int(form.quantity.data)
-                            catalogue_quantity = int(selected_listing.catalogue.quantity)
-
+                        # check if new catalogue quanity accept this order quanaity
+                        if new_catalogue_quantity0 >= new_order_quantity0:
+    
+                            if target_order.quantity != form.quantity.data:
+                                target_order.quantity = form.quantity.data
+        
+                            if target_order.date != form.date.data:
+                                target_order.date = form.date.data
+        
+                            if target_order.customer_firstname != form.customer_firstname.data:
+                                target_order.customer_firstname = form.customer_firstname.data
+        
+                            if target_order.customer_lastname != form.customer_lastname.data:
+                                target_order.customer_lastname = form.customer_lastname.data
+    
                             
-                            # (the edit action made here, else can check if new order bigger than so substract less than then add but this 1 step) first back the cataloug quanity as it was before this order added then check the new requested quantity (not direct - as this edit)
-                            original_catalogue_quantity = int(catalogue_quantity + current_order_quantity)                                                    
-                            if original_catalogue_quantity >= order_quantity:
-                                # make the update action only if this check passed
-                                target_order.update()
-                                selected_listing.catalogue.quantity = int(original_catalogue_quantity - order_quantity)
-                                selected_listing.catalogue.update()
-                                flash('Successfully Updated The order', 'success')
-                            else:
-                                flash('Unable to add edit, the order quantity is greater than the available catalog quantity', 'warning')
-                                success = False
-                        else: 
-                            # here quantity not changed so direct update others
+                            if target_order.listing_id != form.listing_id.data:
+                                target_order.listing_id = form.listing_id.data
+
+
+
+                            target_order.listing.catalogue.quantity = orginal_quantity0
+                            selected_listing.catalogue.quantity = new_quantity0
+
                             target_order.update()
+                            target_order.listing.catalogue.update()
+                            selected_listing.catalogue.update()
                             flash('Successfully Updated The order', 'success')
+                        else:
+                            flash('Unable to add edit, the order quantity is greater than the new catalog quantity', 'warning')
+                            success = False
                     else:
-                        # nothing changed user opened the edit page and click edit
-                        flash('Successfully Updated The order', 'success')
+                        # order's listing not changed                    
+                        if target_order.quantity != form.quantity.data:
+                            current_order_quantity = target_order.quantity
+                            target_order.quantity = form.quantity.data
+                            actions += 1
+                            quantity_changed = True
+    
+                        if target_order.date != form.date.data:
+                            target_order.date = form.date.data
+                            actions += 1
+    
+                        if target_order.customer_firstname != form.customer_firstname.data:
+                            target_order.customer_firstname = form.customer_firstname.data
+                            actions += 1
+    
+                        if target_order.customer_lastname != form.customer_lastname.data:
+                            target_order.customer_lastname = form.customer_lastname.data
+                            actions += 1
+                        
+                        if target_order.listing_id != form.listing_id.data:
+                            target_order.listing_id = form.listing_id.data
+                            actions += 1
+
+                        if actions > 0:
+                            
+                            if quantity_changed:
+                                # this check can block the whole update action incase it fails
+                                order_quantity = int(form.quantity.data)
+                                catalogue_quantity = int(selected_listing.catalogue.quantity)
+    
+                                
+                                # (the edit action made here, else can check if new order bigger than so substract less than then add but this 1 step) first back the cataloug quanity as it was before this order added then check the new requested quantity (not direct - as this edit)
+                                original_catalogue_quantity = int(catalogue_quantity + current_order_quantity)                                                    
+                                if original_catalogue_quantity >= order_quantity:
+                                    new_quantity = int(original_catalogue_quantity - order_quantity)                                    
+                                    target_order.update()
+                                    selected_listing.catalogue.quantity = new_quantity                          
+                                    selected_listing.catalogue.update()
+
+                                    flash('Successfully Updated The order', 'success')
+                                else:
+                                    flash('Unable to add edit, the order quantity is greater than the available catalog quantity', 'warning')
+                                    success = False
+                            else: 
+                                # here quantity not changed so direct update others
+                                target_order.update()
+                                flash('Successfully Updated The order', 'success')
+                        else:
+                            # nothing changed user opened the edit page and click edit
+                            flash('Successfully Updated The order', 'success')
 
                 else:
                     flash('Unable to edit order invalid listing provided', 'danger')
@@ -1121,33 +1251,34 @@ def edit_order(dashboard_id, listing_id, order_id):
                 # wtforms error (render_template)
                 success = False
             
-            redirect_url = form.action_redirect.data if form.action_redirect.data else None
         except Exception as e:
             print('System Error: {} , info: {}'.format(e, sys.exc_info()))
-            flash('Unknown error unable to display Add Order form', 'danger')
-        
+            flash('Unknown error unable to display Edit Order form', 'danger')
+
         finally:
             if success == False:
-                return render_template('crud/edit_order.html', form=form, dashboard_id=dashboard_id, listing_id=listing_id, order_id=order_id)
+                return render_template('crud/edit_order.html', form=form, listing_id=listing_id, order_id=order_id, redirect_url=redirect_url)
             else:
                 if redirect_url is not None:
                     return redirect(redirect_url)
                 else:
-                    return redirect(url_for('routes.view_listing', dashboard_id=dashboard_id, listing_id=listing_id))
-        
+                    return redirect(url_for('routes.view_listing', listing_id=listing_id))
+
     else:
-        return render_template('crud/edit_order.html', form=form, dashboard_id=dashboard_id, listing_id=listing_id, order_id=order_id)
+        return render_template('crud/edit_order.html', form=form, listing_id=listing_id, order_id=order_id)
         
 
 
 
-@routes.route('/dashboards/<int:dashboard_id>/listings/<int:listing_id>/orders/<int:order_id>/delete', methods=['GET', 'POST'])
+@routes.route('/listings/<int:listing_id>/orders/<int:order_id>/delete', methods=['GET', 'POST'])
 @login_required
 @vendor_permission.require(http_exception=403)
-def delete_order(dashboard_id, listing_id, order_id):
+def delete_order(listing_id, order_id):
     redirect_url = None
     try:
+        user_dashboard = current_user.dashboard
         form = removeOrderForm()
+        redirect_url = secureRedirect(form.action_redirect.data) if form.action_redirect and form.action_redirect.data else None
         # user can change url by mistake so this query prevent any invalid url not given by system (unlike supplier purchase which is global for any dashboard) (Supplier Purchase diffrent alot that listing purchase)
         target_order = db.session.query(
             Order
@@ -1160,32 +1291,36 @@ def delete_order(dashboard_id, listing_id, order_id):
         ).filter(
             Order.id == order_id,
             Listing.id == listing_id,
-            Dashboard.id == dashboard_id,
+            Dashboard.id == user_dashboard.id,
             User.id == current_user.id
         ).one_or_none()
 
         if target_order is not None:
             if form.validate_on_submit():
+
                 current_quantity = int(target_order.listing.catalogue.quantity)
                 order_quantity = int(target_order.quantity)
-                target_order.listing.catalogue.quantity = order_quantity + order_quantity
+                target_order.listing.catalogue.quantity = current_quantity + order_quantity
+                target_order.listing.catalogue.update()
                 target_order.delete()
+
+                # update dashboard orders count
+                updateDashboardOrders(db, Order, Listing, user_dashboard)
                 flash('Successfully removed order with ID: {}'.format(order_id), 'success')
             else:
                 # security wtform
                 flash('Unable to delete order with ID: {} , invalid Data'.format(order_id), 'danger')
         else:
             flash('Unable to delete order with ID: {} , it not found or delete'.format(order_id), 'danger')
-        
-        redirect_url = form.action_redirect.data if form.action_redirect.data else None
     except Exception as e:
         print('System Error delete_order: {} , info: {}'.format(e, sys.exc_info()))
         flash('Unknown error unable to edit order with id: {}'.format(order_id), 'danger')
+
     finally:
         if redirect_url is not None:
-            return redirect(redirect_url)            
+            return redirect(redirect_url)
         else:
-            return redirect(url_for('routes.view_listing', dashboard_id=dashboard_id, listing_id=listing_id))
+            return redirect(url_for('routes.view_listing', listing_id=listing_id))
 
 
 
@@ -1197,31 +1332,28 @@ def orders():
     try:
         request_page = request.args.get('page', 1)
         order_remove = removeOrderForm()
-        default_dashboard = Dashboard.query.filter_by(default=True, user_id=current_user.id).first()
-        if default_dashboard is not None:
-            orders_query = db.session.query(
-                Order
-            ).join(
-                Listing
-            ).filter(
-                Listing.dashboard_id == default_dashboard.id,
-            )
-            pagination = makePagination(
-                request_page,
-                orders_query,
-                lambda total_pages: [url_for('routes.orders', page=page_index) for page_index in range(1, total_pages+1)]
-            )
+
+        orders_query = db.session.query(
+            Order
+        ).join(
+            Listing
+        ).filter(
+            Listing.dashboard_id == current_user.dashboard.id,
+        )
+        pagination = makePagination(
+            request_page,
+            orders_query,
+            lambda total_pages: [url_for('routes.orders', page=page_index) for page_index in range(1, total_pages+1)]
+        )
             
-            action_redirect = url_for('routes.orders', page=request_page)
-            orders = pagination['data']
-            return render_template('orders.html', orders=orders, pagination_btns=pagination['pagination_btns'], order_remove=order_remove, action_redirect=action_redirect)
-        else:
-            flash("No default dashboard found, if you haven't created a dashboard you will need to create one and it will automatically be set as the default dashboard", 'warning')
-            return redirect(url_for('routes.index'))
+        action_redirect = url_for('routes.orders', page=request_page)
+        orders = pagination['data']
+        return render_template('orders.html', orders=orders, pagination_btns=pagination['pagination_btns'], order_remove=order_remove, action_redirect=action_redirect)
+
     except Exception as e:
         print('System Error orders: {} , info: {}'.format(e, sys.exc_info()))
         flash('Unknown error unable to display orders page', 'danger')
-        return redirect(url_for('main.home'))
+        return redirect(url_for('routes.index'))
 
 ################ -------------------------- Suppliers -------------------- ################
 @routes.route('/suppliers', methods=['GET'])
@@ -1244,27 +1376,33 @@ def suppliers():
         else:
             return redirect(url_for('routes.index'))
 
+
 @routes.route('/suppliers/<int:supplier_id>', methods=['GET'])
 @login_required
 @vendor_permission.require()
 def view_supplier(supplier_id):
     success = True
+    message = ''
+    purchases = []
     try:
         deleteform = removeSupplierForm()
         delete_purchase_form = removePurchaseForm()
-        supplier = Supplier.query.filter_by(id=supplier_id, user_id=current_user.id).one_or_none()
-        purchases = Purchase.query.filter_by(supplier_id=supplier.id).all()
-        if supplier is None:
-            flash('Unable to Find Supplier with id: {}, it maybe deleted.'.format(supplier_id), 'danger')
+        supplier = Supplier.query.filter_by(id=supplier_id, user_id=current_user.id).one_or_none()        
+        if supplier is not None:
+            purchases = Purchase.query.filter_by(supplier_id=supplier.id).all()
+        else:
+            message = 'Unable to Find Supplier with id: {}, it maybe deleted.'.format(supplier_id)
             success = False
+
     except Exception as e:
         print('System Error: {} , info: {}'.format(e, sys.exc_info()))
-        flash('Unknown error unable to display suppliers page', 'danger')
+        message = 'Unknown error unable to display suppliers page'        
         success = False
     finally:
         if success == True:
             return render_template('supplier.html', supplier=supplier, purchases=purchases,deleteform=deleteform,delete_purchase_form=delete_purchase_form)
         else:
+            flash(message, 'danger')
             return redirect(url_for('routes.suppliers'))
 
 @routes.route('/suppliers/add', methods=['POST'])
@@ -1434,21 +1572,33 @@ def add_purchase_supplier(supplier_id):
         success = True
         try:
             if form.validate_on_submit():
-                # confirm listing id and supplier id are in user listings and suppliers (else user can create request for other user's suppliers)
-                valid_ids = int(form.listing_id.data) in [listing.id for listing in user_listings] and int(form.supplier_id.data) in [supplier.id for supplier in current_user.suppliers]
-                if valid_ids:
-                    new_purchase = Purchase(quantity=form.quantity.data, date=form.date.data, supplier_id=form.supplier_id.data, listing_id=form.listing_id.data)
-                    new_purchase.insert()
+                target_listing = db.session.query(Listing).join(Catalogue, Listing.catalogue_id==Catalogue.id).filter(Listing.id==form.listing_id.data, Catalogue.user_id==current_user.id).one_or_none()
+                if target_listing:
+                    # confirm listing id and supplier id are in user listings and suppliers (else user can create request for other user's suppliers)
+                    valid_ids = int(form.listing_id.data) in [listing.id for listing in user_listings] and int(form.supplier_id.data) in [supplier.id for supplier in current_user.suppliers]
+                    if valid_ids:
+                        new_purchase = Purchase(quantity=form.quantity.data, date=form.date.data, supplier_id=form.supplier_id.data, listing_id=target_listing.id)
+                        new_purchase.insert()
+                        # update number of quantity of the catalogue (catalogue update it's listings when change)
+                        new_purchase.listing.catalogue.quantity = int(new_purchase.listing.catalogue.quantity) + int(new_purchase.quantity)                                        
+                        new_purchase.listing.catalogue.update()
+
+                        # update sum of dashboard's purchases
+                        updateDashboardPurchasesSum(db, Purchase, Listing, current_user.dashboard)
+                    else:
+                        # invalid listing or supplier id, secuirty
+                        success = None
+                        flash('Unable to add New Purchase make sure data is valid', 'danger')
                 else:
-                    # invalid listing or supplier id, secuirty
+                    flash('Unable to add New Purchase selected listing not found or deleted', 'danger')
                     success = None
-                    flash('Unable to add New Purchase make sure data is valid', 'danger')
             else:
                 success = False
         except Exception as e:
             print('System Error: {} , info: {}'.format(e, sys.exc_info()))
             flash('Unknown error unable to Add Purchase', 'danger')
             success = None
+
         finally:
             if success == True:
                 flash('Successfully Created New Purchase for Supplier With ID:'.format(form.supplier_id.data))
@@ -1457,6 +1607,7 @@ def add_purchase_supplier(supplier_id):
                 return render_template('crud/add_purchase_supplier.html', form=form, supplier_id=supplier_id)
             else:
                 return redirect(url_for('routes.view_supplier', supplier_id=supplier_id))
+
     else:
         return render_template('crud/add_purchase_supplier.html', form=form, supplier_id=supplier_id)
 
@@ -1516,20 +1667,63 @@ def edit_purchase_supplier(supplier_id, purchase_id):
         try:
             if form.validate_on_submit():
                 valid_ids = int(form.listing_id.data) in [listing.id for listing in user_listings] and int(form.supplier_id.data) in [supplier.id for supplier in current_user.suppliers]
-                if valid_ids:
-                    if target_purchase.listing_id != form.listing_id.data:
-                        target_purchase.listing_id = form.listing_id.data
+                selected_listing = Listing.query.filter_by(id=form.listing_id.data).one_or_none()
+                if valid_ids and selected_listing:
 
-                    if target_purchase.supplier_id != form.supplier_id.data:
-                        target_purchase.supplier_id = form.supplier_id.data
+                    if target_purchase.listing.catalogue.id != selected_listing.catalogue.id:
+                        #return 'here listing change to diffrent catalogue'
 
-                    if target_purchase.quantity != form.quantity.data:
-                        target_purchase.quantity = form.quantity.data
+                        original_quantity = int(target_purchase.listing.catalogue.quantity) - int(target_purchase.quantity)
+                        original_quantity = original_quantity if original_quantity >= 0 else 0
+                        new_quantity = int(selected_listing.catalogue.quantity) + int(form.quantity.data)
 
-                    if target_purchase.date != form.date.data:
-                        target_purchase.date = form.date.data
+                        if target_purchase.supplier_id != form.supplier_id.data:
+                            target_purchase.supplier_id = form.supplier_id.data                          
+    
+                        if target_purchase.date != form.date.data:
+                            target_purchase.date = form.date.data
 
-                    target_purchase.update()
+                        if target_purchase.quantity != form.quantity.data:
+                            target_purchase.quantity = form.quantity.data
+                            quantity_changed = True
+                            
+                        if target_purchase.listing_id != form.listing_id.data:
+                            target_purchase.listing_id = form.listing_id.data
+
+
+                        target_purchase.listing.catalogue.quantity = original_quantity
+                        selected_listing.catalogue.quantity = new_quantity
+
+                        target_purchase.update()
+
+                        selected_listing.catalogue.update()
+                        target_purchase.listing.catalogue.update()
+
+                    else:
+                           
+                        if target_purchase.supplier_id != form.supplier_id.data:
+                            target_purchase.supplier_id = form.supplier_id.data
+
+                        if target_purchase.quantity != form.quantity.data:
+                            original_quantity = int(target_purchase.listing.catalogue.quantity) - int(target_purchase.quantity)
+                            original_quantity = original_quantity if original_quantity >= 0 else 0
+                            new_quantity = original_quantity + int(form.quantity.data)
+                            target_purchase.quantity = form.quantity.data
+                            selected_listing.catalogue.quantity = new_quantity
+                            quantity_changed = True
+                            
+    
+                        if target_purchase.date != form.date.data:
+                            target_purchase.date = form.date.data
+
+                        if target_purchase.listing_id != form.listing_id.data:
+                            target_purchase.listing_id = form.listing_id.data
+
+                        target_purchase.update()
+
+                        if quantity_changed:
+                            selected_listing.catalogue.update()
+
                 else:                    
                     flash('Unable to edit Purchases with ID:{}'.format(purchase_id), 'danger')
                     success = None
@@ -1549,7 +1743,7 @@ def edit_purchase_supplier(supplier_id, purchase_id):
                 return redirect(url_for('routes.view_supplier', supplier_id=supplier_id))
     else:
         return render_template('crud/edit_purchase_supplier.html', form=form, supplier_id=supplier_id, purchase_id=purchase_id)
-    
+
 @routes.route('/suppliers/<int:supplier_id>/purchases/<int:purchase_id>/delete', methods=['POST'])
 @login_required
 @vendor_permission.require(http_exception=403)
@@ -1570,7 +1764,20 @@ def delete_purchase_supplier(supplier_id, purchase_id):
         ).one_or_none()
         if target_purchase is not None:
             if form.validate_on_submit():
+
+                current_quantity = int(target_purchase.listing.catalogue.quantity)
+                purchase_quantity = int(target_purchase.quantity)
+
+                target_catalogue_quantity = current_quantity - purchase_quantity
+                target_catalogue_quantity = target_catalogue_quantity if target_catalogue_quantity >= 0 else 0
+                target_purchase.listing.catalogue.quantity = target_catalogue_quantity
+
                 target_purchase.delete()
+                target_purchase.listing.catalogue.update()
+
+
+                # update sum of dashboard's purchases
+                updateDashboardPurchasesSum(db, Purchase, Listing, current_user.dashboard)
                 flash('Successfully removed purchase with ID: {}'.format(purchase_id), 'success')
             else:
                 # security wtform
@@ -1582,6 +1789,91 @@ def delete_purchase_supplier(supplier_id, purchase_id):
         flash('Unknown error unable to edit purchase with id: {}'.format(purchase_id), 'danger') 
     finally:
         return redirect(url_for('routes.view_supplier', supplier_id=supplier_id))
+
+
+###########################  Dashboard platforms  ##############################
+@routes.route('/platforms/add', methods=['POST'])
+@login_required
+@vendor_permission.require(http_exception=403)
+def add_platform():    
+    try:
+        form = addPlatformForm()
+        if form.validate_on_submit():
+            new_platform = Platform(dashboard_id=current_user.dashboard.id, name=form.name_add.data)
+            new_platform.insert()
+            flash('Successfully Created New Platform', 'success')
+        else:
+            print(form.errors.items())
+            for field, errors in form.errors.items():
+                if field == 'csrf_token':
+                    continue
+                if field == 'name_add':
+                    field = 'name'
+                flash('Error in {} : {}'.format(field, ','.join(errors)), 'danger')
+
+    except Exception as e:
+        print('System Error: {} , info: {}'.format(e, sys.exc_info()))
+        flash('Unknown Error unable to create new Platform', 'danger')
+    finally:       
+        return redirect(url_for('routes.index'))
+
+@routes.route('/platforms/<int:platform_id>/edit', methods=['GET', 'POST'])
+@login_required
+@vendor_permission.require()
+def edit_platform(platform_id):
+    success = True
+    actions = 0
+    try:
+        form = editPlatformForm()
+        if form.validate_on_submit():
+            target_platform = Platform.query.filter_by(id=platform_id, dashboard_id=current_user.dashboard.id).one_or_none()
+            if target_platform is not None:
+                if target_platform.name != form.name_edit.data:
+                    target_platform.name = form.name_edit.data
+                    target_platform.update()
+                    flash('Successfully edit platform ID:({})'.format(platform_id), 'success')
+                else:
+                    flash('No changes Detected.', 'success')
+            else:
+                flash('platform with ID: ({})  not found or deleted'.format(platform_id))
+        else:
+            for field, errors in form.errors.items():
+                if field == 'csrf_token':
+                    continue
+
+                if field == 'name_edit':
+                    field = 'name'
+
+                flash('Error in {} : {}'.format(field, ','.join(errors)), 'danger')
+            success = False
+    except Exception as e:
+        print('System Error: {} , info: {}'.format(e, sys.exc_info()))
+        flash('Unknown error unable to edit platform', 'danger')
+        success = False
+    finally:
+        return redirect(url_for('routes.index'))
+
+@routes.route('/platforms/<int:platform_id>/delete', methods=['POST'])
+@login_required
+@vendor_permission.require(http_exception=403)
+def delete_platform(platform_id):
+    try:
+        form = removePlatformForm()
+        target_platform = Platform.query.filter_by(id=platform_id,dashboard_id=current_user.dashboard.id).one_or_none()
+        if target_platform is not None:
+            if form.validate_on_submit():
+                target_platform.delete()
+                flash('Successfully deleted Platform ID: {}'.format(platform_id), 'success')
+            else:
+                flash('Unable to delete platform, ID: {}'.format(platform_id), 'danger')
+        else:
+            flash('Platform not found it maybe deleted, ID: {}'.format(platform_id))
+    except Exception as e:
+        print('System Error: {} , info: {}'.format(e, sys.exc_info()))
+        flash('Unknown error unable to delete platform', 'danger')
+    finally:
+        return redirect(url_for('routes.index'))
+    
 
 @routes.errorhandler(403)
 def method_not_allowed(e):

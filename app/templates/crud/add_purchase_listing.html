@@ -1,18 +1,20 @@
 {% extends 'base.html' %}
 {% block title %}Add Purchase{% endblock %}
-{% block page_description %}This is form to add new Purchase{% if listing_id %} For Listing ID: ({{listing_id}}){% endif %}, listings are for dashboard {% if dashboard_id %} ({{dashboard_id}}) {% endif %}{% endblock %}
+{% block page_description %}This is form to add new Purchase{% if listing_id %} For Listing ID: ({{listing_id}}){% endif %}{% endblock %}
+{% block head_data %}
+  <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
+  <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+{% endblock %}
 {% block body %}
 <div class="container border rounded p-3">
   {% include 'messages.html' %}
 
-  {% if dashboard_id %}
-  <a href="{{url_for('routes.listings', dashboard_id=dashboard_id)}}" type="button" class="btn btn-light">
+  <a href="{{url_for('routes.listings')}}" type="button" class="btn btn-light">
     Back To Listings
   </a>
-  {% endif %}
   <div class="d-flex justify-content-end align-items-center">
-    {% if dashboard_id and listing_id %}
-    <a href="{{url_for('routes.view_listing', dashboard_id=dashboard_id, listing_id=listing_id)}}" type="button" class="btn btn-outline-warning">
+    {% if listing_id %}
+    <a href="{{url_for('routes.view_listing', listing_id=listing_id)}}" type="button" class="btn btn-outline-warning">
       Back To Listing ({{listing_id}})
     </a>
     {% endif %}
@@ -23,7 +25,7 @@
       {% if form and listing_id %}
       <div class="col-12 p-3 d-flex justify-content-center align-items-center cursor-pointer text-decoration-none text-dark media_small_width_100">
         <div class="container">
-            <form action="{{url_for('routes.add_purchase_listing', dashboard_id=dashboard_id, listing_id=listing_id)}}" method="POST">          
+            <form action="{{url_for('routes.add_purchase_listing', listing_id=listing_id)}}" method="POST">          
               {{form.hidden_tag()}}
               <div class="form-group">
                 {{form.supplier_id.label}}
@@ -75,11 +77,32 @@
               </div>
               <div class="d-flex justify-content-center align-items-center w-50 mx-auto">
                 {{form.add(class='btn btn-success w-50')}}
-                <a href="{{url_for('routes.view_listing', dashboard_id=dashboard_id, listing_id=listing_id)}}" class="btn btn-primary w-50">Cancel</a>
+                <a id="cancel_link" href="{{url_for('routes.view_listing', listing_id=listing_id)}}" class="btn btn-primary w-50">Cancel</a>
               </div>
             </form>
         </div>
       </div>
+      <script>
+        /* add search select input */
+        $(document).ready(function() {            
+            $('#supplier_id').select2({  // init Select2 on form's name field
+                placeholder: "{{ form.supplier_id.label.text }}",
+                allowClear: true,
+                "width": "100%"
+            });
+            $('#listing_id').select2({  // init Select2 on form's name field
+                placeholder: "{{ form.listing_id.label.text }}",
+                allowClear: true,
+                "width": "100%"
+            });
+
+
+        });
+        let customRedirect = {% if redirect_url %}{{redirect_url|tojson}}{% else %}null{% endif %};
+        $(document).ready(function() {
+            setFormRedirectByUrl(customRedirect);
+        });
+      </script>
       {% else %}
       <div class="alert alert-danger">Unable to Display Add Purchase form right now.</div>
       {% endif %}

@@ -6,7 +6,7 @@
   {% include 'messages.html' %}
   <img src="{{url_for('static', filename='assets/images/loading_circle.gif')}}" class="loading_circle" style="display:none;" />    
   <div class="container-fluid content_container">
-    {% if dashboard_id and listings is defined %} 
+    {% if listings is defined %} 
     <!-- settings menu-->
     <div id="settings_toast_cont">
       <button type="button" class="btn btn-outline-primary mb-1" id="open_settings">Settings</button>
@@ -29,11 +29,8 @@
     </div>
     <!-- settings end -->
     <div class="d-flex justify-content-end align-items-center flex-wrap">
-      <a href="{{url_for('routes.add_listing', dashboard_id=dashboard_id)}}" class="ml-2 btn btn-primary">
+      <a href="{{url_for('routes.add_listing')}}" class="ml-2 btn btn-primary">
         Add Listing
-      </a>
-      <a href="{{url_for('routes.view_dashboard', dashboard_id=dashboard_id)}}" class="ml-2 btn btn-success">
-        Back to Dashboard ({{dashboard_id}})
       </a>
     </div>
     <!-- search component -->
@@ -66,10 +63,20 @@
     <!-- card display -->
     <div class="row" id="card_display" style="display:none;">
       {% for listing in listings %}
+
+      {# create platforms search string #}
+      {% set ns = namespace(platforms_string='') %}
+      {% for listing_platform in listing.platforms %}
+        {% set ns.platforms_string = ns.platforms_string ~ listing_platform.platform.name  %}
+        {% if not loop.last %}
+        {% set ns.platforms_string = ns.platforms_string ~ ', ' %}
+        {% endif %}
+      {% endfor %}
+
       <div class="searching_card col-4 p-3 d-flex justify-content-center align-items-stretch cursor-pointer text-decoration-none text-dark media_small_width_100"
       data-search-id="{{listing.id}}" data-search-catalogueid="{{listing.catalogue_id}}" data-search-sku="{{listing.sku}}"
       data-search-product_name="{{listing.product_name}}" data-search-price="{{listing.price}}" 
-      data-search-sale_price="{{listing.sale_price}}" data-search-quantity="{{listing.quantity}}" data-search-platform="{{listing.platform}}">
+      data-search-sale_price="{{listing.sale_price}}" data-search-quantity="{{listing.quantity}}" data-search-platform="{{ns.platforms_string}}">
 
       <div class="hover_shadow row container border rounded shadow p-3">
           <div class="col-sm-12 mb-3 text-center">
@@ -83,14 +90,14 @@
             <div class="overflow_within">Price: <span>{{listing.price}}</span></div>
             <div class="overflow_within">Sale Price: <span>{{listing.sale_price}}</span></div>
             <div class="overflow_within">Quantity: <span>{{listing.quantity}}</span></div>
-            <div class="overflow_within">Platform: <span>{{listing.platform}}</span></div>
+            <div class="overflow_within">Platform: <span>{% for listing_platform in listing.platforms %}<span class="badge badge-secondary">{{listing_platform.platform.name}}</span>{% endfor %}</span></div>
           </div>
           <div class="col-sm-12 row">
             <div class="col-sm-6">
-              <a href="{{url_for('routes.view_listing', dashboard_id=listing.dashboard.id, listing_id=listing.id)}}" class="btn btn-primary btn-block">View</a>
+              <a href="{{url_for('routes.view_listing', listing_id=listing.id)}}" class="btn btn-primary btn-block">View</a>
             </div>
             <div class="col-sm-6">
-              <a href="{{url_for('routes.edit_listing', dashboard_id=listing.dashboard.id, listing_id=listing.id)}}" class="btn btn-secondary btn-block">Edit</a>
+              <a href="{{url_for('routes.edit_listing', listing_id=listing.id)}}" class="btn btn-secondary btn-block">Edit</a>
             </div>            
           </div>
         </div>
@@ -119,9 +126,18 @@
           </thead>
           <tbody>
             {% for listing in listings %}
+              {# create platforms search string #}
+              {% set ns = namespace(platforms_string='') %}
+              {% for listing_platform in listing.platforms %}
+                {% set ns.platforms_string = ns.platforms_string ~ listing_platform.platform.name  %}
+                {% if not loop.last %}
+                {% set ns.platforms_string = ns.platforms_string ~ ', ' %}
+                {% endif %}
+              {% endfor %}
+              
             <tr class="searching_card" data-search-id="{{listing.id}}" data-search-catalogueid="{{listing.catalogue_id}}" data-search-sku="{{listing.sku}}"
             data-search-product_name="{{listing.product_name}}" data-search-price="{{listing.price}}" 
-            data-search-sale_price="{{listing.sale_price}}" data-search-quantity="{{listing.quantity}}" data-search-platform="{{listing.platform}}">
+            data-search-sale_price="{{listing.sale_price}}" data-search-quantity="{{listing.quantity}}" data-search-platform="{{ns.platforms_string}}">
               <td>
                 <p class="overflow_within">{{listing.id}}</p>
               </td>
@@ -147,16 +163,16 @@
                 <p class="overflow_within">{{listing.quantity}}</p>
               </td>
               <td>
-                <p class="overflow_within">{{listing.platform}}</p>
-              </td>                                          
+                <p class="overflow_within">{% for listing_platform in listing.platforms %}<span class="badge badge-secondary">{{listing_platform.platform.name}}</span>{% endfor %}</p>
+              </td>                        
               <td>
                 <div class="col-sm-12 row">
                   <div class="col-sm-12 d-flex justify-content-around align-items-center">
                     <div>
-                      <a href="{{url_for('routes.view_listing', dashboard_id=listing.dashboard.id, listing_id=listing.id)}}" class="btn btn-primary btn-block">View</a>
+                      <a href="{{url_for('routes.view_listing', listing_id=listing.id)}}" class="btn btn-primary btn-block">View</a>
                     </div>
                     <div>
-                      <a href="{{url_for('routes.edit_listing', dashboard_id=listing.dashboard.id, listing_id=listing.id)}}" class="btn btn-secondary btn-block">Edit</a>
+                      <a href="{{url_for('routes.edit_listing', listing_id=listing.id)}}" class="btn btn-secondary btn-block">Edit</a>
                     </div>              
                   </div>                               
                 </div>
@@ -195,7 +211,7 @@ const paginationPage = {{ request.args.get('page', 1) }};
 displayPaginationComponent(paginationBtns, paginationPage, ['listings_pag1', 'listings_pag2']);
 
 /* add search component to the page */
-searchComponent('mid', 'swing');
+searchComponent('mid', 'swing', cp=function(){return true;}, addon='', condition='*=');
 
 toggleSettingsToast();
 </script>

@@ -1,26 +1,25 @@
 {% extends 'base.html' %}
 {% block title %}Add Listing{% endblock %}
 {% block page_description %}This is form to add new Manual Listing Product{% endblock %}
+{% block head_data %}
+  <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
+  <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+{% endblock %}
 {% block body %}
 <div class="container border rounded p-3">
   {% include 'messages.html' %}
   <div class="d-flex justify-content-end align-items-center flex-wrap">
-    {% if dashboard_id %}
-    <a href="{{url_for('routes.listings', dashboard_id=dashboard_id)}}" type="button" class="btn btn-primary">
+    <a href="{{url_for('routes.listings')}}" type="button" class="btn btn-primary">
       Back To Listings
     </a>
-    <a href="{{url_for('routes.view_dashboard', dashboard_id=dashboard_id)}}" type="button" class="btn btn-success ml-2">
-        Back To Dashboard {{dashboard_id}}
-    </a>    
-    {% endif %}
   </div>
   <div class="container-fluid content_container">
     <div class="row">
       <!-- Logged User Dashboards  -->
-      {% if dashboard_id and form %}
+      {% if form %}
       <div class="col-12 p-3 d-flex justify-content-center align-items-center cursor-pointer text-decoration-none text-dark media_small_width_100">
         <div class="container">
-            <form action="{{url_for('routes.add_listing', dashboard_id=dashboard_id)}}" method="POST">          
+            <form action="{{url_for('routes.add_listing')}}" method="POST">          
               {{form.hidden_tag()}}
               <div class="form-group">
                 {{form.catalogue_id.label}}
@@ -35,12 +34,12 @@
                 {% endif %}
               </div>
               <div class="form-group">
-                {{form.platform.label}}
-                {{form.platform(class='form-control', placeholder='Plateform')}}
+                {{form.platforms.label}}
+                {{form.platforms(class='form-control', placeholder='Plateforms')}}
 
-                {% if form.platform.errors %}
+                {% if form.platforms.errors %}
                 <ul class="errors bg-danger text-white">
-                    {% for error in form.platform.errors %}
+                    {% for error in form.platforms.errors %}
                         <li class="p-1 mb-1">{{ error }}</li>
                     {% endfor %}
                 </ul>
@@ -48,11 +47,21 @@
               </div>
               <div class="d-flex justify-content-center align-items-center w-50 mx-auto">
                 {{form.add(class='btn btn-success w-50')}}
-                <a href="{{url_for('routes.listings', dashboard_id=dashboard_id)}}" class="btn btn-primary w-50">Cancel</a>
+                <a href="{{url_for('routes.listings')}}" class="btn btn-primary w-50">Cancel</a>
               </div>
             </form>
         </div>
       </div>
+      <script>
+        /* add search select input */
+        $(document).ready(function() {
+            $('#catalogue_id').select2({  // init Select2 on form's name field
+                placeholder: "{{ form.catalogue_id.label.text }}",
+                allowClear: true,
+                "width": "100%"
+            });
+        });
+      </script>
       {% else %}
       <div class="alert alert-danger">Unable to Display Add Dashboards form right now.</div>
       {% endif %}

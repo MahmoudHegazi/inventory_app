@@ -73,7 +73,7 @@ class RoleModalView(InventoryModelView):
 
 class DashboardModalView(InventoryModelView):
     column_filters = ['created_date', 'updated_date', 'num_of_listings', 'num_of_orders', 'sum_of_monthly_purchases', 'user']
-    column_searchable_list = ['title', 'user_id']
+    column_searchable_list = ['title']
     column_editable_list = ['title']
     form_excluded_columns = ['created_date', 'updated_date', 'listings']
 
@@ -85,9 +85,9 @@ class catalogueModalView(InventoryModelView):
 
 
 class ListingModalView(InventoryModelView):
-    column_filters = ['created_date', 'updated_date', 'catalogue_id', 'sku', 'product_name', 'product_description', 'brand', 'category', 'price', 'sale_price','quantity', 'platform', 'catalogue']
-    column_searchable_list = ['sku', 'catalogue_id', 'product_name', 'brand', 'category', 'price', 'platform']
-    column_editable_list = ['product_name', 'brand', 'category', 'price', 'sale_price', 'quantity', 'platform']
+    column_filters = ['created_date', 'updated_date', 'catalogue_id', 'sku', 'product_name', 'product_description', 'brand', 'category', 'price', 'sale_price','quantity', 'catalogue']
+    column_searchable_list = ['sku', 'catalogue_id', 'product_name', 'brand', 'category', 'price']
+    column_editable_list = ['product_name', 'brand', 'category', 'price', 'sale_price', 'quantity']
     # exclude skue, etc from forms as it updated by sqlalchemy event automatic when catalogue update,and in insert it filled up automatic with on_model_change
     form_excluded_columns = ['created_date', 'updated_date', 'purchases', 'orders', 'sku', 'product_name', 'product_description', 'brand', 'category', 'price', 'sale_price','quantity']
 

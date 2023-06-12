@@ -4,14 +4,59 @@ import sys
 from sqlalchemy import desc, asc
 from sqlalchemy.orm import relationship, backref
 #from bcrypt import gensalt, hashpw, checkpw
-from sqlalchemy import DateTime, Enum
+from sqlalchemy import DateTime, Enum, func
 from sqlalchemy.dialects.mysql import FLOAT
 from sqlalchemy.ext.declarative import declarative_base
 from app import db
 from flask_login import UserMixin
+from sqlalchemy.orm.attributes import get_history
 ################################ ---------- Tables for Authentication (Start) ---------------- #########################
 
 Base = declarative_base()
+
+
+class Dashboard(db.Model):
+    __tablename__ = 'dashboard'
+    id = db.Column(db.Integer, primary_key=True, nullable=False)
+    title = db.Column(db.String(45), nullable=True, default='Dashboard')
+    num_of_listings = db.Column(db.Integer, nullable=True, default=0)
+    num_of_orders = db.Column(db.Integer, nullable=True, default=0)
+    sum_of_monthly_purchases = db.Column(db.DECIMAL(precision=12, scale=2, asdecimal=True), nullable=True, default=0.00)    
+    created_date = db.Column(db.DateTime, nullable=False, default=datetime.datetime.utcnow)
+    updated_date = db.Column(db.DateTime, nullable=True, default=None, onupdate=datetime.datetime.utcnow)
+    listings = db.relationship("Listing", backref="dashboard", cascade="all, delete", passive_deletes=True)
+    platforms = db.relationship("Platform", backref="dashboard", cascade="all, delete", passive_deletes=True)
+    user = db.relationship("User", backref="dashboard", cascade="all, delete", passive_deletes=True, uselist=False)
+
+
+    def __init__(self, title='Dashboard', num_of_listings=0, num_of_orders=0, sum_of_monthly_purchases=0.00):
+        self.title = title
+        self.num_of_listings = num_of_listings
+        self.num_of_orders = num_of_orders
+        self.sum_of_monthly_purchases = sum_of_monthly_purchases        
+
+    def insert(self):
+        db.session.add(self)
+        db.session.commit()
+
+    def update(self):
+        db.session.commit()
+
+    def delete(self):
+        db.session.delete(self)
+        db.session.commit()
+
+    def format(self):
+        return {
+        'id': self.id,
+        'title': self.title,
+        'num_of_listings': self.num_of_listings,
+        'num_of_orders': self.num_of_orders,
+        'sum_of_monthly_purchases': self.sum_of_monthly_purchases,
+        'created_date': self.created_date,
+        'updated_date': self.updated_date
+        }
+
 
 #, autoincrement=True email
 class User(UserMixin, db.Model):
@@ -25,12 +70,14 @@ class User(UserMixin, db.Model):
     approved = db.Column(db.Boolean, nullable=False, default=True)
     authenticated = db.Column(db.Boolean, default=False)
     created_date = db.Column(db.DateTime, nullable=False, default=datetime.datetime.utcnow)
-    updated_date = db.Column(db.DateTime, nullable=True, default=None, onupdate=datetime.datetime.utcnow)
-    dashboards = db.relationship("Dashboard", backref="user", cascade="all, delete", lazy='dynamic', passive_deletes=True)
+    updated_date = db.Column(db.DateTime, nullable=True, default=None, onupdate=datetime.datetime.utcnow)    
+    dashboard_id = db.Column(db.Integer, db.ForeignKey('dashboard.id', ondelete="CASCADE", onupdate="CASCADE"), nullable=False, unique=True)
     suppliers = db.relationship("Supplier", backref="user", cascade="all, delete", passive_deletes=True)
     roles = db.relationship("UserRoles", backref="user", cascade="all, delete", passive_deletes=True)
     catalogues = db.relationship('Catalogue', backref='user', cascade="all, delete", lazy='dynamic', passive_deletes=True)
-    def __init__(self, name, uname, email, upass, image='default_user.png', approved=True):
+
+    def __init__(self, dashboard_id, name, uname, email, upass, image='default_user.png', approved=True):
+        self.dashboard_id = dashboard_id
         self.name = name
         self.uname = uname
         self.email = email
@@ -72,6 +119,7 @@ class User(UserMixin, db.Model):
     def format(self):
         return {
         'id': self.id,
+        'dashboard_id': self.dashboard_id,
         'name': self.name,
         'uname': self.uname,
         'email': self.email,
@@ -189,49 +237,6 @@ class Supplier(db.Model):
         'updated_date': self.updated_date
         }
 
-class Dashboard(db.Model):
-    __tablename__ = 'dashboard'
-    id = db.Column(db.Integer, primary_key=True, nullable=False)
-    title = db.Column(db.String(45), nullable=True, default='New Dashboard')
-    num_of_listings = db.Column(db.Integer, nullable=True, default=0)
-    num_of_orders = db.Column(db.Integer, nullable=True, default=0)
-    sum_of_monthly_purchases = db.Column(db.DECIMAL(precision=12, scale=2, asdecimal=True), nullable=True, default=0.00)
-    user_id = db.Column(db.Integer, db.ForeignKey('user.id', ondelete="CASCADE", onupdate="CASCADE"), nullable=False)
-    default = db.Column(db.Boolean, nullable=True, default=0)
-    created_date = db.Column(db.DateTime, nullable=False, default=datetime.datetime.utcnow)
-    updated_date = db.Column(db.DateTime, nullable=True, default=None, onupdate=datetime.datetime.utcnow)
-    listings = db.relationship("Listing", backref="dashboard", cascade="all, delete", passive_deletes=True)
-
-
-    def __init__(self, user_id, title='New Dashboard', num_of_listings=0, num_of_orders=0, sum_of_monthly_purchases=0.00, default=0):
-        self.user_id = user_id
-        self.title = title
-        self.num_of_listings = num_of_listings
-        self.num_of_orders = num_of_orders
-        self.sum_of_monthly_purchases = sum_of_monthly_purchases        
-        self.default = default
-
-    def insert(self):
-        db.session.add(self)
-        db.session.commit()
-
-    def update(self):
-        db.session.commit()
-
-    def delete(self):
-        db.session.delete(self)
-        db.session.commit()
-
-    def format(self):
-        return {
-        'id': self.id,
-        'title': self.title,
-        'num_of_listings': self.num_of_listings,
-        'num_of_orders': self.num_of_orders,
-        'sum_of_monthly_purchases': self.sum_of_monthly_purchases,
-        'created_date': self.created_date,
-        'updated_date': self.updated_date
-        }
 
 # sku, product_name, product_description, product_name, product_description, brand, category, price, sale_price, quantity, product_model,
 # condition, upc, location, product_image, 
@@ -279,7 +284,38 @@ class Catalogue(db.Model): # catelouge
         db.session.commit()
 
     def update(self):
+        # update listings data when update done with event after_update (no use event)
         db.session.commit()
+
+    def sync_catalogue_listings(self):
+
+        for catalogue_listing in self.listings:
+            if self.sku != catalogue_listing.sku:
+                catalogue_listing.sku = self.sku
+
+            if self.product_name != catalogue_listing.product_name:
+                catalogue_listing.product_name = self.product_name
+
+            if self.product_description != catalogue_listing.product_description:
+                catalogue_listing.product_description = self.product_description
+
+            if self.brand != catalogue_listing.brand:
+                catalogue_listing.brand = self.brand
+
+            if self.category != catalogue_listing.category:
+                catalogue_listing.category = self.category
+
+            if self.price != catalogue_listing.price:
+                catalogue_listing.price = self.price
+
+            if self.sale_price != catalogue_listing.sale_price:
+                catalogue_listing.sale_price = self.sale_price
+
+            if self.quantity != catalogue_listing.quantity:
+                catalogue_listing.quantity = self.quantity
+
+            # catalogue class data changed update will also update the listing catalogue data to the new changed
+            catalogue_listing.update()
 
     def delete(self):
         db.session.delete(self)
@@ -316,7 +352,6 @@ class Listing(db.Model):
     price = db.Column(db.DECIMAL(precision=10, scale=2, asdecimal=True), nullable=True, default=0.00)
     sale_price = db.Column(db.DECIMAL(precision=10, scale=2, asdecimal=True), nullable=True, default=0.00)
     quantity = db.Column(db.Integer, nullable=True)
-    platform = db.Column(db.String(45), nullable=True)
     image = db.Column(db.String(45), nullable=True, default='default_listing.png') 
     created_date = db.Column(DateTime, nullable=False, default=datetime.datetime.utcnow)
     updated_date = db.Column(DateTime, nullable=True, default=None, onupdate=datetime.datetime.utcnow)
@@ -324,11 +359,11 @@ class Listing(db.Model):
     catalogue_id = db.Column(db.Integer, db.ForeignKey('catalogue.id', ondelete="CASCADE", onupdate="CASCADE"), nullable=False)
     purchases = db.relationship("Purchase", backref="listing", cascade="all, delete", passive_deletes=True)
     orders = db.relationship("Order", backref="listing", cascade="all, delete", passive_deletes=True)
+    platforms = db.relationship("ListingPlatform", backref="listing", cascade="all, delete", passive_deletes=True)
 
-    def __init__(self, dashboard_id, catalogue_id, platform=None, image='default_listing.png'):
+    def __init__(self, dashboard_id, catalogue_id, image='default_listing.png'):
         self.dashboard_id = dashboard_id
-        self.catalogue_id = catalogue_id        
-        self.platform = platform
+        self.catalogue_id = catalogue_id
         self.image = image
 
         # automatic fill catalogue data in listing data, also incase catalogue not found stop initalize and throw error which captured by route try and except and print the flash message for user inform him error in creating which right
@@ -356,6 +391,31 @@ class Listing(db.Model):
 
     def update(self):
         db.session.commit()
+        # here catalogue id not changed but listing need update (only can effect listing)
+        #if self.quantity != self.catalogue.quantity:
+        #    self.catalogue.quantity = self.quantity
+        #    self.catalogue.update()
+
+    def sync_listing(self):
+
+        if self.sku != self.catalogue.sku:
+            self.sku = self.catalogue.sku
+        if self.product_name != self.catalogue.product_name:
+            self.product_name = self.catalogue.product_name
+        if self.product_description != self.catalogue.product_description:
+            self.product_description = self.catalogue.product_description
+        if self.brand != self.catalogue.brand:
+            self.brand = self.catalogue.brand
+        if self.category != self.catalogue.category:
+            self.category = self.catalogue.category
+        if self.price != self.catalogue.price:
+            self.price = self.catalogue.price
+        if self.sale_price != self.catalogue.sale_price:
+            self.sale_price = self.catalogue.sale_price
+        if self.quantity != self.catalogue.quantity:
+            self.quantity = self.catalogue.quantity
+        db.session.commit()
+
 
     def delete(self):
         db.session.delete(self)
@@ -374,7 +434,6 @@ class Listing(db.Model):
         'price': self.price,
         'sale_price': self.sale_price,
         'quantity': self.quantity,
-        'platform': self.platform,
         'image': self.image
         }
 
@@ -459,6 +518,80 @@ class Order(db.Model):
         'created_date': self.created_date,
         'updated_date': self.updated_date
         }
+    
+
+
+################################ ---------- Tables for Dashboard Plateforms (Start) ---------------- #########################
+
+class Platform(db.Model):
+    __tablename__ = 'platform'
+    id = db.Column(db.Integer, primary_key=True, nullable=False)
+    name = db.Column(db.String(100), nullable=False)
+    dashboard_id = db.Column(db.Integer, db.ForeignKey('dashboard.id', ondelete="CASCADE", onupdate="CASCADE"), nullable=False)    
+    created_date = db.Column(DateTime, nullable=False, default=datetime.datetime.utcnow)
+    updated_date = db.Column(DateTime, nullable=True, default=None, onupdate=datetime.datetime.utcnow)
+    plateforms = db.relationship("ListingPlatform", backref="platform", cascade="all, delete", passive_deletes=True)
+
+    def __init__(self, dashboard_id, name):
+        self.dashboard_id = dashboard_id
+        self.name = name
+
+
+    def insert(self):
+        db.session.add(self)
+        db.session.commit()
+
+    def update(self):
+        db.session.commit()
+
+    def delete(self):
+        db.session.delete(self)
+        db.session.commit()
+
+    def format(self):
+        return {
+        'id': self.id,
+        'dashboard_id': self.dashboard_id,
+        'name': self.name,
+        'created_date': self.created_date,
+        'updated_date': self.updated_date
+        }
+    
+
+class ListingPlatform(db.Model):
+    __tablename__ = 'listing_platform'
+    id = db.Column(db.Integer, primary_key=True, nullable=False)
+    listing_id = db.Column(db.Integer, db.ForeignKey('listing.id', ondelete="CASCADE", onupdate="CASCADE"), nullable=False)
+    platform_id = db.Column(db.Integer, db.ForeignKey('platform.id', ondelete="CASCADE", onupdate="CASCADE"), nullable=False)
+    created_date = db.Column(DateTime, nullable=False, default=datetime.datetime.utcnow)
+    updated_date = db.Column(DateTime, nullable=True, default=None, onupdate=datetime.datetime.utcnow)
+
+    def __init__(self, listing_id, platform_id):
+        self.listing_id = listing_id
+        self.platform_id = platform_id
+
+    def insert(self):
+        db.session.add(self)
+        db.session.commit()
+
+    def update(self):
+        db.session.commit()
+
+    def delete(self):
+        db.session.delete(self)
+        db.session.commit()
+
+    def format(self):
+        return {
+        'id': self.id,
+        'listing_id': self.listing_id,
+        'platform_id': self.platform_id,
+        'created_date': self.created_date,
+        'updated_date': self.updated_date
+        }
+    
+################################ ---------- Tables for Dashboard Plateforms (End) ---------------- #########################
+
 
 ################################ ---------- Tables for Inventory (End) ---------------- #########################
 # some functions for automation
@@ -467,76 +600,55 @@ class Order(db.Model):
 def insert_order_to_printer(mapper, connection, target):
     print("hi")
 """
-# automatic after update Catalogue update it's listings data if any change on shared cells
+
+# automatic after update Catalogue update it's listings data if any change on shared cells (1 side cascade)
 @db.event.listens_for(Catalogue, "after_update")
-def update_listing_on_catalogue_update(mapper, connection, target):
+def update_listing_on_catalogue_update(mapper, connection, target):    
     try:
-        if target and target.listings:
-            for listing in target.listings:
-                the_table = listing.__table__
-                updates = {}
-                if listing.sku != target.sku:
-                    updates['sku'] = target.sku
-
-                if listing.product_name != target.product_name:
-                    updates['product_name'] = target.product_name
-
-                if listing.product_description != target.product_description:
-                    updates['product_description'] = target.product_description
-
-                if listing.brand != target.brand:
-                    updates['brand'] = target.brand
-
-                if listing.category != target.category:
-                    updates['category'] = target.category
-
-                if listing.price != target.price:
-                    updates['price'] = target.price
-
-                if listing.sale_price != target.sale_price:
-                    updates['sale_price'] = target.sale_price
-
-                if listing.quantity != target.quantity:
-                    updates['quantity'] = target.quantity
-            
-                if len(updates) > 0:
-                    connection.execute(the_table.update().values(**updates))
+        # there are already session within that event, and can not commited within this event, to keep app use sqlalchemy you need create new session and use it
+        scoped_session = db.create_scoped_session()
+        for alisting in target.listings:
+            list_to_update = scoped_session.query(Listing).filter_by(id=alisting.id).one_or_none()
+            if list_to_update:
+                list_to_update.sku = target.sku
+                list_to_update.product_name = target.product_name
+                list_to_update.product_description = target.product_description
+                list_to_update.brand = target.brand
+                list_to_update.category = target.category
+                list_to_update.price = target.price
+                list_to_update.sale_price = target.sale_price
+                list_to_update.quantity = target.quantity
+        scoped_session.commit()
     except Exception as e:
-        print('Error in Updating catalogue event db function (update_listing_on_catalogue_update): {}'.format(e, sys.exc_error()))
-
-# event db on listing updated maybe user changed catalogue id, so if any shared data diffrent from parent catalgoue update it revese of above step (need add in admin)
-@db.event.listens_for(Listing, "after_update")
-def update_listing_on_catalogue_change(mapper, connection, target):
+        scoped_session.rollback()
+        raise e
+        print('Error in Updating catalogue event db function (update_listing_on_catalogue_update): {}'.format(e, sys.exc_info()))
+    finally:
+        scoped_session.close()
+"""
+@db.event.listens_for(Order, "after_delete")
+def after_delete_order(mapper, connection, target):    
     try:
-        if target and target.catalogue:
-            the_table = target.__table__
-            updates = {}
-            if target.sku != target.catalogue.sku:
-                updates['sku'] = target.catalogue.sku
+        # there are already session within that event, and can not commited within this event, to keep app use sqlalchemy you need create new session and use it
+        
+        scoped_session = db.create_scoped_session()
 
-            if target.product_name != target.catalogue.product_name:
-                updates['product_name'] = target.catalogue.product_name
+        orders_total = sum([order.quantity for order in Listing.orders])
 
-            if target.product_description != target.catalogue.product_description:
-                updates['product_description'] = target.catalogue.product_description
-
-            if target.brand != target.catalogue.brand:
-                updates['brand'] = target.catalogue.brand
-
-            if target.category != target.catalogue.category:
-                updates['category'] = target.catalogue.category
-
-            if target.price != target.catalogue.price:
-                updates['price'] = target.catalogue.price
-
-            if target.sale_price != target.catalogue.sale_price:
-                updates['sale_price'] = target.catalogue.sale_price
-
-            if target.quantity != target.catalogue.quantity:
-                updates['quantity'] = target.catalogue.quantity
-            
-            if len(updates) > 0:
-                connection.execute(the_table.update().values(**updates))
+        # back catalogue quantity as it was before the deleted order quantity
+        target_catalogue = scoped_session.query(Catalogue).filter_by(id=target.listing.catalogue.id).one_or_none()
+        if target_catalogue:
+            target_catalogue_quantity = target_catalogue.quantity
+            target_catalogue_quantity += int(orders_total)
+            target_catalogue.quantity = target_catalogue_quantity        
+            scoped_session.commit()
+        else:
+            print('target_catalogue in after_delete_order not found, {}'.format(str(target_catalogue)))    
 
     except Exception as e:
-        print('Error in Updating catalogue event db function (update_listing_on_catalogue_change): {}'.format(e, sys.exc_error()))
+        scoped_session.rollback()
+        raise e
+        print('Error in Updating catalogue event db function (update_listing_on_catalogue_update): {}'.format(e, sys.exc_info()))
+    finally:
+        scoped_session.close()
+""" 

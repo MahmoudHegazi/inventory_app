@@ -2,37 +2,20 @@ import json
 import sys
 import os
 from flask import Flask, Blueprint, session, redirect, url_for, flash, Response, request, render_template, jsonify, Request
-from .models import User, Dashboard, Catalogue, Listing
-from .forms import CatalogueExcelForm, defaultDashboardForm
+from .models import *
+from .forms import CatalogueExcelForm, ExportDataForm
 from . import vendor_permission, admin_permission, db, excel
-from .functions import get_mapped_catalogues_dicts
+from .functions import get_mapped_catalogues_dicts, getTableColumns, getFilterBooleanClauseList, ExportSqlalchemyFilter, get_export_data
 from flask_login import login_required, current_user
 import flask_excel
 import pyexcel
+from sqlalchemy.sql import extract
+from sqlalchemy import or_, and_, func , asc, desc, text
 #from app import excel
 
 
+
 main = Blueprint('main', __name__, template_folder='templates', static_folder='static')
-
-
-# this bridge route to redirect to the default dashboard if any else it return to dashboards page to let user create new dashboard, and it will set as default by default
-@main.route('/home', methods=['GET'])
-@login_required
-@vendor_permission.require()
-def home():
-    default_dashboard = None
-    try:
-        default_dashboard = Dashboard.query.filter_by(default=True, user_id=current_user.id).first()
-    except Exception as e:
-        print('System Error home: {} , info: {}'.format(e, sys.exc_info()))
-    finally:
-        if default_dashboard is not None:
-            return redirect(url_for('routes.view_dashboard', dashboard_id=default_dashboard.id))
-        else:
-            flash('Unable To find the Default Dashboard, Please Add New Dashboard', 'info')
-            return redirect(url_for('routes.index'))
-
-
 
 @main.route('/import_catalogues_excel', methods=['POST', 'GET'])
 @login_required
@@ -75,15 +58,34 @@ def import_catalogues_excel():
                             #return str(catalogue_exist)
 
                             if catalogue_exist:
-                                # daynmic update existing catalogue data with new imported
-                                for key, value in db_row.items():
-                                    setattr(catalogue_exist, key, value)
-                                    catalogue_exist.update()
+
+                                # check if new quantity fit current catalogue orders
+                                total_orders = 0
+                                for catalogue_listing in catalogue_exist.listings:
+                                    for order in catalogue_listing.orders:
+                                        total_orders += order.quantity
+
+                                valid_quantity = True
+                                if db_row['quantity']<total_orders:
+                                    flash("Ignored row: {}, the catalogue quantity can not updated, becuase the new quantity exported from excel is less that current catalogue's orders, try update quantity or edit orders of current catalogue".format(str(row_index+1)), "danger")
+                                    valid_quantity = False
+                                
+                                # update only if new quantity is accept current orders of catalogue
+                                if valid_quantity:
+                                    # daynmic update existing catalogue data with new imported
+                                    for key, value in db_row.items():
+                                        setattr(catalogue_exist, key, value)
+                                        catalogue_exist.update()
+
+                                    uploaded_skus.append(db_row['sku'])
+                                else:
+                                    invalid_rows.append(str(row_index+1))
+
                             else:
                                 newCatalogue = Catalogue(user_id=current_user.id, **db_row)
                                 newCatalogue.insert()
 
-                            uploaded_skus.append(db_row['sku'])
+                                uploaded_skus.append(db_row['sku'])
 
                         except Exception as e:
                             # if error it broke the next rows rollback and continue
@@ -92,9 +94,8 @@ def import_catalogues_excel():
                             invalid_rows.append(str(row_index+1))
                             continue
                     else:
-                        duplicated_skus.append(str)
+                        duplicated_skus.append(str(db_row['product_name']))
                         continue
-   
                     
                 # response message with report what data uploaded and what have issues and where issues
                 total_ignored = len(duplicated_skus) + len(invalid_rows)
@@ -112,21 +113,23 @@ def import_catalogues_excel():
     except Exception as e:
         print('System Error import_catalogues_excel: {} , info: {}'.format(e, sys.exc_info()))
         message = 'Unable to import excel data please try again later'
-        success = False 
+        success = False
         raise e
     
+
     finally:
         status = 'success' if success else 'danger'
         flash(message, status)
         return redirect(url_for('routes.catalogues'))
-    
+
+
 # export listing
-@main.route('/export_listings/<string:dashboard_id>', methods=['GET'])
+@main.route('/export_listings', methods=['GET'])
 @login_required
 @vendor_permission.require()
-def listing_export(dashboard_id):
+def listing_export():
     try:
-        selected_listings = db.session.query(Listing).join(Dashboard).filter(Listing.dashboard_id==dashboard_id, Dashboard.user_id==current_user.id).all()
+        selected_listings = Listing.query.filter_by(dashboard_id=current_user.dashboard.id).all()
         # this do 2 things, incase there are no data error may raised, also for performance as there no data no need call this heavy function
         if selected_listings:
             column_names = Listing.__table__.columns.keys()
@@ -135,57 +138,274 @@ def listing_export(dashboard_id):
             return excel_response
         else:
             flash('There is no data to be exported.', 'warning')
-            return redirect(url_for('routes.view_dashboard', dashboard_id=dashboard_id))
+            return redirect(url_for('routes.index'))
     except Exception as e:
         # redirect used to display the flash message incase of error , becuase this GET request and it processed in the same rendered page (so flash can not displayed without refresh)
         print('System Error listing_export: {} , info: {}'.format(e, sys.exc_info()))
         flash('Unknown error Your request could not be processed right now, please try again later.', 'danger')
-        return redirect(url_for('routes.view_dashboard', dashboard_id=dashboard_id))
-
-# make dashboard default
-@main.route('/default_dashboard/<string:dashboard_id>', methods=['POST'])
-@login_required
-@vendor_permission.require()
-def set_default_dashboard(dashboard_id):
-    message = ''
-    success = False
-    try:
-        default_form = defaultDashboardForm()
-        if default_form.validate_on_submit():
-            selected_dashboard = Dashboard.query.filter_by(id=dashboard_id, user_id=current_user.id).one_or_none()
-            if selected_dashboard is not None:
-                # it always will be 1 default dashboard, but this action can fix the app if more than dashboard seleected by db or somethign
-                default_dashboards = Dashboard.query.filter_by(default=True, user_id=current_user.id).all()
-                for default_bashboard in default_dashboards:
-                    default_bashboard.default = False
-                    default_bashboard.update()
-                # update selected dashboard default status
-                selected_dashboard.default = True
-                selected_dashboard.update()
-                message = 'Dashboard with ID: {} has been successfully set as the default dashboard.'.format(dashboard_id)
-                success = True
-            else:
-                message = 'The specified dashboard was not found, it may have been deleted.'
-                success = False
-        else:
-            message = 'Unable to process your Request.'
-            success = False   
-    except Exception as e:
-        print('System Error set_default_dashboard: {} , info: {}'.format(e, sys.exc_info()))
-        message = 'Unknown error Your request could not be processed right now, please try again later.'
-        success = False
-    finally:
-        message_status = 'success' if success else 'danger'
-        flash(message, message_status)
         return redirect(url_for('routes.index'))
 
+def getChartData(chart_query_result, label_i=0, data_i=1):
+    labels = []
+    data = []
+    for chartItem in chart_query_result:        
+        labels.append(str(chartItem[label_i]))
+        data.append(str(chartItem[data_i]))
 
-@main.route('/reports_tool', methods=['POST', 'GET'])
+    return {'labels': labels, 'data': data}
+
+@main.route('/reports', methods=['POST', 'GET'])
 @login_required
 @admin_permission.require()
-def reports_tool():
-    from sqlalchemy.inspection import inspect
-    thing_relations = inspect(User).relationships.items()
+def reports():
+    export_form = ExportDataForm()
+    # chart 1
+    chart_query = db.session.query(
+        Listing.product_name,
+        func.sum(Order.quantity).label('total_quantities')
+    ).join(
+        Catalogue, Listing.catalogue_id == Catalogue.id
+    ).join(
+        Order, Listing.id == Order.listing_id
+    ).filter(
+        Catalogue.user_id == current_user.id
+    ).group_by(Listing.id).order_by(desc('total_quantities')).limit(5).all()
+    chartdata = getChartData(chart_query, label_i=0, data_i=1)
+    chart_data = {
+        'id': 'top_ordered_products',
+        'type': 'bar',
+        'data': chartdata['data'],
+        'labels': chartdata['labels'],
+        'label': 'Top Ordered Products',
+        'background_colors': [ 'rgba(255, 99, 132, 0.2)', 'rgba(255, 159, 64, 0.2)', 'rgba(255, 205, 86, 0.2)', 'rgba(75, 192, 192, 0.2)', 'rgba(54, 162, 235, 0.2)', 'rgba(153, 102, 255, 0.2)', 'rgba(201, 203, 207, 0.2)'],
+        'border_colors': [ 'rgb(255, 99, 132)', 'rgb(255, 159, 64)', 'rgb(255, 205, 86)', 'rgb(75, 192, 192)', 'rgb(54, 162, 235)', 'rgb(153, 102, 255)', 'rgb(201, 203, 207)' ],
+        'description': 'Products with the largest number of orders'
+    }
 
-    #return str(thing_relations)
-    return render_template('admin/reports_tool.html')
+    # chart 1
+    chart1_query = db.session.query(
+        Listing.product_name,
+        func.sum(Order.quantity).label('total_quantities')
+    ).join(
+        Catalogue, Listing.catalogue_id == Catalogue.id
+    ).join(
+        Order, Listing.id == Order.listing_id
+    ).filter(
+        Catalogue.user_id == current_user.id
+    ).group_by(Listing.id).order_by(asc('total_quantities')).limit(5).all()
+    chartdata1 = getChartData(chart1_query, label_i=0, data_i=1)
+    chart_data1 = {
+        'id': 'less_ordered_products',
+        'type': 'pie',
+        'data': chartdata1['data'],
+        'labels': chartdata1['labels'],
+        'label': 'least demanded products',
+        'background_colors': [ 'rgba(255, 99, 132, 0.2)', 'rgba(255, 159, 64, 0.2)', 'rgba(255, 205, 86, 0.2)', 'rgba(75, 192, 192, 0.2)', 'rgba(54, 162, 235, 0.2)', 'rgba(153, 102, 255, 0.2)', 'rgba(201, 203, 207, 0.2)'],
+        'border_colors': [ 'rgb(255, 99, 132)', 'rgb(255, 159, 64)', 'rgb(255, 205, 86)', 'rgb(75, 192, 192)', 'rgb(54, 162, 235)', 'rgb(153, 102, 255)', 'rgb(201, 203, 207)' ],
+        'description': 'Products with the lowest number of orders'
+    }
+
+    # chart 2
+    chart2_query = db.session.query(
+        Listing.product_name,
+        func.sum(Purchase.quantity).label('total_quantities')
+    ).join(
+        Purchase, Listing.id == Purchase.listing_id
+    ).join(
+        Catalogue, Listing.catalogue_id == Catalogue.id
+    ).filter(
+        Catalogue.user_id == current_user.id
+    ).group_by(Listing.id).order_by(desc('total_quantities')).limit(5).all()
+    chartdata2 = getChartData(chart2_query, label_i=0, data_i=1)
+    chart_data2 = {
+        'id': 'most_purchased_products',
+        'type': 'bar',
+        'data': chartdata2['data'],
+        'labels': chartdata2['labels'],
+        'label': 'Most purchased products',
+        'description': 'Products with the largest number of purchases'
+    }
+
+    # chart 3
+    chart3_query = db.session.query(
+        Listing.product_name,
+        func.sum(Purchase.quantity).label('total_quantities')
+    ).join(
+        Purchase, Listing.id == Purchase.listing_id
+    ).join(
+        Catalogue, Listing.catalogue_id == Catalogue.id
+    ).filter(
+        Catalogue.user_id == current_user.id
+    ).group_by(Listing.id).order_by(asc('total_quantities')).limit(5).all()
+    chartdata3 = getChartData(chart3_query, label_i=0, data_i=1)
+    chart_data3 = {
+        'id': 'less_purchased_products',
+        'type': 'bar',
+        'data': chartdata3['data'],
+        'labels': chartdata3['labels'],
+        'label': 'least purchased products',
+        'description': 'Products with the lowest number of purchases'
+    }
+    # chart 4
+    chart4_query = db.session.query(
+        Supplier.name,
+        func.sum(Purchase.quantity).label('total_purchases')
+    ).join(
+        Purchase, Supplier.id==Purchase.supplier_id
+    ).filter(
+        Supplier.user_id == current_user.id
+    ).group_by(Purchase.supplier_id).order_by(desc('total_purchases')).limit(5).all()
+    chartdata4 = getChartData(chart4_query, label_i=0, data_i=1)
+    chart_data4 = {
+        'id': 'top_purchases_suppliers',
+        'type': 'bar',
+        'data': chartdata4['data'],
+        'labels': chartdata4['labels'],
+        'label': 'Top Purchases Suppliers',
+        'description': 'The supplier with the most number of purchases'
+    }
+
+    # chart 5 (type of this charts matters later when have alot of suppliers and purchases will define who suppliers not work with him alot)
+    chart5_query = db.session.query(
+        Supplier.name,
+        func.sum(Purchase.quantity).label('total_purchases')
+    ).join(
+        Purchase, Supplier.id==Purchase.supplier_id
+    ).filter(
+        Supplier.user_id == current_user.id
+    ).group_by(Purchase.supplier_id).order_by(asc('total_purchases')).limit(5).all()
+    chartdata5 = getChartData(chart5_query, label_i=0, data_i=1)
+    chart_data5 = {
+        'id': 'less_purchases_suppliers',
+        'type': 'bar',
+        'data': chartdata5['data'],
+        'labels': chartdata5['labels'],
+        'label': 'Less Purchases Suppliers',
+        'description': 'The supplier with the less number of purchases'
+    }
+
+    # chart 6
+    chart6_query = db.session.query(
+        Supplier.name,
+        func.sum(Purchase.quantity).label('total_purchases')
+    ).join(
+        Purchase, Supplier.id==Purchase.supplier_id
+    ).filter(
+        Supplier.user_id == current_user.id
+    ).group_by(Purchase.supplier_id).order_by(desc('total_purchases')).all()
+    chartdata6 = getChartData(chart6_query, label_i=0, data_i=1)
+    chart_data6 = {
+        'id': 'suppliers_purchases',
+        'type': 'doughnut',
+        'data': chartdata6['data'],
+        'labels': chartdata6['labels'],
+        'label': 'purchases from suppliers',
+        'description': 'the number of purchases from suppliers'
+    }
+
+    # chart 7
+    chart7_query = db.session.query(
+        extract('year', Order.date),
+        func.sum(Order.quantity).label('total_orders')
+    ).join(
+        Listing, Order.listing_id==Listing.id
+    ).join(
+        Catalogue, Listing.catalogue_id==Catalogue.id
+    ).filter(
+        Catalogue.user_id == current_user.id
+    ).group_by(extract('year', Order.date)).order_by(asc('total_orders')).all()
+    chartdata7 = getChartData(chart7_query, label_i=0, data_i=1)
+    chart_data7 = {
+        'id': 'orders_yearly_performance',
+        'type': 'bar',
+        'data': chartdata7['data'],
+        'labels': chartdata7['labels'],
+        'label': 'Orders Per Year',
+        'description': 'The number of orders per year',
+        'col': '6'
+    }
+    # 'year_picker_ajax': {'years': [2012, 2013, 2014]}, add dynamic ajax year input in chart, remaning
+
+    # chart 8 (Remaning monthly with ajax select for month)
+    chart8_query = db.session.query(
+        extract('year', Purchase.date),
+        func.sum(Purchase.quantity).label('total_purchases')
+    ).join(
+        Listing, Purchase.listing_id==Listing.id
+    ).join(
+        Catalogue, Listing.catalogue_id==Catalogue.id
+    ).filter(
+        Catalogue.user_id == current_user.id
+    ).group_by(extract('year', Purchase.date)).order_by(asc('total_purchases')).all()
+    # perfere for performance line chart as it up and down, but prefere for years bar
+    chartdata8 = getChartData(chart8_query, label_i=0, data_i=1)
+    chart_data8 = {
+        'id': 'purchases_yearly_performance',
+        'type': 'line',
+        'data': chartdata8['data'],
+        'labels': chartdata8['labels'],
+        'label': 'Purchases Per Year',
+        'description': 'The number of Purchases per year',
+        'col': 12
+    }
+    
+    return render_template('reports.html', charts_data=[chart_data, chart_data1, chart_data2, chart_data3, chart_data4, chart_data5, chart_data6, chart_data7, chart_data8], export_form=export_form)
+
+
+@main.route('/get_filter_columns', methods=['GET'])
+@login_required
+@admin_permission.require()
+def get_filter_columns():
+    try:
+        requested_table = request.args.get('table', '')
+        # consts (usefor secuirty) getSqlalchemyColumnByName
+        export_sqlalchemy_filter = ExportSqlalchemyFilter()
+        # return all or only requested 
+        data = export_sqlalchemy_filter.tables_data[requested_table] if requested_table in export_sqlalchemy_filter.tables_data else None
+        return jsonify({'code': 200, 'data': data})
+    except Exception as e:
+        print('System Error get_filter_columns: {} , info: {}'.format(e, sys.exc_info()))
+        flash('Unknown error Your request could not be processed right now, please try again later.', 'danger')
+        return jsonify({'code': 500, 'message': 'system error'})
+
+
+# full sqlalchemy dynamic export table data
+@main.route('/reports/export', methods=['POST'])
+@login_required
+@admin_permission.require()
+def reports_export():
+    message = ''
+    success = True
+    excel_response = None
+    data = []
+    column_names = []
+    try:
+        export_form = ExportDataForm()
+        if export_form.validate_on_submit():
+            columns = request.form.getlist('column[]')
+            operators = request.form.getlist('operator[]')
+            values = request.form.getlist('value[]')
+            condition = export_form.condition.data
+            table_name = export_form.table_name.data
+            data_res = get_export_data(db, flask_excel, current_user.id, table_name, columns, operators, values, condition)
+            if data_res and 'success' in data_res and 'excel_response' in data_res and data_res['success'] == True and data_res['excel_response']:
+                excel_response = data_res['excel_response']
+            else:
+                message = data_res['message'] if data_res and 'message' in data_res and data_res['message'] else 'Uknonw error, unable to export your file right now.'
+                success = False
+        else:
+            message = 'Invalid Data'
+            success = False
+    except Exception as e:
+        print('System Error reports_export: {} , info: {}'.format(e, sys.exc_info()))
+        message = message if message != '' else 'Unknown Error Found While process your request'
+        success = False
+    
+    finally:
+        if success == True and excel_response:
+            return excel_response
+        else:
+            flash(message, 'danger')
+            return redirect(url_for('main.reports'))
+
+    

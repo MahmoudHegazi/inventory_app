@@ -24,7 +24,7 @@ function toggleLoadingCircle(on=false, displayCSS='', containerSelector='.conten
 
 function displayAjaxError(message, status='success'){
     $("#ajax_flashes").html('');
-    if (message==null && status == null){
+    if (message==null){
       // clear messages
       return false;
     }
@@ -81,7 +81,7 @@ function SearchByJS(
 eg:99m and html cards search done using DOM so it speed after setup like DOM selector (no css required and work with bs4 and not remove elements or styles)
 */
 /* this addon used to enable calling this function multiple times to handle the selectors */
-function searchComponent(speed='slow',easing='swing', cp=function(){return true;}, addon=''){
+function searchComponent(speed='slow',easing='swing', cp=function(){return true;}, addon='', condition='='){
     const stopSearchForm = function(){
         if ($(`form#search_form${addon}`).length){
             $(`form#search_form${addon}`).on('submit', (ev)=>{
@@ -147,7 +147,8 @@ function searchComponent(speed='slow',easing='swing', cp=function(){return true;
         const searchColumn = $(`#search_by${addon}`).val().trim();
         const dataAttrName = dataSearchAttrs[searchColumn];
         if (dataAttrName && searchValue){
-          const targetCards = $(`.searching_card${addon}[${dataAttrName}='${searchValue}']`);
+          /* html selector search condition set */
+          const targetCards = $(`.searching_card${addon}[${dataAttrName}${condition}'${searchValue}']`);
           const targetCardsArr = $(targetCards).toArray();
           $(`.searching_card${addon}`).each( (s, searchingCard)=>{
             if (!targetCardsArr.includes($(searchingCard)[0])){
@@ -381,15 +382,93 @@ function displayPaginationComponent(paginationBtns, paginationPage, containerIDs
 }
 
 /* get the redirect_url query parameter and update the form action_redirect input */
-function setFormRedirectByUrl(){
+function setFormRedirectByUrl(customRedirect=null){
+  let redirect_url = '';
   if ($("#action_redirect").length){
-    const params = new Proxy(new URLSearchParams(window.location.search), {
-      get: (searchParams, prop) => searchParams.get(prop),
-    });
-    if (params.redirect_url){
-      $("#action_redirect").val(params.redirect_url);
+    if (customRedirect == null){
+      const params = new Proxy(new URLSearchParams(window.location.search), {
+        get: (searchParams, prop) => searchParams.get(prop),
+      });
+      if (params.redirect_url){
+        redirect_url = params.redirect_url;
+        $("#action_redirect").val(params.redirect_url);
+      }
+    } else {
+      $("#action_redirect").val(customRedirect);
     }
   }
+  if ($("#cancel_link").length && redirect_url){
+    $("#cancel_link").attr('href', redirect_url);
+  }
+  
+}
+
+
+
+/* this function used with bs4 collabse and table row collabsed large content it set active status to last closed and scroll to it for better xu */
+function addCollabseEndTableEffect(rowsSelector='.searching_card', closeOnlyBtn='.close_only_btn', closeOpenBtn='.close_open_btn', scrollIntoViewData={behavior: 'smooth', block: "center", inline: "nearest"}){
+  if (noEffects==true){
+    return false;
+  }
+
+  const setLastColapsedActive = (event)=> {
+      if ($(event.currentTarget).length && $(event.currentTarget).closest('tr').length && $(event.currentTarget).closest('tr').prev().length){
+        const targetRow = $(event.currentTarget).closest('tr').prev();
+        if (rowsSelector && $(rowsSelector).length){
+          $(rowsSelector).removeClass('bg-info');
+          $(rowsSelector).removeClass('text-white');
+          targetRow.addClass('bg-info');
+          targetRow.addClass('text-white');
+          targetRow[0].scrollIntoView(scrollIntoViewData);
+          setTimeout(()=>{
+            $(rowsSelector).removeClass('bg-info');
+            $(rowsSelector).removeClass('text-white');
+          }, 2000);
+          return true;
+        } else {
+          console.log('Not Started actions invalid selector as this function called only when there are rows already with btns');
+          return false;
+        }
+      } else {
+        console.log("can not set active when close show listing data");
+        return false;
+      }
+  };
+  if (closeOnlyBtn && $(closeOnlyBtn).length){
+    $(closeOnlyBtn).on('click', setLastColapsedActive);
+  }
+  
+  if (closeOpenBtn && $(closeOpenBtn).length){
+    $(closeOpenBtn).on('click', ()=>{
+      $(rowsSelector).removeClass('bg-info');
+      $(rowsSelector).removeClass('text-white');
+    });
+  }
+
+}
+
+/* fill edit platform form with data */
+function fillEditPlatForm(){
+  $(".edit_platform").on('click', (event)=>{
+    if ($(event.currentTarget).length && $(event.currentTarget).attr('data-platform-id') && $("#name_edit").length && $("#platform_id_edit").length && $(`#edit_platform_form`)) {
+        const action_url = String($(event.currentTarget).attr('data-url')).trim();
+        const platform_id = String($(event.currentTarget).attr('data-platform-id')).trim();
+        const platform_name = String($(event.currentTarget).attr('data-platform-name')).trim();      
+        $("#platform_id_edit").val(platform_id);
+        $("#name_edit").val(platform_name);
+        $(`#edit_platform_form`).attr('action', action_url);
+    }
+  });
+
+  $(`#edit_platform_form`).on('hidden.bs.modal', () => {
+    if ($("#platform_id_edit").length){
+      $("#platform_id_edit").val("");
+    }
+    if ($("#name_edit").length){
+      $("#name_edit").val("");
+    }
+    $(`#edit_platform_form`).attr('action', '');
+  });
 }
 
 

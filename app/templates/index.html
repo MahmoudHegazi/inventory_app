@@ -1,231 +1,170 @@
 {% extends 'base.html' %}
-{% block title %}Inventory{% endblock %}
-{% block page_description %}this is home page for logged users in the application{% endblock %}
+{% block title %}{% if dashboard %}{{dashboard.title}}{% endif %}{% endblock %}
+{% block page_description %}this is Dashboard page, can view/edit/delete dashboard and view/add/edit it's listings {% endblock %}
 {% block body %}
 <div class="container border rounded p-3">
   {% include 'messages.html' %}
   <img src="{{url_for('static', filename='assets/images/loading_circle.gif')}}" class="loading_circle" style="display:none;" />
 
   <div class="container-fluid content_container">
-
-    <!-- settings menu-->
-    <div id="settings_toast_cont">
-      <button type="button" class="btn btn-outline-primary mb-1" id="open_settings">Settings</button>
-      <div id="settings_toast" class="toast shadow" data-autohide="false" style="display:none">
-         <div class="toast-header bg-dark text-white">
-            <span><i class="fa fa-gear"></i> Settings</span>
-         </div>
-         <div class="toast-body">
-            <div class="row">
-               <div class="col-sm-12 d-flex justify-content-start align-items-center">
-                  <label>Display: </label>
-                  <select class="form-control ml-2" id="switch_display">
-                     <option value="card">Card</option>
-                     <option value="table" selected="selected">Table</option>
-                  </select>
-               </div>
-            </div>
-         </div>
-      </div>
-    </div>
-    <!-- settings menu end-->
-    <div class="d-flex justify-content-end align-items-center">
-      <!-- Button to Open the Modal for add new dashboard -->
-      <a href="{{url_for('routes.add_dashboard')}}" type="button" class="btn btn-primary">
-        Add Dashboard
+    {% if dashboard %}
+    <div class="d-flex justify-content-end align-items-center flex-wrap">
+      <a href="{{url_for('main.listing_export')}}" class="ml-2 btn btn-secondary">
+        Export Listings
       </a>
     </div>
+    <div class="row mt-2">
+      <div class="border rounded col-4 p-3 d-flex justify-content-center align-items-start cursor-pointer text-decoration-none text-dark media_small_width_100">
+        <div class="hover_shadow row container shadow p-3">
+            <div class="col-sm-12 mb-3 text-center">
+                <img src="{{url_for('static', filename='assets/images/default_dashboard.png')}}" alt="dashboard icon" width="150" class="mxwidth-150" />
+                <h3 class="overflow_within title"><span class="badge badge-primary">{{dashboard.title}}</span></h3>
+            </div>
+            <div class="col-sm-12">
+              <p class="overflow_within">Id: <span class="id">{{dashboard.id}}</span></p>
+            </div>
+            <div class="col-sm-12">
+              <p class="overflow_within">Total Listings: <span class="total_listings">{{dashboard.num_of_listings}}</span></p>
+            </div>
+            <div class="col-sm-12">
+              <p class="overflow_within">Total Orders: <span class="total_orders">{{dashboard.num_of_orders}}</span></p>
+            </div>
+            <div class="col-sm-12">
+              <p class="overflow_within">Monthly Purchases: <span class="monthly_purchases">{{dashboard.sum_of_monthly_purchases}}</span></p>
+            </div>
+            <div class="col-sm-12">
+              <p class="overflow_within">Created At: <span class="total_orders">{{dashboard.created_date}}</span></p>
+            </div>
+            <div class="col-sm-12">
+              <p class="overflow_within">Updated At: 
+                <span class="monthly_purchases">{% if dashboard.updated_date %}{{dashboard.updated_date}}{% endif %}</span>
+              </p>
+            </div>
+        </div>
+      </div>      
+      <div class="col-sm-8 p-3 row border rounded">
+        <div class="container">
+          <div class="mt-1 mb-2 d-flex justify-content-between align-items-center">
+            <h4>Listings</h4>
+            <div>
+              <a href="{{url_for('routes.listings')}}" class="btn btn-outline-primary">View Listings</a>
+              <a href="{{url_for('routes.add_listing')}}" class="btn btn-outline-success">Add Listing</a>
+            </div>
+          </div>
+          <!-- search component -->
+          <div class="row mt-2 mb-2">
+            <div class="col-sm-11 mx-auto" title="search by sku, price, Category, Product Name">
+              <form id="search_form" class="row">
+                <input class="form-control col-sm-5" type="text" name="search_value" id="search_value" placeholder="search by sku, price, Category, Product Name" value=""/>
+                <select class="form-control col-sm-4" name="search_by" id="search_by">
+                  <option value="">Search BY</option>
+                  <option class="search_column" value="sku">SKU</option>
+                  <option class="search_column" value="product_name">Product Name</option>
+                  <option class="search_column" value="category">Category</option>
+                  <option class="search_column" value="price">Price</option>
+                </select>
+                <button type="button" id="cancel_search" class="btn btn-sm col-sm-1 btn-danger" style="display:none;"><i class="fa fa-close"></i></button>
+                <button type="submit" class="btn btn-success col-sm-2">Search</button>
+              </form>
+            </div>
+          </div>
+          <!-- search component end -->
 
-    <!-- search component -->
-    <div class="row mt-2 mb-2">
-      <div class="col-sm-11 mx-auto" title="search by id, Total Listings, Total Orders, Monthly Purchases">
-        <form id="search_form" class="row">
-          <input class="form-control col-sm-5" type="text" name="search_value" id="search_value" placeholder="search by id, Total Listings, Total Orders, Monthly Purchases" value=""/>
-          <select class="form-control col-sm-4" name="search_by" id="search_by">
-            <option value="">Search BY</option>
-            <option class="search_column" value="id">ID</option>
-            <option class="search_column" value="title">Title</option>
-            <option class="search_column" value="num_of_listings">Total Listings</option>
-            <option class="search_column" value="num_of_orders">Total Orders</option>
-            <option class="search_column" value="sum_of_monthly_purchases">Monthly Purchases</option>
-          </select>
-          <button type="button" id="cancel_search" class="btn btn-sm col-sm-1 btn-danger" style="display:none;"><i class="fa fa-close"></i></button>
-          <button type="submit" class="btn btn-success col-sm-2">Search</button>
-        </form>
-      </div>
-    </div>
-    <!-- search component end -->
-    
-    <!-- dashboards Pagination start -->
-    <div id="dashboard_pag1" class="d-flex justify-content-center align-items-center mt-2"></div>
-    <!-- Pagination end-->
-    
-    <div class="row" id="card_display" style="display:none;">
-      <!-- Logged User Dashboards  -->
-      {% if dashboards is defined %}
-      {% for dashboard in dashboards %}
-      <div class="searching_card col-4 p-3 d-flex justify-content-center align-items-center cursor-pointer text-decoration-none text-dark media_small_width_100 d_relative"
-      data-search-id="{{dashboard.id}}" data-search-title="{{dashboard.title}}" data-search-num_of_listings="{{dashboard.num_of_listings}}"
-      data-search-num_of_orders="{{dashboard.num_of_orders}}" data-search-sum_of_monthly_purchases="{{dashboard.sum_of_monthly_purchases}}">
-        {% if dashboard.default %}
-        <img src="https://static.nike.com/a/images/t_default/f3b16365-9455-4023-9030-84f447fcc8c8/hair-bow-lfVBML.png" width="100" title="This dashboard is the default dashboard" class="default_icon_card">
-        {% endif %}
-        <!-- Card Display -->
-        <div class="hover_shadow row container border rounded shadow p-3">
-          <div class="col-sm-12 mb-3 text-center">
-            <img src="{{url_for('static', filename='assets/images/default_dashboard.png')}}" alt="dashboard icon" width="100" class="mxwidth-100" />
+          <div class="overflow_600">
+              <table class="table table-bordered">
+                <thead>
+                  <tr>
+                    <th>SKU</th>
+                    <th>Product Name</th>
+                    <th>Category</th>
+                    <th>Price</th>
+                    <th>Action</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {% if dashboard.listings %}
+                  {% for listing in dashboard.listings %}
+                  <tr class="searching_card"
+                  data-search-sku="{{listing.sku}}" data-search-product_name="{{listing.product_name}}"
+                  data-search-category="{{listing.category}}" data-search-price="{{listing.price}}">
+                    <td>{{listing.sku}}</td>
+                    <td>{{listing.product_name}}</td>
+                    <td>{{listing.category}}</td>
+                    <td>{{listing.price}}</td>
+                    <td>
+                      
+                      <div class="d-flex justify-content-around align-items-center">
+                        <a href="{{url_for('routes.view_listing', listing_id=listing.id)}}" class="btn btn-primary btn-sm"><i class="fa fa-external-link"></i></a>
+                        <a href="{{url_for('routes.edit_listing', listing_id=listing.id)}}" class="btn btn-secondary btn-sm"><i class="fa fa-edit"></i></a>
+                        <a href="#listing_{{listing.id}}" data-toggle="collapse" class="btn btn-primary btn-sm close_open_btn"><i class="fa fa-eye"></i></a>
+                      </div>
+                    </td>
+                  </tr>
+                  <tr>
+                    <td colspan="5">
+                      <div id="listing_{{listing.id}}" class="shadow p-2 collapse">
+                        {% include 'partialse/listing_view.html' %}
+                        <a href="#listing_{{listing.id}}" data-toggle="collapse" class="btn btn-primary btn-sm close_only_btn"><i class="fa fa-arrow-up"></i></a>
+                      </div>
+                    </td>
+                  </tr>
+                  {% endfor %}
+                  {% endif %}
+                </tbody>
+              </table>
           </div>
-          <div class="col-sm-12">
-            <p class="overflow_within text-center  "><strong>{{dashboard.title}}</strong></p>
-          </div>
-          <div class="col-sm-12">
-            <p class="overflow_within  ">Id: <span class="id">{{dashboard.id}}</span></p>
-          </div>
-          <div class="col-sm-12">
-            <p class="overflow_within  ">Total Listings: <span class="total_listings">{{dashboard.num_of_listings}}</span></p>
-          </div>
-          <div class="col-sm-12">
-            <p class="overflow_within  ">Total Orders: <span class="total_orders">{{dashboard.num_of_orders}}</span></p>
-          </div>
-          <div class="col-sm-12">
-            <p class="overflow_within  ">Monthly Purchases: <span class="monthly_purchases">{{dashboard.sum_of_monthly_purchases}}</span></p>
-          </div>
-          <div class="col-sm-12 row">
-            <div class="col-sm-12 d-flex justify-content-between align-items-center">
-              <div>
-                <a href="{{url_for('routes.view_dashboard', dashboard_id=dashboard.id)}}" class="btn btn-primary"><i class="fa fa-eye"></i></a>
+
+          <div class="div border shadow rounded p-2">
+            <h5 class="mt-2 mb-3"><span>Plateforms: </span> 
+              <button type="button" data-toggle="modal" data-target="#addPlatformModal" class="btn btn-success btn-sm" style="float:right;"><i class="fa fa-plus"></i></button></h5>
+            <div class="row" style="max-height:300px;overflow: auto;">
+              <!-- plateforms -->
+              {% for platform in dashboard.platforms %}
+              <div class="col-sm-12 row">
+                <div class="col-sm-6">
+                  <p style="word-break: break-word;">{{platform.name}}</p>
+                </div>
+                <div class="col-sm-6 text-right">
+                  <button data-toggle="modal" data-url="{{url_for('routes.edit_platform', platform_id=platform.id)}}" data-platform-id="{{platform.id}}" data-platform-name="{{platform.name}}" data-target="#editPlatformModal" class="btn btn-sm btn-warning edit_platform" type="button"><i class="fa fa-edit"></i></button>
+                  <button data-toggle="modal" data-url="{{url_for('routes.delete_platform', platform_id=platform.id)}}" data-platform-id="{{platform.id}}" data-target="#deletePlatformModal" class="btn btn-sm btn-danger wtform_modal_deletebtn" type="button"><i class="fa fa-remove"></i></button>
+                </div>
               </div>
-              <div>
-                <a href="{{url_for('routes.edit_dashboard', dashboard_id=dashboard.id)}}" class="btn btn-secondary"><i class="fa fa-edit"></i></a>
-              </div>
-              {% if dashboard.default == 0 %}
-              <div>
-                <button data-url="{{url_for('main.set_default_dashboard', dashboard_id=dashboard.id)}}" data-toggle="modal" 
-                data-target="#setDefaultDashboard" data-dashboard-id="{{dashboard.id}}" onclick="toggleLoadingCircle(true, 'block')" 
-                class="wtform_modal_deletebtn btn btn-warning" title="Set this dashboard as the default dashboard, so you can see it on the home page.">
-                <i class="fa fa-check-square"></i>
-                </button>
-              </div>
-              {% endif %}
-              <div>
-                <a href="{{url_for('routes.listings', dashboard_id=dashboard.id)}}" class="btn btn-success">Listings</a>
-              </div>                      
-            </div>                               
+              {% endfor %}
+            </div>
           </div>
+
         </div>
       </div>
-      {% endfor %}
-      {% else %}
-      <div class="alert alert-danger">Unable to Display Dashboards right now.</div>
-      {% endif %}
     </div>
-    <!-- Card Display End -->
-
-    <!-- Table Display -->
-    <div class="row" id="table_display">
-        <!-- table display -->
-        <div class="col-sm-12">         
-          <table class="table table-hover">
-            <thead>
-              <tr>
-                <th>#</th>
-                <th>Icon</th>
-                <th>Title</th>
-                <th>Total Listings</th>
-                <th>Total Orders</th>
-                <th>Monthly Purchases</th>
-                <th>Action</th>
-              </tr>
-            </thead>
-            <tbody>
-              {% if dashboards is defined %}
-              {% for dashboard in dashboards %}
-              <tr class="searching_card" data-search-id="{{dashboard.id}}" data-search-title="{{dashboard.title}}" data-search-num_of_listings="{{dashboard.num_of_listings}}"
-              data-search-num_of_orders="{{dashboard.num_of_orders}}" data-search-sum_of_monthly_purchases="{{dashboard.sum_of_monthly_purchases}}">
-                <td>                  
-                  <p class="overflow_within d_relative">
-                    {% if dashboard.default %}
-                    <img src="{{url_for('static', filename='assets/images/bow_default_icon.png')}}" title="This dashboard is the default dashboard" class="default_icon_table" width="50">
-                    {% endif %}
-                    {{dashboard.id}}
-                  </p>
-                </td>
-                <td>
-                  <p class="overflow_within"><img src="{{url_for('static', filename='assets/images/default_dashboard.png')}}" alt="dashboard icon" width="50" class="mxwidth-50" /></p>
-                </td>                
-                <td>
-                  <p class="overflow_within">{{dashboard.title}}</p>
-                </td>
-                <td>
-                  <p class="overflow_within">{{dashboard.num_of_listings}}</p>
-                </td>
-                <td>
-                  <p class="overflow_within">{{dashboard.num_of_orders}}</p>
-                </td>
-                <td>
-                  <p class="overflow_within">{{dashboard.sum_of_monthly_purchases}}</p>
-                </td>
-                <td>
-                  <div class="col-sm-12 row">
-                    <div class="col-sm-12 d-flex justify-content-around align-items-center">
-                      <div>
-                        <a href="{{url_for('routes.view_dashboard', dashboard_id=dashboard.id)}}" class="btn btn-primary btn-sm"><i class="fa fa-eye"></i></a>
-                      </div>
-                      <div>
-                        <a href="{{url_for('routes.edit_dashboard', dashboard_id=dashboard.id)}}" class="btn btn-secondary btn-sm"><i class="fa fa-edit"></i></a>
-                      </div>
-                      {% if dashboard.default == 0 %}
-                      <div>
-                        <button data-url="{{url_for('main.set_default_dashboard', dashboard_id=dashboard.id)}}" data-toggle="modal" 
-                          data-target="#setDefaultDashboard" data-dashboard-id="{{dashboard.id}}" onclick="toggleLoadingCircle(true, 'block')" 
-                          class="wtform_modal_deletebtn btn btn-warning btn-sm" title="Set this dashboard as the default dashboard, so you can see it on the home page.">
-                          <i class="fa fa-check-square"></i>
-                        </button>
-                      </div>
-                      {% endif %}
-                      <div>
-                        <a href="{{url_for('routes.listings', dashboard_id=dashboard.id)}}" class="btn btn-success btn-sm">Listings</a>
-                      </div>                              
-                  </div>
-                </td>
-              </tr>
-              {% endfor %}
-              {% endif %}
-            </tbody>
-          </table>
-        </div>      
-    </div>
-    <!-- Table Display End -->
-
-    <!-- dashboards Pagination start -->
-    <div id="dashboard_pag2" class="d-flex justify-content-center align-items-center mt-2"></div>
-    <!-- Pagination end-->
-
+    {% else %}
+    <div class="alert alert-danger">Unable to Display Dashboard right now.</div>
+    {% endif %}
   </div>
 </div>
-{% from 'forms.html' import dashboards_forms %}
-{{dashboards_forms(default_form)}}
+
+{% from 'forms.html' import home_forms %}
+{{ home_forms(add_platform=add_platform, edit_platform=edit_platform, delete_platform=delete_platform) }}
 {% endblock %}
 
 
 {% block page_scripts %}
 <script>
-/* Add Pagination component*/
-const paginationBtns = {% if pagination_btns %}{{pagination_btns|tojson|safe}}{% else %}[]{% endif %};
-const paginationPage = {{ request.args.get('page', 1) }};
-displayPaginationComponent(paginationBtns, paginationPage, ['dashboard_pag1', 'dashboard_pag2']);
-
-  
-
 // noEffects = true;
-/* add event listener for toggle bs4 toast and display settings menu for display table and card */
-toggleSettingsToast();
 
 searchComponent('mid', 'swing');
 
-/* set Default dashboard (close) */
-$('#setDefaultDashboard').on('shown.bs.modal', ()=>{toggleLoadingCircle(false, 'block');});
-deleteWtformsModalProccess(dataAttId='data-dashboard-id', formId='set_default_dashboard', idInputId='default_dashboard_id', modalId='setDefaultDashboard');
+addCollabseEndTableEffect(
+  rowsSelector='.searching_card',
+  closeOnlyBtn='.close_only_btn',
+  closeOpenBtn='.close_open_btn',
+  scrollIntoViewData={behavior: 'smooth', block: "center", inline: "nearest"}
+);
 
+
+deleteWtformsModalProccess(dataAttId='data-platform-id', formId='remove_platform_form', idInputId='platform_id_remove', modalId='deletePlatformModal');
+
+
+// handle fill edit modal form data
+fillEditPlatForm();
 </script>
 {% endblock page_scripts %}

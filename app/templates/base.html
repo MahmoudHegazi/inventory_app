@@ -39,11 +39,10 @@
 </head>
 <body>
 
-
 <div class="container">
   <nav class="navbar navbar-expand-md bg-light navbar-light shadow">
     {% if current_user.is_authenticated %}
-    <a class="navbar-brand" href="{{url_for('main.home')}}"><img src="{{url_for('static', filename='assets/images/'~current_user.image|safe)}}"  style="max-height: 50px;"/></a>
+    <a class="navbar-brand" href="{{url_for('routes.index')}}"><img src="{{url_for('static', filename='assets/images/'~current_user.image|safe)}}"  style="max-height: 50px;"/></a>
     {% endif %}
     <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#collapsibleNavbar">
       <span class="navbar-toggler-icon"></span>
@@ -52,10 +51,7 @@
       <ul class="w-100 navbar-nav">
         {% if current_user.is_authenticated %}
         <li class="ml-2 nav-item bg-light border">
-          <a class="nav-link" href="{{url_for('main.home')}}">Home</a>
-        </li>
-        <li class="ml-2 nav-item bg-light border">
-          <a class="nav-link" href="{{url_for('routes.index')}}">Dashboards</a>
+          <a class="nav-link" href="{{url_for('routes.index')}}">Home</a>
         </li>
         <li class="ml-2 nav-item bg-light border">
           <a class="nav-link" href="{{url_for('routes.suppliers')}}">Suppliers</a>
@@ -64,7 +60,13 @@
           <a class="nav-link" href="{{url_for('routes.catalogues')}}">Catalogues</a>
         </li>
         <li class="ml-2 nav-item bg-light border">
+          <a class="nav-link" href="{{url_for('routes.listings')}}">Listings</a>
+        </li>        
+        <li class="ml-2 nav-item bg-light border">
           <a class="nav-link" href="{{url_for('routes.orders')}}">Orders</a>
+        </li>
+        <li class="ml-2 nav-item bg-light border">
+          <a class="nav-link" href="{{url_for('main.reports')}}">Reports</a>
         </li>
         <li class="nav-item border ml-auto bg-light">
           <a class="nav-link" href="{{url_for('auth.logout')}}">Logout</a>
@@ -83,7 +85,7 @@
         </li>      
         {% endif %}
       </ul>
-    </div>  
+    </div>
   </nav>
   <div class="jumbotron text-center header_bg">
     <h1>{% if self.title %}{{self.title()}}{% else %}Inventory App{% endif %}</h1>
@@ -92,8 +94,19 @@
     <p>{{self.page_description()}}</p>
     {% endif %}
   </div>
+
+  
+  {# jinja2 tool for back link, refere only for current webapp it set Null but user can change request better pass function to check secureRedirect or session or force not change refere by user #}
+  {% set redirect_back = url_for('routes.index') %}
+  {% if request.referrer and not request.referrer.endswith('/home') and not request.referrer.endswith('/') %}
+  {% set redirect_back = request.referrer %}
+  {% endif %}
+   {% if request.endpoint != 'routes.index' %}
+   <a href="{{redirect_back}}" id="back_jinja2_link" class="text-dark text-underlined"><i class="fa fa-arrow-left"> Back</i></a>
+   {% endif %}
   {% block body %}{% endblock body %}
 
+  
 </div>
 
 

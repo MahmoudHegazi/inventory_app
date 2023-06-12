@@ -7,15 +7,12 @@
   <img src="{{url_for('static', filename='assets/images/loading_circle.gif')}}" class="loading_circle" style="display:none;" />
 
   <div class="container-fluid content_container">
-    <a href="{{url_for('routes.index')}}" class="ml-2 btn btn-light">
-      Back To Dashboards
-    </a>
-    {% if order and dashboard_id and listing_id %}
+    {% if order and listing_id %}
     <div class="d-flex justify-content-end align-items-center flex-wrap">
-      <a href="{{url_for('routes.view_listing', dashboard_id=dashboard_id, listing_id=listing_id)}}" class="btn btn-success">
+      <a href="{{url_for('routes.view_listing', listing_id=listing_id)}}" class="btn btn-success">
         Back to Listing ({{listing_id}})
       </a>
-      <a href="{{url_for('routes.edit_order', dashboard_id=dashboard_id, listing_id=listing_id, order_id=order.id)}}" class="ml-2 btn btn-primary">
+      <a href="{{url_for('routes.edit_order', listing_id=listing_id, order_id=order.id)}}" class="ml-2 btn btn-primary">
         Edit Order
       </a>
     </div>
@@ -51,7 +48,7 @@
             </div>
             <div class="col-sm-12 row">
               <div class="col-sm-6">
-                <button data-url="{{url_for('routes.delete_order', dashboard_id=dashboard_id, listing_id=listing_id, order_id=order.id)}}" data-toggle="modal" 
+                <button data-url="{{url_for('routes.delete_order', listing_id=listing_id, order_id=order.id)}}" data-toggle="modal" 
                   data-target="#deleteOrderModal" data-order-id="{{order.id}}" onclick="toggleLoadingCircle(true, 'block')" 
                   class="wtform_modal_deletebtn btn btn-danger btn-block">Delete
                 </button>
@@ -64,7 +61,7 @@
           <div class="mt-1 mb-2 d-flex justify-content-between align-items-center">
             <h4>Listing</h4>
             <div>
-              <a href="{{url_for('routes.listings', dashboard_id=dashboard_id)}}" class="btn btn-outline-primary">Go to Listing ({{listing_id}})</a>
+              <a href="{{url_for('routes.listings')}}" class="btn btn-outline-primary">Go to Listing ({{listing_id}})</a>
             </div>
           </div>
           <div class="container">

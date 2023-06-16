@@ -98,6 +98,7 @@ function searchComponent(speed='slow',easing='swing', cp=function(){return true;
         stopSearchForm();
         return false;
     }
+    
     /* Full JQuery component */
     const dataSearchAttrs = {};
     let searchColumnsIndex = 0;
@@ -123,6 +124,7 @@ function searchComponent(speed='slow',easing='swing', cp=function(){return true;
       /* add class css to overide bs, and added to card after hide effect completed in callback */
       $("body").append(`<style>.hidden_search_card${addon}{ display: none !important; }</style>`);
 
+      
       /* function to remove hidden cards with same effect and callback */
       function cancelSearch(speed, easing, cp){
         /* this for jquery works with bs4 becuase added css class with display:none !important so remove it and start make jquery effect that will run even if bs display element as it slow eg can not after display use: $(oldHidden).hide();*/
@@ -133,9 +135,10 @@ function searchComponent(speed='slow',easing='swing', cp=function(){return true;
           if (hi+1 == $(oldHidden).length){
             $(elm).show(speed, easing, cp);
           } else {
-            $(elm).show(speed, easing);
+            $(elm).show(speed, easing);            
           }
-        });      
+        });
+        
       };
 
       /* event listener for search (all hide actions) */
@@ -143,6 +146,7 @@ function searchComponent(speed='slow',easing='swing', cp=function(){return true;
         event.preventDefault();
         /* to allow reaserch not pass cp (clean and old search which hide cards, before start new search) */
         cancelSearch(speed, easing, ()=>{});
+        
         const searchValue = $(`#search_value${addon}`).val().trim();
         const searchColumn = $(`#search_by${addon}`).val().trim();
         const dataAttrName = dataSearchAttrs[searchColumn];
@@ -174,7 +178,8 @@ function searchComponent(speed='slow',easing='swing', cp=function(){return true;
         cancelSearch(speed, easing, cp);
         $(`#cancel_search${addon}`).hide();
         $(`#search_value${addon}`).val('');
-        
+        /* this normal event fired when cancel search happend, usefull for integerate search with diffrent components, like multiple select */
+        $(window).trigger('searchComponent.cancelSearch');        
       });      
       return true;
     }
@@ -471,7 +476,206 @@ function fillEditPlatForm(){
   });
 }
 
+function collabse_listing_effect(){
+  if (noEffects === true){return false;}
+  const collabseData = {};
+  $(".close_open_btn, .close_only_btn").on('click', (e)=>{
+    if ($(e.currentTarget).length && $(e.currentTarget).attr('href').length && $(e.currentTarget).closest('tr').length){
+      const currentProp = collabseData[$(e.currentTarget).attr('href')];
+      if (currentProp){
+        if (currentProp === true){
+          collabseData[$(e.currentTarget).attr('href')] = false;
+        } else {
+          collabseData[$(e.currentTarget).attr('href')] = true;
+        }
+  
+      } else {
+        collabseData[$(e.currentTarget).attr('href')] = true;
+      }
+      
+      if (collabseData[$(e.currentTarget).attr('href')] === true){
+        $(document).trigger('collabse_start', $(e.currentTarget).closest('tr'));
+      } else {
+        $(document).trigger('collabse_end', $(e.currentTarget).closest('tr'));
+      }
+    }
+  });
+  
+  $(document).on('collabse_start', (e, target)=>{
+    $("#info_part").css('position', 'absolute');
+    $("#info_part").css('left', '-10000px');
+    $("#main_part").removeClass('col-sm-8');
+    $("#main_part").addClass('col-sm-12');
+  });
+  
+  
+  $(document).on('collabse_end', (e, target)=>{
+    let end_now = true;
+    /* end only effect when all opend listing closed, need more than 1 listing open to test */
+    for (item in collabseData){
+      if (collabseData[item] === true){
+        end_now = false;
+      }
+    }
+    if (end_now){
+      $("#info_part").css('position', '');
+      $("#info_part").css('left', '');
+      $("#main_part").removeClass('col-sm-12');
+      $("#main_part").addClass('col-sm-8');
+      $("#info_part").show();
+    }
+    
+  });
+}
 
+/* integerted with search throw 1 event cancel search, and visible elements (searchComponent use display none for process search result) */
+function multipleSelectComponent(checkboxSelector='', dataLabel='', actionModals=[], selectAllSelector=''){
+  let checkedCheckBoxes = [];
+  let selectedValues = [];
+  let selectedLabels = [];
+  // true means can start select all
+  let selectAllStatus = true;
+
+  /* validate actions modals objects (to make function dyanmic focus only with select provid array of objects for each action modal eg:delete_catalogue, update_catalogue_catagory, or any other action provided) */
+  let allActionsReady = (Array.isArray(actionModals) && actionModals.length > 0) ? true : false;
+  for (let a=0; a<actionModals.length; a++){
+   let actionModal = actionModals[a];
+   if (!(
+     actionModal.modalId && actionModal.actionLabesSelctor && actionModal.formInputSelector &&
+     actionModal.startActionBtn && $(actionModal.modalId).length && 
+     $(actionModal.actionLabesSelctor).length && $(actionModal.formInputSelector).length && $(actionModal.startActionBtn).length
+     )){        
+     allActionsReady = false;
+     break;
+   }
+  }
+
+  
+  
+  /* Start function check if all arugments valid */
+  if (allActionsReady && checkboxSelector && $(checkboxSelector).length){
+
+   /* incase of submit any form rest selected inputs for browser back button and searchComponent (note search component uses form to make search, so this will also integert with other components like searchComponent, and fix the browser back button too to clear checked inputs when action form or other forms submited) */ 
+   $('form').on('submit', function(e){
+
+     oldSelected = $(`${checkboxSelector}:checked:visible`);
+     $(checkboxSelector).prop('checked', false);
+     $(checkboxSelector).trigger('change');
+
+   });
+
+   /* easy integerate (inhirte) multipleSelectComponent with searchComponent (no need changes in one or both functions)  */
+   $(window).on('searchComponent.cancelSearch', function(){
+    $(checkboxSelector).prop('checked', false);
+    $(checkboxSelector).trigger('change');
+   });
+   
+   $(checkboxSelector).on('change', function(e){      
+
+     checkedCheckBoxes = Array.from($(`${checkboxSelector}:checked:visible`)).filter( (elm)=>{
+       /* must provide items labels for next action */
+       if ($(elm).length && $(elm).attr('value') && $(elm).val() && $(elm).attr(dataLabel)){
+         return $(elm);
+       }
+     });
+
+     selectedValues = checkedCheckBoxes.map((checkBox)=>{
+         return $(checkBox).val();
+     });
+
+     selectedLabels = checkedCheckBoxes.map( (checkBox)=>{
+       return $(checkBox).attr(dataLabel);
+     });
+
+
+     if (checkedCheckBoxes.length > 0){
+       // if one or more than one item checked display all actions buttons
+       actionModals.forEach( (actionModal)=>{
+         $(actionModal.startActionBtn).show('fast');
+       });
+     } else {
+       actionModals.forEach( (actionModal)=>{
+         $(actionModal.startActionBtn).hide('fast');
+       });
+     }
+
+
+
+     if (selectAllSelector && $(selectAllSelector).length){
+        
+        /* always work with visible elements only to easy integerate with search */
+       if ($(`${checkboxSelector}:visible`).length == checkedCheckBoxes.length){
+         // total visible elements same as total visible elements checked
+         selectAllStatus = false;
+         $(selectAllSelector).text('Unselect All');
+       } else {
+         selectAllStatus = true;
+         $(selectAllSelector).text('Select All');
+       }
+
+     }
+
+   });
+
+   actionModals.forEach( (actionModal)=>{
+       $(actionModal.modalId).on('shown.bs.modal', function(e) {
+         
+       
+       /* set action form input value */
+       $(actionModal.formInputSelector).val(selectedValues.join(","));
+ 
+       $(actionModal.actionLabesSelctor).html("");
+ 
+       // display total element text if provided
+       if (actionModal.totalElement && $(actionModal.totalElement).length){
+         $(actionModal.totalElement).text(selectedValues.length);
+       }
+     
+       // display labels
+       let actionLabesHtml = '';
+       selectedLabels.forEach( (labelText)=>{
+         actionLabesHtml += `<span class="badge badge-secondary mr-1 mt-1">${labelText}</span>`;
+       });
+       $(actionModal.actionLabesSelctor).html(actionLabesHtml);
+     });
+   
+     actionModals.forEach( (actionModal)=>{
+       $(actionModal.modalId).on('hide.bs.modal', function(e) {
+         // empty labels
+         $(actionModal.actionLabesSelctor).html("");
+         // empty total elements text if exist
+         if (actionModal.totalElement && $(actionModal.totalElement).length){
+           $(actionModal.totalElement).text("0");
+         }
+         // if selectAll exist reset it          
+       });
+     });
+
+   });
+
+
+
+
+   /* Make Toggle Select All btn only by check input and trigger change event */
+   if (selectAllSelector && $(selectAllSelector).length){
+     $(selectAllSelector).on('click', function(){
+       if (selectAllStatus){
+         $(checkboxSelector).prop('checked', true);
+         $(checkboxSelector).trigger('change');
+         $(selectAllSelector).text('Unselect All');
+         selectAllStatus = false;
+       } else {
+         $(checkboxSelector).prop('checked', false);
+         $(checkboxSelector).trigger('change');
+         $(selectAllSelector).text('Select All');
+         selectAllStatus = true;
+       }
+     });
+   }
+  } else {
+   console.log('multipleSelectComponent not started');
+  }
+}
 $(document).ready(async function(){
     applyHoverEffect();
 });

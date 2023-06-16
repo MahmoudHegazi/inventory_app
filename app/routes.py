@@ -2,13 +2,13 @@ import json
 import sys
 import os
 import random
-from flask import Flask, Blueprint, session, redirect, url_for, flash, Response, request, render_template, jsonify
+from flask import Flask, Blueprint, session, redirect, url_for, flash, Response, request, render_template, jsonify, abort
 from flask_wtf import Form
 from .models import User, Supplier, Dashboard, Listing, Catalogue, Purchase, Order, Platform, ListingPlatform
 from .forms import addListingForm, editListingForm, addCatalogueForm, editCatalogueForm, \
 removeCatalogueForm, removeListingForm, addSupplierForm, editSupplierForm, removeSupplierForm, \
 addPurchaseForm, editPurchaseForm, removePurchaseForm, addOrderForm, editOrderForm, removeOrderForm, CatalogueExcelForm, \
-addPlatformForm, editPlatformForm, removePlatformForm
+addPlatformForm, editPlatformForm, removePlatformForm, removeCataloguesForm, removeListingsForm
 from . import vendor_permission, db
 from .functions import get_safe_redirect, updateDashboardListings, updateDashboardOrders, updateDashboardPurchasesSum, secureRedirect
 from sqlalchemy.exc import IntegrityError
@@ -65,18 +65,14 @@ def makePagination(page=1, query_obj=None, callback=()):
 @vendor_permission.require()
 def index():
     try:
-        deleteform = removeListingForm()
-        delete_purchase = removePurchaseForm(action_redirect=url_for('routes.index'))
-        delete_order =  removeOrderForm(action_redirect=url_for('routes.index'))
-
         add_platform =  addPlatformForm(action_redirect=url_for('routes.index'), dashboard_id=current_user.dashboard.id)
         edit_platform =  editPlatformForm(action_redirect=url_for('routes.index'))
         delete_platform =  removePlatformForm(action_redirect=url_for('routes.index'))
-
-        return render_template('index.html', dashboard=current_user.dashboard, deleteform=deleteform, delete_purchase=delete_purchase, delete_order=delete_order, add_platform=add_platform, edit_platform=edit_platform, delete_platform=delete_platform)
+        return render_template('index.html', dashboard=current_user.dashboard, add_platform=add_platform, edit_platform=edit_platform, delete_platform=delete_platform)
     except Exception as e:
         print('System Error: {} , info: {}'.format(e, sys.exc_info()))
         # flash('Unknown error unable to view product', 'danger')
+        abort(500)
         return 'system error', 500
 
 ################ -------------------------- Catalogue -------------------- ################
@@ -91,8 +87,10 @@ def catalogues():
             lambda total_pages: [url_for('routes.catalogues', page=page_index) for page_index in range(1, total_pages+1)]
         )
         catalogues_excel = CatalogueExcelForm()
+        delete_catalogues = removeCataloguesForm()
+        #return str(delete_catalogues.hidden_tag())+str(delete_catalogues.catalogues_ids)
         user_catalogues = pagination['data']
-        return render_template('catalogues.html', catalogues=user_catalogues,  catalogues_excel=catalogues_excel, pagination_btns=pagination['pagination_btns'])
+        return render_template('catalogues.html', catalogues=user_catalogues,  catalogues_excel=catalogues_excel, pagination_btns=pagination['pagination_btns'], delete_catalogues=delete_catalogues)
     except Exception as e:
         print('System Error: {} , info: {}'.format(e, sys.exc_info()))
         flash('unable to display catalogues page', 'danger')
@@ -269,6 +267,11 @@ def delete_catalogue(catalogue_id):
         if target_Catalogue is not None:
             if form.validate_on_submit():
                 target_Catalogue.delete()
+
+                # update dashboard numbers
+                updateDashboardListings(current_user.dashboard)
+                updateDashboardOrders(db, Order, Listing, current_user.dashboard)
+                updateDashboardPurchasesSum(db, Purchase, Listing, current_user.dashboard)
                 flash('Successfully deleted Catalogue ID: {}'.format(catalogue_id), 'success')
             else:
                 flash('Unable to delete Catalogue, ID: {}'.format(catalogue_id), 'danger')
@@ -278,8 +281,49 @@ def delete_catalogue(catalogue_id):
         print('System Error: {} , info: {}'.format(e, sys.exc_info()))
         flash('Unknown error unable to delete catalogue', 'danger')
     finally:
-        return redirect(url_for('routes.catalogues', catalogue_id=catalogue_id))
-    
+        return redirect(url_for('routes.catalogues'))
+
+
+@routes.route('/catalogues/delete', methods=['POST'])
+@login_required
+@vendor_permission.require(http_exception=403)
+def delete_catalogues():
+    try:
+        form = removeCataloguesForm()
+        deleted_ids = []
+
+        if form.validate_on_submit():
+            user_catalogues_ids = [str(user_catalogue.id) for user_catalogue in current_user.catalogues]
+
+            selected_catalogues = []
+            catalogues_ids_str = str(form.catalogues_ids.data).strip()
+            if catalogues_ids_str:
+                selected_catalogues = catalogues_ids_str.split(',')
+
+            for selected_catalogue_id in selected_catalogues:
+                if selected_catalogue_id in user_catalogues_ids:
+                    selected_catalogue = Catalogue.query.filter_by(id=selected_catalogue_id, user_id=current_user.id).one_or_none()
+                    if selected_catalogue:
+                        deleted_ids.append(selected_catalogue.id)
+                        selected_catalogue.delete()
+            if len(deleted_ids) > 0:
+                updateDashboardListings(current_user.dashboard)
+                updateDashboardOrders(db, Order, Listing, current_user.dashboard)
+                updateDashboardPurchasesSum(db, Purchase, Listing, current_user.dashboard)
+                flash('Successfully deleted Catalogues', 'success')
+            else:
+                flash('No Changes Detected', 'success')
+        else:
+            flash('Unable to delete Catalogues', 'danger')
+    except Exception as e:
+        print('System Error: {} , info: {}'.format(e, sys.exc_info()))
+        flash('Unknown error unable to delete catalogues', 'danger')
+
+    finally:
+        return redirect(url_for('routes.catalogues'))
+
+
+
 ################ -------------------------- Dashboard Listings -------------------- ################
 @routes.route('/listings', methods=['GET'])
 @login_required
@@ -304,8 +348,10 @@ def listings():
         )
         user_dashboard_listings = pagination['data']
 
-        return render_template('listings.html', listings=user_dashboard_listings, pagination_btns=pagination['pagination_btns'])
+        delete_listings = removeListingsForm()
+        return render_template('listings.html', listings=user_dashboard_listings, pagination_btns=pagination['pagination_btns'], delete_listings=delete_listings)
     except Exception as e:
+        print('System Error: {} , info: {}'.format(e, sys.exc_info()))
         flash('Unknown error Unable to view Listings', 'danger')
         return redirect(url_for('routes.index'))
 
@@ -587,6 +633,8 @@ def delete_listing(listing_id):
                 
                 # update number of listings after delete action
                 updateDashboardListings(user_dashboard)
+                updateDashboardOrders(db, Order, Listing, user_dashboard)
+                updateDashboardPurchasesSum(db, Purchase, Listing, user_dashboard)
                 flash('Successfully deleted Listing ID: {}'.format(listing_id), 'success')
             else:
                 flash('Unable to delete Listing, ID: {}'.format(listing_id), 'danger')
@@ -597,6 +645,70 @@ def delete_listing(listing_id):
         flash('Unknown error unable to delete Listing', 'danger')
     finally:
         return redirect(url_for('routes.listings'))
+    
+
+# need after_delete
+@routes.route('/listings/delete', methods=['POST'])
+@login_required
+@vendor_permission.require(http_exception=403)
+def delete_listings():
+    try:
+        user_dashboard = current_user.dashboard
+        form = removeListingsForm()
+        user_listings = db.session.query(
+            Listing
+        ).join(
+            Dashboard, Listing.dashboard_id==Dashboard.id
+        ).join(
+            User, Dashboard.id==User.dashboard_id
+        ).filter(
+            User.id == current_user.id,
+            Dashboard.id == user_dashboard.id
+        ).all()
+        
+        if form.validate_on_submit():
+
+            user_listings_ids = [str(user_listing.id) for user_listing in user_listings]
+
+            deleted_listings = []
+            selected_listings = []
+            listings_ids_str = str(form.listings_ids.data).strip()
+            if listings_ids_str:
+                selected_listings = listings_ids_str.split(',')
+
+            for listing_id in selected_listings:
+                if listing_id in user_listings_ids:
+                    target_listing = Listing.query.filter_by(id=listing_id, dashboard_id=current_user.dashboard_id).one_or_none()
+                    if target_listing:
+                        orders_total = sum([order.quantity for order in target_listing.orders])
+                        purchases_total = sum([purchase.quantity for purchase in target_listing.purchases])
+                        
+                        catalogue_quantity = int(target_listing.catalogue.quantity)
+                        catalogue_quantity += orders_total
+                        catalogue_quantity -= purchases_total
+                        catalogue_quantity = catalogue_quantity if catalogue_quantity >= 0  else 0
+    
+                        target_listing.catalogue.quantity = catalogue_quantity
+                        target_listing.delete()                        
+                        target_listing.catalogue.update()
+
+                        deleted_listings.append(listing_id)
+
+            # update number of listings one time  after all delete actions
+            updateDashboardListings(user_dashboard)
+            updateDashboardOrders(db, Order, Listing, user_dashboard)
+            updateDashboardPurchasesSum(db, Purchase, Listing, user_dashboard)
+            flash('Successfully deleted Listings', 'success')
+        else:
+            flash('Unable to delete Listings', 'danger')
+
+    except Exception as e:
+        print('System Error: {} , info: {}'.format(e, sys.exc_info()))
+        flash('Unknown error unable to delete Listing', 'danger')
+
+    finally:
+        return redirect(url_for('routes.listings'))
+
 
 ################ -------------------------- Listing Purchases (this purchases based on selected listing from any supplier) -------------------- ################
 @routes.route('/listings/<int:listing_id>/purchases/<int:purchase_id>', methods=['GET', 'POST'])
@@ -1874,8 +1986,10 @@ def delete_platform(platform_id):
     finally:
         return redirect(url_for('routes.index'))
     
-
+"""
 @routes.errorhandler(403)
 def method_not_allowed(e):
     #session['redirected_from'] = request.url
     return redirect(url_for('auth.logout'))
+"""
+

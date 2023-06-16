@@ -1,0 +1,9 @@
+{% extends 'base.html' %}
+{% block title %}Forbidden{% endblock %}
+{% block page_description %}Looks like You Have no Premesion To Access this Page.{% endblock %}
+{% block body %}
+<div class="container text-center shadow-lg pt-4 pb-4 mt-2">
+    <img src="{{url_for('static', filename='assets/images/error-icon.png')}}" height="300">
+    <h5>Forbidden Error</h5>
+</div>
+{% endblock %}

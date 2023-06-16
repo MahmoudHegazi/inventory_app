@@ -70,6 +70,9 @@ class removeListingForm(FlaskForm):
     listing_id = HiddenField(validators=[InputRequired()])
     delete = SubmitField('Delete')
 
+class removeListingsForm(FlaskForm):
+    listings_ids = HiddenField()
+    delete_listings = SubmitField('Delete')
 
 # Product Forms
 class catalogueModal(FlaskForm):
@@ -101,9 +104,13 @@ class editCatalogueForm(catalogueModal):
 
 
 class removeCatalogueForm(FlaskForm):
-    catalogue_id = HiddenField(validators=[InputRequired()])
+    catalogue_id = HiddenField(validators=[InputRequired()])    
     delete = SubmitField('Delete')
 
+
+class removeCataloguesForm(FlaskForm):
+    catalogues_ids = HiddenField()
+    delete_catalogues = SubmitField('Delete Catalgoues')
 
 # signup = SubmitField('Signup', default='checked')
 

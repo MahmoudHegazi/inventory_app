@@ -108,6 +108,7 @@ addEventListener("DOMContentLoaded", (event) => {
         if (chartData.description){
           addonsHTML += `<span>${chartData.description} </span>`;
         }
+        /* custom ajax html select box added dynamic by server (filter_year_component) */
         if (chartData.year_picker_ajax && Array.isArray(chartData.year_picker_ajax.years)){
 
           let selectOptions = '';

@@ -9,113 +9,29 @@
   <div class="container-fluid content_container">
     {% if dashboard %}
     <div class="d-flex justify-content-end align-items-center flex-wrap">
-      <a href="{{url_for('main.listing_export')}}" class="ml-2 btn btn-secondary">
-        Export Listings
-      </a>
     </div>
     <div class="row mt-2">
-      <div class="border rounded col-4 p-3 d-flex justify-content-center align-items-start cursor-pointer text-decoration-none text-dark media_small_width_100">
+      <div id="info_part" class="border rounded col-4 p-3 d-flex justify-content-center align-items-start cursor-pointer text-decoration-none text-dark media_small_width_100">
         <div class="hover_shadow row container shadow p-3">
             <div class="col-sm-12 mb-3 text-center">
                 <img src="{{url_for('static', filename='assets/images/default_dashboard.png')}}" alt="dashboard icon" width="150" class="mxwidth-150" />
                 <h3 class="overflow_within title"><span class="badge badge-primary">{{dashboard.title}}</span></h3>
             </div>
             <div class="col-sm-12">
-              <p class="overflow_within">Id: <span class="id">{{dashboard.id}}</span></p>
+              <p class="overflow_within">Total Listings: <span class="total_listings">{% if dashboard.num_of_listings %}{{dashboard.num_of_listings}}{% else %}0{% endif %}</span></p>
             </div>
             <div class="col-sm-12">
-              <p class="overflow_within">Total Listings: <span class="total_listings">{{dashboard.num_of_listings}}</span></p>
+              <p class="overflow_within">Total Orders: <span class="total_orders">{% if dashboard.num_of_orders %}{{dashboard.num_of_orders}}{% else %}0{% endif %}</span></p>
             </div>
             <div class="col-sm-12">
-              <p class="overflow_within">Total Orders: <span class="total_orders">{{dashboard.num_of_orders}}</span></p>
-            </div>
-            <div class="col-sm-12">
-              <p class="overflow_within">Monthly Purchases: <span class="monthly_purchases">{{dashboard.sum_of_monthly_purchases}}</span></p>
-            </div>
-            <div class="col-sm-12">
-              <p class="overflow_within">Created At: <span class="total_orders">{{dashboard.created_date}}</span></p>
-            </div>
-            <div class="col-sm-12">
-              <p class="overflow_within">Updated At: 
-                <span class="monthly_purchases">{% if dashboard.updated_date %}{{dashboard.updated_date}}{% endif %}</span>
-              </p>
+              <p class="overflow_within">Monthly Purchases: <span class="monthly_purchases">{% if dashboard.sum_of_monthly_purchases %}{{dashboard.sum_of_monthly_purchases}}{% else %}0{% endif %}</span></p>
             </div>
         </div>
-      </div>      
-      <div class="col-sm-8 p-3 row border rounded">
+      </div>
+      <div id="main_part" class="col-sm-8 p-3 row border rounded">
         <div class="container">
-          <div class="mt-1 mb-2 d-flex justify-content-between align-items-center">
-            <h4>Listings</h4>
-            <div>
-              <a href="{{url_for('routes.listings')}}" class="btn btn-outline-primary">View Listings</a>
-              <a href="{{url_for('routes.add_listing')}}" class="btn btn-outline-success">Add Listing</a>
-            </div>
-          </div>
-          <!-- search component -->
-          <div class="row mt-2 mb-2">
-            <div class="col-sm-11 mx-auto" title="search by sku, price, Category, Product Name">
-              <form id="search_form" class="row">
-                <input class="form-control col-sm-5" type="text" name="search_value" id="search_value" placeholder="search by sku, price, Category, Product Name" value=""/>
-                <select class="form-control col-sm-4" name="search_by" id="search_by">
-                  <option value="">Search BY</option>
-                  <option class="search_column" value="sku">SKU</option>
-                  <option class="search_column" value="product_name">Product Name</option>
-                  <option class="search_column" value="category">Category</option>
-                  <option class="search_column" value="price">Price</option>
-                </select>
-                <button type="button" id="cancel_search" class="btn btn-sm col-sm-1 btn-danger" style="display:none;"><i class="fa fa-close"></i></button>
-                <button type="submit" class="btn btn-success col-sm-2">Search</button>
-              </form>
-            </div>
-          </div>
-          <!-- search component end -->
-
-          <div class="overflow_600">
-              <table class="table table-bordered">
-                <thead>
-                  <tr>
-                    <th>SKU</th>
-                    <th>Product Name</th>
-                    <th>Category</th>
-                    <th>Price</th>
-                    <th>Action</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {% if dashboard.listings %}
-                  {% for listing in dashboard.listings %}
-                  <tr class="searching_card"
-                  data-search-sku="{{listing.sku}}" data-search-product_name="{{listing.product_name}}"
-                  data-search-category="{{listing.category}}" data-search-price="{{listing.price}}">
-                    <td>{{listing.sku}}</td>
-                    <td>{{listing.product_name}}</td>
-                    <td>{{listing.category}}</td>
-                    <td>{{listing.price}}</td>
-                    <td>
-                      
-                      <div class="d-flex justify-content-around align-items-center">
-                        <a href="{{url_for('routes.view_listing', listing_id=listing.id)}}" class="btn btn-primary btn-sm"><i class="fa fa-external-link"></i></a>
-                        <a href="{{url_for('routes.edit_listing', listing_id=listing.id)}}" class="btn btn-secondary btn-sm"><i class="fa fa-edit"></i></a>
-                        <a href="#listing_{{listing.id}}" data-toggle="collapse" class="btn btn-primary btn-sm close_open_btn"><i class="fa fa-eye"></i></a>
-                      </div>
-                    </td>
-                  </tr>
-                  <tr>
-                    <td colspan="5">
-                      <div id="listing_{{listing.id}}" class="shadow p-2 collapse">
-                        {% include 'partialse/listing_view.html' %}
-                        <a href="#listing_{{listing.id}}" data-toggle="collapse" class="btn btn-primary btn-sm close_only_btn"><i class="fa fa-arrow-up"></i></a>
-                      </div>
-                    </td>
-                  </tr>
-                  {% endfor %}
-                  {% endif %}
-                </tbody>
-              </table>
-          </div>
-
           <div class="div border shadow rounded p-2">
-            <h5 class="mt-2 mb-3"><span>Plateforms: </span> 
+            <h5 class="mt-2 mb-3"><span>Platforms: </span> 
               <button type="button" data-toggle="modal" data-target="#addPlatformModal" class="btn btn-success btn-sm" style="float:right;"><i class="fa fa-plus"></i></button></h5>
             <div class="row" style="max-height:300px;overflow: auto;">
               <!-- plateforms -->
@@ -132,7 +48,6 @@
               {% endfor %}
             </div>
           </div>
-
         </div>
       </div>
     </div>
@@ -151,7 +66,7 @@
 <script>
 // noEffects = true;
 
-searchComponent('mid', 'swing');
+//searchComponent('mid', 'swing');
 
 addCollabseEndTableEffect(
   rowsSelector='.searching_card',
@@ -160,6 +75,8 @@ addCollabseEndTableEffect(
   scrollIntoViewData={behavior: 'smooth', block: "center", inline: "nearest"}
 );
 
+
+collabse_listing_effect();
 
 deleteWtformsModalProccess(dataAttId='data-platform-id', formId='remove_platform_form', idInputId='platform_id_remove', modalId='deletePlatformModal');
 

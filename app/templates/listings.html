@@ -56,11 +56,19 @@
     </div>
     <!-- search component end -->
 
+    <!-- multiple select action -->
+    <div class="p-2">
+      <button id="selectAll" class="btn btn-secondary btn-sm">Select All</button>
+      <button id="deleteListingsOpen" data-toggle="modal" data-target="#removeListings" class="btn btn-danger btn-sm" type="button" style="display:none;">Delete Listings</button>
+    </div>
+    <!-- multiple select end -->
+
+
     <!-- listings Pagination start -->
     <div id="listings_pag1" class="d-flex justify-content-center align-items-center mt-2"></div>
     <!-- Pagination end-->
 
-    <!-- card display -->
+    <!-- card display  (For Mobile, small screen Devices )-->
     <div class="row" id="card_display" style="display:none;">
       {% for listing in listings %}
 
@@ -84,7 +92,7 @@
           </div>
           <div class="col-sm-12 p-3">
             <div class="overflow_within text-center"><strong>{{listing.product_name}}</strong></div>
-            <div class="overflow_within">Id: <span>{{listing.id}}</span></div>
+            <div class="overflow_within"><input type="checkbox" data-check-listing="{{listing.product_name}}" class="select_listings form-control mx-auto" name="select_listings" value="{{listing.id}}" /></div>
             <div class="overflow_within">Catalogue ID: <span>{{listing.catalogue_id}}</span></div>
             <div class="overflow_within">SKU: <span>{{listing.sku}}</span></div>
             <div class="overflow_within">Price: <span>{{listing.price}}</span></div>
@@ -139,7 +147,7 @@
             data-search-product_name="{{listing.product_name}}" data-search-price="{{listing.price}}" 
             data-search-sale_price="{{listing.sale_price}}" data-search-quantity="{{listing.quantity}}" data-search-platform="{{ns.platforms_string}}">
               <td>
-                <p class="overflow_within">{{listing.id}}</p>
+                <p class="overflow_within"><input type="checkbox" data-check-listing="{{listing.product_name}}" class="select_listings form-control" name="select_listings" value="{{listing.id}}" /></p>
               </td>
               <td>
                 <p class="overflow_within"><img src="{{url_for('static', filename='assets/images/'~listing.image)}}" alt="listing icon" width="50" class="mxwidth-50" /></p>
@@ -197,7 +205,7 @@
 
 </div>
 {% import 'forms.html' as forms %}
-{{ forms.listings_forms() }}
+{{ forms.listings_forms(delete_listings=delete_listings) }}
 {% endblock %}
 
 
@@ -214,5 +222,20 @@ displayPaginationComponent(paginationBtns, paginationPage, ['listings_pag1', 'li
 searchComponent('mid', 'swing', cp=function(){return true;}, addon='', condition='*=');
 
 toggleSettingsToast();
+
+/* delete multiple listings */
+const actionModalsArray = [
+    {
+      modalId: '#removeListings',
+      formId: '#remove_listings',
+      actionLabesSelctor: '#items',
+      formInputSelector: '#listings_ids',
+      startActionBtn: '#deleteListingsOpen',
+      totalElement: '#listings_ids_total'
+    }
+  ];
+
+  multipleSelectComponent(checkboxSelector=".select_listings",  dataLabel="data-check-listing", actionModals=actionModalsArray, selectAllSelector="#selectAll");
+
 </script>
 {% endblock page_scripts %}

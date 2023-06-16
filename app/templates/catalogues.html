@@ -1,6 +1,7 @@
 {% extends 'base.html' %}
 {% block title %}Catalogues{% endblock %}
 {% block page_description %}this is catalogues page, you can view/edit and add new catalogue{% endblock %}
+
 {% block body %}
 <div class="container border rounded p-3">
   {% include 'messages.html' %}
@@ -57,12 +58,19 @@
         </form>
       </div>
     </div>
+    <!-- multiple select action -->
+    <div class="p-2">
+      <button id="selectAll" class="btn btn-secondary btn-sm">Select All</button>
+      <button id="deleteCataloguesOpen" data-toggle="modal" data-target="#removeCatalogues" class="btn btn-danger btn-sm" type="button" style="display:none;">Delete Catagloues</button>
+    </div>
+    <!-- multiple select end -->
+
     <!-- search component end -->
     <!-- catalogues Pagination start -->
     <div id="catalogues_pag1" class="d-flex justify-content-center align-items-center mt-2"></div>
     <!-- Pagination end-->
 
-    <!-- Card Display -->
+    <!-- Card Display (For Mobile, small screen Devices ) -->
     <div class="row" id="card_display" style="display:none;">      
       {% for catalogue in catalogues %}
       <div class="searching_card col-4 p-3 d-flex justify-content-center align-items-center cursor-pointer text-decoration-none text-dark media_small_width_100"
@@ -77,7 +85,7 @@
             <p class="overflow_within text-center"><strong>{{catalogue.product_name}}</strong></p>
           </div>
           <div class="col-sm-12">
-            <p class="overflow_within">Id: <span>{{catalogue.id}}</span></p>
+            <p class="overflow_within"><input type="checkbox" data-check-catalogue="{{catalogue.product_name}}" class="deleted_catalogues form-control w-75 mx-auto" name="deleted_catalogues" value="{{catalogue.id}}" /></p>
           </div>
           <div class="col-sm-12">
             <p class="overflow_within">SKU: <span>{{catalogue.sku}}</span></p>
@@ -124,7 +132,7 @@
             data-search-id="{{catalogue.id}}" data-search-sku="{{catalogue.sku}}" data-search-product_name="{{catalogue.product_name}}"
             data-search-price="{{catalogue.price}}"  data-search-location="{{catalogue.location}}">
               <td>
-                <p class="overflow_within">{{catalogue.id}}</p>
+                <p class="overflow_within"><input type="checkbox" data-check-catalogue="{{catalogue.product_name}}" class="deleted_catalogues form-control w-75" name="deleted_catalogues" value="{{catalogue.id}}" /></p>
               </td>
               <td>
                 <p class="overflow_within"><img src="{{url_for('static', filename='assets/images/'~catalogue.product_image)}}" alt="listing icon" width="50" class="mxwidth-50" /></p>
@@ -172,7 +180,7 @@
 </div>
 
 {% import 'forms.html' as forms %}
-{{ forms.catalogues_forms(catalogues_excel=catalogues_excel) }}
+{{ forms.catalogues_forms(catalogues_excel=catalogues_excel,delete_catalogues=delete_catalogues) }}
 {% endblock %}
 
 
@@ -187,8 +195,21 @@ displayPaginationComponent(paginationBtns, paginationPage, ['catalogues_pag1', '
 
 toggleSettingsToast();
 
-searchComponent('mid', 'swing');
+searchComponent('mid', 'swing', cp=function(){return true;}, addon='', condition='*=');
 
+
+  const actionModalsArray = [
+    {
+      modalId: '#removeCatalogues',
+      formId: '#remove_catalogues',
+      actionLabesSelctor: '#items',
+      formInputSelector: '#catalogues_ids',
+      startActionBtn: '#deleteCataloguesOpen',
+      totalElement: '#catalogues_ids_total'
+    }
+  ];
+
+  multipleSelectComponent(checkboxSelector=".deleted_catalogues",  dataLabel="data-check-catalogue", actionModals=actionModalsArray, selectAllSelector="#selectAll");
 
 </script>
 {% endblock page_scripts %}

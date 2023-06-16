@@ -115,11 +115,13 @@ def updateDashboardListings(user_dashboard):
     except Exception as e:
         print('System Error updateDashboardListings: {} , info: {}'.format(e, sys.exc_info()))
         raise e
+    
+
 
 def updateDashboardOrders(db, Order, Listing, user_dashboard):
     try:
         total_dashboard_orders = db.session.query(
-                    func.count(Order.id)
+                    func.sum(Order.quantity)
                 ).join(
                     Listing
                 ).filter(

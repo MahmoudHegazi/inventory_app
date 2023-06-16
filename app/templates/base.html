@@ -32,10 +32,10 @@
 
   <script src="{{url_for('static', filename='assets/js/app.js')}}"></script>
 
-  {% if self.head_data() %}
-  {% block head_data %}{% endblock head_data %}
+  {% if self.head_data %}
+    {% block head_data %}{% endblock %}
   {% endif %}
-
+  
 </head>
 <body>
 

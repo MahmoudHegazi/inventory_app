@@ -1,0 +1,9 @@
+{% extends 'base.html' %}
+{% block title %}Method Not Allowed{% endblock %}
+{% block page_description %}Looks like the Requested Page not accept POST requests.{% endblock %}
+{% block body %}
+<div class="container text-center shadow-lg pt-4 pb-4 mt-2">
+    <img src="{{url_for('static', filename='assets/images/error-icon.png')}}" height="300">
+    <h5>Method Not Allowed Error 405</h5>
+</div>
+{% endblock %}

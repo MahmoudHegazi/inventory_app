@@ -156,7 +156,7 @@ def getChartData(chart_query_result, label_i=0, data_i=1):
 
 @main.route('/reports', methods=['POST', 'GET'])
 @login_required
-@admin_permission.require()
+@vendor_permission.require()
 def reports():
     export_form = ExportDataForm()
     # chart 1

@@ -1,5 +1,5 @@
 import os
-from flask import Flask
+from flask import Flask, render_template
 from flask_sqlalchemy import SQLAlchemy
 from flask_login import LoginManager
 from flask_bcrypt import Bcrypt
@@ -9,11 +9,11 @@ import flask_excel as excel
 
 UPLOAD_FOLDER = os.path.join(os.path.dirname(__file__), '/static/assets/uploads')
 
-app = Flask(__name__)
+app = Flask(__name__, template_folder='templates', static_folder='static')
 app.config['SECRET_KEY'] = 'wdqwq122e12dmokokwdqkokdok23qwmsmczx445mvnbn1ndqqqdkpqookmnckzknvnvn123nnr2nrndmmakadmmqw12'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = True
-#app.config['SQLALCHEMY_DATABASE_URI'] = 'mysql://mr204h:Ilda2011@localhost/inventory123'
-app.config['SQLALCHEMY_DATABASE_URI'] = 'mysql://dbmasteruser:Success2023!@ls-78a3019a69abb8942e164ba31b7f79d941a5b928.cm1krsomo3zh.ca-central-1.rds.amazonaws.com/inventory123'
+app.config['SQLALCHEMY_DATABASE_URI'] = 'mysql://mr204h:Ilda2011@localhost/inventory123'
+# app.config['SQLALCHEMY_DATABASE_URI'] = 'mysql://dbmasteruser:Success2023!@ls-78a3019a69abb8942e164ba31b7f79d941a5b928.cm1krsomo3zh.ca-central-1.rds.amazonaws.com/inventory123'
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 app.config['MAX_CONTENT_LENGTH'] = 50 * 1024 * 1024
 app.config['AUTH_ALLOWED_FILES'] = {'png', 'jpg', 'jpeg', 'gif'}
@@ -61,6 +61,20 @@ static_path = os.path.join(os.path.dirname(__file__), 'static')
 admin.add_view(FileAdmin(static_path, '/static/', 'Files Manager'))
 admin.add_link(backlink)
 
+# display errors page for all app based on all given errors
+@app.errorhandler(403)
+def handle_forbidden(e):
+    #return render_template('errors/error_404.html') (incase not need show 403 details for secuirty) but not valid incase submit form etc
+    return render_template('errors/error_403.html')
 
+@app.errorhandler(404)
+def handle_not_found(e):
+    return render_template('errors/error_404.html')
 
-
+@app.errorhandler(405)
+def handle_method_not_allowed(e):
+    return render_template('errors/error_405.html')
+ 
+@app.errorhandler(500)
+def handle_internal_server_error(e):
+    return render_template('errors/error_500.html')

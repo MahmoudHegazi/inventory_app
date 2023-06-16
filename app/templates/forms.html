@@ -114,10 +114,42 @@
 {% endmacro %}
 
 
-{% macro listings_forms() %}
+{% macro listings_forms(delete_listings) %}
+<div class="modal fade" id="removeListings">
+  <div class="modal-dialog">
+    <div class="modal-content">
+    
+      <!-- Modal Header -->
+      <div class="modal-header">
+        <h4 class="modal-title">Remove multiple catalogues</h4>
+        <button type="button" class="close" data-dismiss="modal">&times;</button>
+      </div>      
+      <!-- Modal body -->
+      <div class="modal-body">
+        {% if delete_listings and delete_listings.listings_ids and delete_listings.delete_listings %}
+        <p><span>You are going to delete</span><strong><span class="badge badge-danger mx-1" id="listings_ids_total">0</span></strong><span>items</span></p>
+        <form id="remove_listings" action="{{url_for('routes.delete_listings')}}" method="post">
+            {{delete_listings.hidden_tag()}}
+            <div id="items" class="d-flex justify-content-start align-items-center flex-wrap p-2"></div>
+            {{delete_listings.delete_listings(class='btn btn-danger btn-sm mt-3 btn-block')}}
+        </form>
+        {% else %}
+        <div class="alert-danger">Unable to Display Remove Listings form right now.</div>
+        {% endif %}
+      </div>
+      
+      <!-- Modal footer -->
+      <div class="modal-footer">
+        <button type="button" class="btn btn-danger" data-dismiss="modal">Close</button>
+      </div>
+      
+    </div>
+  </div>
+</div>
+
 {% endmacro %}
 
-{% macro catalogues_forms(catalogues_excel) %}
+{% macro catalogues_forms(catalogues_excel, delete_catalogues) %}
 <div class="modal fade" id="importExcelCatalogues">
   <div class="modal-dialog">
     <div class="modal-content">
@@ -139,6 +171,38 @@
         </form>
         {% else %}
         <div class="alert-danger">Unable to Display Upload Catalogues Excel Upload form right now.</div>
+        {% endif %}
+      </div>
+      
+      <!-- Modal footer -->
+      <div class="modal-footer">
+        <button type="button" class="btn btn-danger" data-dismiss="modal">Close</button>
+      </div>
+      
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="removeCatalogues">
+  <div class="modal-dialog">
+    <div class="modal-content">
+    
+      <!-- Modal Header -->
+      <div class="modal-header">
+        <h4 class="modal-title">Remove multiple catalogues</h4>
+        <button type="button" class="close" data-dismiss="modal">&times;</button>
+      </div>      
+      <!-- Modal body -->
+      <div class="modal-body">
+        {% if delete_catalogues and delete_catalogues.catalogues_ids %}
+        <p><span>You are going to delete</span><strong><span class="badge badge-danger mx-1" id="catalogues_ids_total">0</span></strong><span>items</span></p>
+        <form id="remove_catalogues" action="{{url_for('routes.delete_catalogues')}}" method="post">
+            {{delete_catalogues.hidden_tag()}}
+            <div id="items" class="d-flex justify-content-start align-items-center flex-wrap p-2"></div>
+            {{delete_catalogues.delete_catalogues(class='btn btn-danger btn-sm mt-3 btn-block')}}
+        </form>
+        {% else %}
+        <div class="alert-danger">Unable to Display Remove Catalogues form right now.</div>
         {% endif %}
       </div>
       
@@ -194,7 +258,7 @@
     
       <!-- Modal Header -->
       <div class="modal-header">
-        <h4 class="modal-title">Delete Dashboard</h4>
+        <h4 class="modal-title">Delete Listing</h4>
         <button type="button" class="close" data-dismiss="modal">&times;</button>
       </div>
       

@@ -10,7 +10,7 @@ removeCatalogueForm, removeListingForm, addSupplierForm, editSupplierForm, remov
 addPurchaseForm, editPurchaseForm, removePurchaseForm, addOrderForm, editOrderForm, removeOrderForm, CatalogueExcelForm, \
 addPlatformForm, editPlatformForm, removePlatformForm, removeCataloguesForm, removeListingsForm
 from . import vendor_permission, db
-from .functions import get_safe_redirect, updateDashboardListings, updateDashboardOrders, updateDashboardPurchasesSum, secureRedirect
+from .functions import get_safe_redirect, updateDashboardListings, updateDashboardOrders, updateDashboardPurchasesSum, secureRedirect, get_charts
 from sqlalchemy.exc import IntegrityError
 from flask_login import login_required, current_user
 import flask_excel
@@ -65,10 +65,17 @@ def makePagination(page=1, query_obj=None, callback=()):
 @vendor_permission.require()
 def index():
     try:
+        charts_data = get_charts(db, current_user,
+            charts_ids=[
+                'top_ordered_products',
+                'most_purchased_products', 
+                'top_purchases_suppliers', 'orders_yearly_performance',
+            ]
+        )
         add_platform =  addPlatformForm(action_redirect=url_for('routes.index'), dashboard_id=current_user.dashboard.id)
         edit_platform =  editPlatformForm(action_redirect=url_for('routes.index'))
         delete_platform =  removePlatformForm(action_redirect=url_for('routes.index'))
-        return render_template('index.html', dashboard=current_user.dashboard, add_platform=add_platform, edit_platform=edit_platform, delete_platform=delete_platform)
+        return render_template('index.html', dashboard=current_user.dashboard, charts_data=charts_data, add_platform=add_platform, edit_platform=edit_platform, delete_platform=delete_platform)
     except Exception as e:
         print('System Error: {} , info: {}'.format(e, sys.exc_info()))
         # flash('Unknown error unable to view product', 'danger')

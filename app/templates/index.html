@@ -11,24 +11,37 @@
     <div class="d-flex justify-content-end align-items-center flex-wrap">
     </div>
     <div class="row mt-2">
-      <div id="info_part" class="border rounded col-4 p-3 d-flex justify-content-center align-items-start cursor-pointer text-decoration-none text-dark media_small_width_100">
-        <div class="hover_shadow row container shadow p-3">
-            <div class="col-sm-12 mb-3 text-center">
+      <div id="info_part" class="border rounded col-12 m-0 d-flex justify-content-center align-items-start text-decoration-none text-dark media_small_width_100">
+        <div class="hover_shadow row container-fluid shadow mb-3 mt-3">
+            <div class="row col-sm-12 m-0 p-0 mb-1 mt-1">
+              <div class="col-sm-6 text-center m-0 p-3 shadow">
                 <img src="{{url_for('static', filename='assets/images/default_dashboard.png')}}" alt="dashboard icon" width="150" class="mxwidth-150" />
                 <h3 class="overflow_within title"><span class="badge badge-primary">{{dashboard.title}}</span></h3>
-            </div>
-            <div class="col-sm-12">
-              <p class="overflow_within">Total Listings: <span class="total_listings">{% if dashboard.num_of_listings %}{{dashboard.num_of_listings}}{% else %}0{% endif %}</span></p>
-            </div>
-            <div class="col-sm-12">
-              <p class="overflow_within">Total Orders: <span class="total_orders">{% if dashboard.num_of_orders %}{{dashboard.num_of_orders}}{% else %}0{% endif %}</span></p>
-            </div>
-            <div class="col-sm-12">
-              <p class="overflow_within">Monthly Purchases: <span class="monthly_purchases">{% if dashboard.sum_of_monthly_purchases %}{{dashboard.sum_of_monthly_purchases}}{% else %}0{% endif %}</span></p>
+              </div>
+              <div class="col-sm-6 row m-0 p-3 text-left shadow">
+                <div class="col-sm-12">
+                  <p class="overflow_within">Total Listings: <span class="total_listings">{% if dashboard.num_of_listings %}{{dashboard.num_of_listings}}{% else %}0{% endif %}</span></p>
+                </div>
+                <div class="col-sm-12">
+                  <p class="overflow_within">Total Orders: <span class="total_orders">{% if dashboard.num_of_orders %}{{dashboard.num_of_orders}}{% else %}0{% endif %}</span></p>
+                </div>
+                <div class="col-sm-12">
+                  <p class="overflow_within">Monthly Purchases: <span class="monthly_purchases">{% if dashboard.sum_of_monthly_purchases %}{{dashboard.sum_of_monthly_purchases}}{% else %}0{% endif %}</span></p>
+                </div>
+              </div>
             </div>
         </div>
       </div>
-      <div id="main_part" class="col-sm-8 p-3 row border rounded">
+      <div id="main_part" class="col-sm-12 p-3 row border rounded">
+        <!-- Charts Start -->
+        <div class="container">
+          <div class="mt-5 border container shadow p-3">
+              {% include 'particles/charts_component.html' %}
+          </div>
+        </div>
+        <!-- Charts End -->
+
+        <!-- Platforms Start -->
         <div class="container">
           <div class="div border shadow rounded p-2">
             <h5 class="mt-2 mb-3"><span>Platforms: </span> 
@@ -49,8 +62,11 @@
             </div>
           </div>
         </div>
+        <!-- Platforms End -->        
       </div>
     </div>
+
+    
     {% else %}
     <div class="alert alert-danger">Unable to Display Dashboard right now.</div>
     {% endif %}

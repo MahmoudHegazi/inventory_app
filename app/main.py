@@ -5,11 +5,10 @@ from flask import Flask, Blueprint, session, redirect, url_for, flash, Response,
 from .models import *
 from .forms import CatalogueExcelForm, ExportDataForm
 from . import vendor_permission, admin_permission, db, excel
-from .functions import get_mapped_catalogues_dicts, getTableColumns, getFilterBooleanClauseList, ExportSqlalchemyFilter, get_export_data
+from .functions import get_mapped_catalogues_dicts, getTableColumns, getFilterBooleanClauseList, ExportSqlalchemyFilter, get_export_data, get_charts
 from flask_login import login_required, current_user
 import flask_excel
 import pyexcel
-from sqlalchemy.sql import extract
 from sqlalchemy import or_, and_, func , asc, desc, text
 #from app import excel
 
@@ -145,211 +144,26 @@ def listing_export():
         flash('Unknown error Your request could not be processed right now, please try again later.', 'danger')
         return redirect(url_for('routes.index'))
 
-def getChartData(chart_query_result, label_i=0, data_i=1):
-    labels = []
-    data = []
-    for chartItem in chart_query_result:        
-        labels.append(str(chartItem[label_i]))
-        data.append(str(chartItem[data_i]))
-
-    return {'labels': labels, 'data': data}
-
 @main.route('/reports', methods=['POST', 'GET'])
 @login_required
 @vendor_permission.require()
 def reports():
-    export_form = ExportDataForm()
-    # chart 1
-    chart_query = db.session.query(
-        Listing.product_name,
-        func.sum(Order.quantity).label('total_quantities')
-    ).join(
-        Catalogue, Listing.catalogue_id == Catalogue.id
-    ).join(
-        Order, Listing.id == Order.listing_id
-    ).filter(
-        Catalogue.user_id == current_user.id
-    ).group_by(Listing.id).order_by(desc('total_quantities')).limit(5).all()
-    chartdata = getChartData(chart_query, label_i=0, data_i=1)
-    chart_data = {
-        'id': 'top_ordered_products',
-        'type': 'bar',
-        'data': chartdata['data'],
-        'labels': chartdata['labels'],
-        'label': 'Top Ordered Products',
-        'background_colors': [ 'rgba(255, 99, 132, 0.2)', 'rgba(255, 159, 64, 0.2)', 'rgba(255, 205, 86, 0.2)', 'rgba(75, 192, 192, 0.2)', 'rgba(54, 162, 235, 0.2)', 'rgba(153, 102, 255, 0.2)', 'rgba(201, 203, 207, 0.2)'],
-        'border_colors': [ 'rgb(255, 99, 132)', 'rgb(255, 159, 64)', 'rgb(255, 205, 86)', 'rgb(75, 192, 192)', 'rgb(54, 162, 235)', 'rgb(153, 102, 255)', 'rgb(201, 203, 207)' ],
-        'description': 'Products with the largest number of orders'
-    }
-
-    # chart 1
-    chart1_query = db.session.query(
-        Listing.product_name,
-        func.sum(Order.quantity).label('total_quantities')
-    ).join(
-        Catalogue, Listing.catalogue_id == Catalogue.id
-    ).join(
-        Order, Listing.id == Order.listing_id
-    ).filter(
-        Catalogue.user_id == current_user.id
-    ).group_by(Listing.id).order_by(asc('total_quantities')).limit(5).all()
-    chartdata1 = getChartData(chart1_query, label_i=0, data_i=1)
-    chart_data1 = {
-        'id': 'less_ordered_products',
-        'type': 'pie',
-        'data': chartdata1['data'],
-        'labels': chartdata1['labels'],
-        'label': 'least demanded products',
-        'background_colors': [ 'rgba(255, 99, 132, 0.2)', 'rgba(255, 159, 64, 0.2)', 'rgba(255, 205, 86, 0.2)', 'rgba(75, 192, 192, 0.2)', 'rgba(54, 162, 235, 0.2)', 'rgba(153, 102, 255, 0.2)', 'rgba(201, 203, 207, 0.2)'],
-        'border_colors': [ 'rgb(255, 99, 132)', 'rgb(255, 159, 64)', 'rgb(255, 205, 86)', 'rgb(75, 192, 192)', 'rgb(54, 162, 235)', 'rgb(153, 102, 255)', 'rgb(201, 203, 207)' ],
-        'description': 'Products with the lowest number of orders'
-    }
-
-    # chart 2
-    chart2_query = db.session.query(
-        Listing.product_name,
-        func.sum(Purchase.quantity).label('total_quantities')
-    ).join(
-        Purchase, Listing.id == Purchase.listing_id
-    ).join(
-        Catalogue, Listing.catalogue_id == Catalogue.id
-    ).filter(
-        Catalogue.user_id == current_user.id
-    ).group_by(Listing.id).order_by(desc('total_quantities')).limit(5).all()
-    chartdata2 = getChartData(chart2_query, label_i=0, data_i=1)
-    chart_data2 = {
-        'id': 'most_purchased_products',
-        'type': 'bar',
-        'data': chartdata2['data'],
-        'labels': chartdata2['labels'],
-        'label': 'Most purchased products',
-        'description': 'Products with the largest number of purchases'
-    }
-
-    # chart 3
-    chart3_query = db.session.query(
-        Listing.product_name,
-        func.sum(Purchase.quantity).label('total_quantities')
-    ).join(
-        Purchase, Listing.id == Purchase.listing_id
-    ).join(
-        Catalogue, Listing.catalogue_id == Catalogue.id
-    ).filter(
-        Catalogue.user_id == current_user.id
-    ).group_by(Listing.id).order_by(asc('total_quantities')).limit(5).all()
-    chartdata3 = getChartData(chart3_query, label_i=0, data_i=1)
-    chart_data3 = {
-        'id': 'less_purchased_products',
-        'type': 'bar',
-        'data': chartdata3['data'],
-        'labels': chartdata3['labels'],
-        'label': 'least purchased products',
-        'description': 'Products with the lowest number of purchases'
-    }
-    # chart 4
-    chart4_query = db.session.query(
-        Supplier.name,
-        func.sum(Purchase.quantity).label('total_purchases')
-    ).join(
-        Purchase, Supplier.id==Purchase.supplier_id
-    ).filter(
-        Supplier.user_id == current_user.id
-    ).group_by(Purchase.supplier_id).order_by(desc('total_purchases')).limit(5).all()
-    chartdata4 = getChartData(chart4_query, label_i=0, data_i=1)
-    chart_data4 = {
-        'id': 'top_purchases_suppliers',
-        'type': 'bar',
-        'data': chartdata4['data'],
-        'labels': chartdata4['labels'],
-        'label': 'Top Purchases Suppliers',
-        'description': 'The supplier with the most number of purchases'
-    }
-
-    # chart 5 (type of this charts matters later when have alot of suppliers and purchases will define who suppliers not work with him alot)
-    chart5_query = db.session.query(
-        Supplier.name,
-        func.sum(Purchase.quantity).label('total_purchases')
-    ).join(
-        Purchase, Supplier.id==Purchase.supplier_id
-    ).filter(
-        Supplier.user_id == current_user.id
-    ).group_by(Purchase.supplier_id).order_by(asc('total_purchases')).limit(5).all()
-    chartdata5 = getChartData(chart5_query, label_i=0, data_i=1)
-    chart_data5 = {
-        'id': 'less_purchases_suppliers',
-        'type': 'bar',
-        'data': chartdata5['data'],
-        'labels': chartdata5['labels'],
-        'label': 'Less Purchases Suppliers',
-        'description': 'The supplier with the less number of purchases'
-    }
-
-    # chart 6
-    chart6_query = db.session.query(
-        Supplier.name,
-        func.sum(Purchase.quantity).label('total_purchases')
-    ).join(
-        Purchase, Supplier.id==Purchase.supplier_id
-    ).filter(
-        Supplier.user_id == current_user.id
-    ).group_by(Purchase.supplier_id).order_by(desc('total_purchases')).all()
-    chartdata6 = getChartData(chart6_query, label_i=0, data_i=1)
-    chart_data6 = {
-        'id': 'suppliers_purchases',
-        'type': 'doughnut',
-        'data': chartdata6['data'],
-        'labels': chartdata6['labels'],
-        'label': 'purchases from suppliers',
-        'description': 'the number of purchases from suppliers'
-    }
-
-    # chart 7
-    chart7_query = db.session.query(
-        extract('year', Order.date),
-        func.sum(Order.quantity).label('total_orders')
-    ).join(
-        Listing, Order.listing_id==Listing.id
-    ).join(
-        Catalogue, Listing.catalogue_id==Catalogue.id
-    ).filter(
-        Catalogue.user_id == current_user.id
-    ).group_by(extract('year', Order.date)).order_by(asc('total_orders')).all()
-    chartdata7 = getChartData(chart7_query, label_i=0, data_i=1)
-    chart_data7 = {
-        'id': 'orders_yearly_performance',
-        'type': 'bar',
-        'data': chartdata7['data'],
-        'labels': chartdata7['labels'],
-        'label': 'Orders Per Year',
-        'description': 'The number of orders per year',
-        'col': '6'
-    }
-    # 'year_picker_ajax': {'years': [2012, 2013, 2014]}, add dynamic ajax year input in chart, remaning
-
-    # chart 8 (Remaning monthly with ajax select for month)
-    chart8_query = db.session.query(
-        extract('year', Purchase.date),
-        func.sum(Purchase.quantity).label('total_purchases')
-    ).join(
-        Listing, Purchase.listing_id==Listing.id
-    ).join(
-        Catalogue, Listing.catalogue_id==Catalogue.id
-    ).filter(
-        Catalogue.user_id == current_user.id
-    ).group_by(extract('year', Purchase.date)).order_by(asc('total_purchases')).all()
-    # perfere for performance line chart as it up and down, but prefere for years bar
-    chartdata8 = getChartData(chart8_query, label_i=0, data_i=1)
-    chart_data8 = {
-        'id': 'purchases_yearly_performance',
-        'type': 'line',
-        'data': chartdata8['data'],
-        'labels': chartdata8['labels'],
-        'label': 'Purchases Per Year',
-        'description': 'The number of Purchases per year',
-        'col': 12
-    }
-    
-    return render_template('reports.html', charts_data=[chart_data, chart_data1, chart_data2, chart_data3, chart_data4, chart_data5, chart_data6, chart_data7, chart_data8], export_form=export_form)
+    try:
+        charts_data = get_charts(db, current_user,
+            charts_ids=[
+                'top_ordered_products','less_ordered_products',
+                'most_purchased_products', 'less_purchased_products',
+                'top_purchases_suppliers', 'less_purchases_suppliers',
+                'suppliers_purchases', 'orders_yearly_performance',
+                'purchases_yearly_performance',
+            ]
+        )
+        export_form = ExportDataForm()  
+        return render_template('reports.html', charts_data=charts_data, export_form=export_form)
+    except Exception as e:
+        print('System Error: {} , info: {}'.format(e, sys.exc_info()))
+        flash('unable to display reports page', 'danger')
+        return redirect(url_for('routes.index'))
 
 
 @main.route('/get_filter_columns', methods=['GET'])

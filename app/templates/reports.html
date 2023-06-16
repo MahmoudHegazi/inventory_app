@@ -36,37 +36,8 @@
           {{forms.reports_forms(export_form=export_form, action_url=url_for('main.reports_export'))}}
         
 
-          <div class="mt-5 border container shadow p-3 textn-center">
-            {% if charts_data is defined %}
-            <div class="p-3 row">
-              {% for chart in charts_data %}
-                {% if chart.col is defined %}
-                  {% set col_sm = chart.col %}
-                {% else %}
-                  {% if charts_data|length == 1  %}{% set col_sm = '12' %}{% else %}{% set col_sm = '6' %}{% endif %}
-                {% endif %}
-                             
-                <div class="border border-light shadow-lg rounded text-center p-3 col-sm-{{col_sm}}">
-                  <div class="p-5 bg-dark text-white">
-                    <!-- display only valid charts this work good with js too -->
-                    {% if chart.id is defined and chart.data is defined and chart.labels is defined and chart.label is defined %}
-                    <canvas id="{{chart.id}}"></canvas>
-                    <div id="addons_{{chart.id}}">
-
-                    </div>
-                    {% else %}
-                      <div class="alert alert-danger text-center h">Unable to Display chart right now.</div>
-                    {% endif %}
-                  </div>
-                </div>
-              {% endfor %}
-            </div>
-            {% else %}
-            <script>
-              chartsData = null;
-             </script>
-            <div class="alert alert-danger text-center h">Unable to Display charts right now.</div>
-            {% endif %}
+          <div class="mt-5 border container shadow p-3">
+            {% include 'particles/charts_component.html' %}
           </div>
 
     </div>
@@ -81,81 +52,6 @@
 {% block page_scripts %}
 
 <script src="{{url_for('static', filename='assets/js/export.js')}}"></script>
-<script>
-var chartsData = {{charts_data|tojson|safe}};
-addEventListener("DOMContentLoaded", (event) => {
-  const charts = {};
-  const options = {
-        scales: {
-          y: {
-            beginAtZero: true,
-          }
-        },
-  };
-  backGroundColors = undefined;
-  borderColors = undefined;
-  
-  chartsData.forEach( (chartData)=>{
-    if (chartData && chartData.id && chartData.type && chartData.data && chartData.labels && chartData.label && document.querySelector(`canvas#${chartData.id}`) && Array.isArray(chartData.data) && Array.isArray(chartData.labels) && chartData.data.length == chartData.labels.length){
-      
-      const ctx = document.querySelector(`canvas#${chartData.id}`);
 
-      /* add the description and the ajax year select or any other config addons */
-      const addonsElm = document.querySelector(`#addons_${chartData.id}`);
-      let addonsHTML = '<p>';
-      if (addonsElm){
-
-        if (chartData.description){
-          addonsHTML += `<span>${chartData.description} </span>`;
-        }
-        /* custom ajax html select box added dynamic by server (filter_year_component) */
-        if (chartData.year_picker_ajax && Array.isArray(chartData.year_picker_ajax.years)){
-
-          let selectOptions = '';
-          chartData.year_picker_ajax.years.forEach( (yearOption)=>{
-            selectOptions += `<option value="${yearOption}">${yearOption}</option>`;
-          });
-          addonsHTML += `<select data-chart='${chartData.id}'>${selectOptions}</select>`;
-        }
-        addonsElm.innerHTML = `${addonsHTML}</p>`; 
-      }
-      
-      
-      /* optional set background colors and labels if provided from server */
-      if ( chartData.background_colors && Array.isArray(chartData.background_colors) ){
-        backGroundColors =  chartData.background_colors;
-      }
-      if ( chartData.border_colors && Array.isArray(chartData.border_colors) ){
-        borderColors =  chartData.border_colors;
-      }
-
-      var data = {
-        labels: chartData.labels,
-        datasets: [{
-          label: chartData.label,
-          data: chartData.data,
-          backgroundColor: backGroundColors,
-          borderColor: borderColors,
-          borderWidth: 1,
-          description: 'white'
-        }]
-      };
-
-      const config = {
-        type: chartData.type,
-        data: data,
-        options: options,
-      };
-      Chart.defaults.global.defaultFontColor = "#fff";
-      const newChart = new Chart(ctx, config);
-      charts[chartData.id] = newChart;
-    } else {
-      console.log('Invalid Chart object found, ignored.')
-    }
-  });
-
-});
-
-</script>
 {% endblock page_scripts %}
 

@@ -64,8 +64,8 @@ admin.add_link(backlink)
 # display errors page for all app based on all given errors
 @app.errorhandler(403)
 def handle_forbidden(e):
-    #return render_template('errors/error_404.html') (incase not need show 403 details for secuirty) but not valid incase submit form etc
-    return render_template('errors/error_403.html')
+    return render_template('errors/error_404.html') 
+    # return render_template('errors/error_403.html')
 
 @app.errorhandler(404)
 def handle_not_found(e):

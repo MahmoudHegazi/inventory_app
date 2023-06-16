@@ -2,8 +2,9 @@ import sys
 from urllib.parse import urlparse, urljoin
 from flask import request
 from sqlalchemy import func
-from sqlalchemy import or_, and_
-
+from .models import Supplier, Dashboard, Listing, Catalogue, Purchase, Order, Platform, ListingPlatform
+from sqlalchemy.sql import extract
+from sqlalchemy import or_, and_, func , asc, desc
 
 def is_safe_redirect_url(target):
     host_url = urlparse(request.host_url)
@@ -209,8 +210,6 @@ class ExportSqlalchemyFilter():
     opeartors = ['=', '!=', '>', '<', '>=', '<=', 'val%', '%val', '%val%']
     
     def __init__(self):
-        from .models import Supplier, Catalogue, Listing, Purchase, Order, Platform, ListingPlatform
-
         self.catalogue_columns = getTableColumns(Catalogue, ['user_id'])
         self.listing_columns = getTableColumns(Listing, expetColumns=['image', 'platform', 'dashboard_id'])
         self.purchase_columns = getTableColumns(Purchase)
@@ -501,3 +500,270 @@ def get_export_data(db, flask_excel, current_user_id, table_name, columns, opera
         return response
     
     return response
+
+# charts
+
+def getChartData(chart_query_result, label_i=0, data_i=1):
+    labels = []
+    data = []
+    for chartItem in chart_query_result:        
+        labels.append(str(chartItem[label_i]))
+        data.append(str(chartItem[data_i]))
+
+    return {'labels': labels, 'data': data}
+
+def get_charts(db, current_user, charts_ids=[]):
+    result = {}
+    result_array = []
+    index = 0
+    try:
+        for chart_id in charts_ids:
+            index += 1
+            if chart_id not in result:            
+                if chart_id == 'top_ordered_products':
+                    # chart 1
+                    chart_query = db.session.query(
+                        Listing.product_name,
+                        func.sum(Order.quantity).label('total_quantities')
+                    ).join(
+                        Catalogue, Listing.catalogue_id == Catalogue.id
+                    ).join(
+                        Order, Listing.id == Order.listing_id
+                    ).filter(
+                        Catalogue.user_id == current_user.id
+                    ).group_by(Listing.id).order_by(desc('total_quantities')).limit(5).all()
+                    chartdata = getChartData(chart_query, label_i=0, data_i=1)
+                    chart_data = {
+                        'id': 'top_ordered_products',
+                        'type': 'bar',
+                        'data': chartdata['data'],
+                        'labels': chartdata['labels'],
+                        'label': 'Top Ordered Products',
+                        'background_colors': [ 'rgba(255, 99, 132, 0.2)', 'rgba(255, 159, 64, 0.2)', 'rgba(255, 205, 86, 0.2)', 'rgba(75, 192, 192, 0.2)', 'rgba(54, 162, 235, 0.2)', 'rgba(153, 102, 255, 0.2)', 'rgba(201, 203, 207, 0.2)'],
+                        'border_colors': [ 'rgb(255, 99, 132)', 'rgb(255, 159, 64)', 'rgb(255, 205, 86)', 'rgb(75, 192, 192)', 'rgb(54, 162, 235)', 'rgb(153, 102, 255)', 'rgb(201, 203, 207)' ],
+                        'description': 'Products with the largest number of orders'
+                    }
+                    result[chart_id] = True
+                    result_array.append(chart_data)
+                    continue
+                
+                elif chart_id == 'less_ordered_products':
+                    # chart 1
+                    chart_query = db.session.query(
+                        Listing.product_name,
+                        func.sum(Order.quantity).label('total_quantities')
+                    ).join(
+                        Catalogue, Listing.catalogue_id == Catalogue.id
+                    ).join(
+                        Order, Listing.id == Order.listing_id
+                    ).filter(
+                        Catalogue.user_id == current_user.id
+                    ).group_by(Listing.id).order_by(asc('total_quantities')).limit(5).all()
+                    chartdata = getChartData(chart_query, label_i=0, data_i=1)
+                    chart_data = {
+                        'id': 'less_ordered_products',
+                        'type': 'pie',
+                        'data': chartdata['data'],
+                        'labels': chartdata['labels'],
+                        'label': 'least demanded products',
+                        'background_colors': [ 'rgba(255, 99, 132, 0.2)', 'rgba(255, 159, 64, 0.2)', 'rgba(255, 205, 86, 0.2)', 'rgba(75, 192, 192, 0.2)', 'rgba(54, 162, 235, 0.2)', 'rgba(153, 102, 255, 0.2)', 'rgba(201, 203, 207, 0.2)'],
+                        'border_colors': [ 'rgb(255, 99, 132)', 'rgb(255, 159, 64)', 'rgb(255, 205, 86)', 'rgb(75, 192, 192)', 'rgb(54, 162, 235)', 'rgb(153, 102, 255)', 'rgb(201, 203, 207)' ],
+                        'description': 'Products with the lowest number of orders'
+                    }
+                    result[chart_id] = True
+                    result_array.append(chart_data)
+                    continue
+    
+                elif chart_id == 'most_purchased_products':
+                    # chart 2
+                    chart_query = db.session.query(
+                        Listing.product_name,
+                        func.sum(Purchase.quantity).label('total_quantities')
+                    ).join(
+                        Purchase, Listing.id == Purchase.listing_id
+                    ).join(
+                        Catalogue, Listing.catalogue_id == Catalogue.id
+                    ).filter(
+                        Catalogue.user_id == current_user.id
+                    ).group_by(Listing.id).order_by(desc('total_quantities')).limit(5).all()
+                    chartdata = getChartData(chart_query, label_i=0, data_i=1)
+                    chart_data = {
+                        'id': 'most_purchased_products',
+                        'type': 'bar',
+                        'data': chartdata['data'],
+                        'labels': chartdata['labels'],
+                        'label': 'Most purchased products',
+                        'description': 'Products with the largest number of purchases'
+                    }
+                    result[chart_id] = True
+                    result_array.append(chart_data)
+                    continue
+                
+                elif chart_id == 'less_purchased_products':
+    
+                    # chart 3
+                    chart_query = db.session.query(
+                        Listing.product_name,
+                        func.sum(Purchase.quantity).label('total_quantities')
+                    ).join(
+                        Purchase, Listing.id == Purchase.listing_id
+                    ).join(
+                        Catalogue, Listing.catalogue_id == Catalogue.id
+                    ).filter(
+                        Catalogue.user_id == current_user.id
+                    ).group_by(Listing.id).order_by(asc('total_quantities')).limit(5).all()
+                    chartdata = getChartData(chart_query, label_i=0, data_i=1)
+                    chart_data = {
+                        'id': 'less_purchased_products',
+                        'type': 'bar',
+                        'data': chartdata['data'],
+                        'labels': chartdata['labels'],
+                        'label': 'least purchased products',
+                        'description': 'Products with the lowest number of purchases'
+                    }
+                    result[chart_id] = True
+                    result_array.append(chart_data)
+                    continue
+                
+                elif chart_id == 'top_purchases_suppliers':
+    
+                    # chart 4
+                    chart_query = db.session.query(
+                        Supplier.name,
+                        func.sum(Purchase.quantity).label('total_purchases')
+                    ).join(
+                        Purchase, Supplier.id==Purchase.supplier_id
+                    ).filter(
+                        Supplier.user_id == current_user.id
+                    ).group_by(Purchase.supplier_id).order_by(desc('total_purchases')).limit(5).all()
+                    chartdata = getChartData(chart_query, label_i=0, data_i=1)
+                    chart_data = {
+                        'id': 'top_purchases_suppliers',
+                        'type': 'bar',
+                        'data': chartdata['data'],
+                        'labels': chartdata['labels'],
+                        'label': 'Top Purchases Suppliers',
+                        'description': 'The supplier with the most number of purchases'
+                    }
+                    result[chart_id] = True
+                    result_array.append(chart_data)
+                    continue
+                
+                elif chart_id == 'less_purchases_suppliers':
+    
+                    # chart 5 (type of this charts matters later when have alot of suppliers and purchases will define who suppliers not work with him alot)
+                    chart_query = db.session.query(
+                        Supplier.name,
+                        func.sum(Purchase.quantity).label('total_purchases')
+                    ).join(
+                        Purchase, Supplier.id==Purchase.supplier_id
+                    ).filter(
+                        Supplier.user_id == current_user.id
+                    ).group_by(Purchase.supplier_id).order_by(asc('total_purchases')).limit(5).all()
+                    chartdata = getChartData(chart_query, label_i=0, data_i=1)
+                    chart_data = {
+                        'id': 'less_purchases_suppliers',
+                        'type': 'bar',
+                        'data': chartdata['data'],
+                        'labels': chartdata['labels'],
+                        'label': 'Less Purchases Suppliers',
+                        'description': 'The supplier with the less number of purchases'
+                    }
+                    result[chart_id] = True
+                    result_array.append(chart_data)
+                    continue
+                
+                elif chart_id == 'suppliers_purchases':
+    
+                    # chart 6
+                    chart_query = db.session.query(
+                        Supplier.name,
+                        func.sum(Purchase.quantity).label('total_purchases')
+                    ).join(
+                        Purchase, Supplier.id==Purchase.supplier_id
+                    ).filter(
+                        Supplier.user_id == current_user.id
+                    ).group_by(Purchase.supplier_id).order_by(desc('total_purchases')).all()
+                    chartdata = getChartData(chart_query, label_i=0, data_i=1)
+                    chart_data = {
+                        'id': 'suppliers_purchases',
+                        'type': 'doughnut',
+                        'data': chartdata['data'],
+                        'labels': chartdata['labels'],
+                        'label': 'purchases from suppliers',
+                        'description': 'the number of purchases from suppliers'
+                    }
+                    result[chart_id] = True
+                    result_array.append(chart_data)
+                    continue
+                
+                elif chart_id == 'orders_yearly_performance':
+                
+                    # chart 7
+                    chart_query = db.session.query(
+                        extract('year', Order.date),
+                        func.sum(Order.quantity).label('total_orders')
+                    ).join(
+                        Listing, Order.listing_id==Listing.id
+                    ).join(
+                        Catalogue, Listing.catalogue_id==Catalogue.id
+                    ).filter(
+                        Catalogue.user_id == current_user.id
+                    ).group_by(extract('year', Order.date)).order_by(asc('total_orders')).all()
+                    chartdata = getChartData(chart_query, label_i=0, data_i=1)
+                    chart_data = {
+                        'id': 'orders_yearly_performance',
+                        'type': 'bar',
+                        'data': chartdata['data'],
+                        'labels': chartdata['labels'],
+                        'label': 'Orders Per Year',
+                        'description': 'The number of orders per year',
+                        'col': '6'
+                    }
+                    # 'year_picker_ajax': {'years': [2012, 2013, 2014]}, add dynamic ajax year input in chart, remaning
+                    result[chart_id] = True
+                    result_array.append(chart_data)
+                    continue
+
+                elif chart_id == 'purchases_yearly_performance':
+                
+                    # chart 8 (Remaning monthly with ajax select for month)
+                    chart_query = db.session.query(
+                        extract('year', Purchase.date),
+                        func.sum(Purchase.quantity).label('total_purchases')
+                    ).join(
+                        Listing, Purchase.listing_id==Listing.id
+                    ).join(
+                        Catalogue, Listing.catalogue_id==Catalogue.id
+                    ).filter(
+                        Catalogue.user_id == current_user.id
+                    ).group_by(extract('year', Purchase.date)).order_by(asc('total_purchases')).all()
+                    # perfere for performance line chart as it up and down, but prefere for years bar
+                    chartdata = getChartData(chart_query, label_i=0, data_i=1)
+                    chart_data = {
+                        'id': 'purchases_yearly_performance',
+                        'type': 'line',
+                        'data': chartdata['data'],
+                        'labels': chartdata['labels'],
+                        'label': 'Purchases Per Year',
+                        'description': 'The number of Purchases per year',
+                        'col': 12
+                    }
+                    result[chart_id] = True
+                    result_array.append(chart_data)
+                    continue
+                else:
+                    # id provided not exist
+                    result[chart_id] = False
+                    result_array.append({})
+                    continue
+            else:
+                # duplicated id provided
+                result[str(index)] = False
+                result_array.append({})
+    except Exception as e:
+        print('System Error get_filter_columns: {} , info: {}'.format(e, sys.exc_info()))
+        result[str(index)] = False
+        result_array.append({})
+    finally:
+        return result_array

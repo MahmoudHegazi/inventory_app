@@ -32,8 +32,9 @@ def import_catalogues_excel():
         if catalogue_excel_form.validate_on_submit():
             # convert flask_excel request.get_array to mapped db rows dicts with same name of sqlalchemy class **
             # this simpler and more professional than request.save_to_database  and clear add or not add this row
-            imported_rows = request.get_array(field_name='excel_file')
             
+            imported_rows = request.get_array(field_name='excel_file', encoding='utf-8')
+
             # remove empty rows
             excel_rows = []
             for row in imported_rows:
@@ -45,6 +46,8 @@ def import_catalogues_excel():
 
             
             mapped_catalogues = get_mapped_catalogues_dicts(excel_rows)
+            #return str(mapped_catalogues)
+            
             if mapped_catalogues['success']:
                 for row_index in range(len(mapped_catalogues['db_rows'])):
 
@@ -52,6 +55,9 @@ def import_catalogues_excel():
 
                     if db_row['sku'] not in uploaded_skus:
                         try:
+
+
+
                             
                             catalogue_exist = Catalogue.query.filter_by(sku=db_row['sku']).first()
                             #return str(catalogue_exist)
@@ -64,10 +70,13 @@ def import_catalogues_excel():
                                     for order in catalogue_listing.orders:
                                         total_orders += order.quantity
 
+                                
                                 valid_quantity = True
                                 if db_row['quantity']<total_orders:
                                     flash("Ignored row: {}, the catalogue quantity can not updated, becuase the new quantity exported from excel is less that current catalogue's orders, try update quantity or edit orders of current catalogue".format(str(row_index+1)), "danger")
                                     valid_quantity = False
+                                
+                                
                                 
                                 # update only if new quantity is accept current orders of catalogue
                                 if valid_quantity:
@@ -75,16 +84,20 @@ def import_catalogues_excel():
                                     for key, value in db_row.items():
                                         setattr(catalogue_exist, key, value)
                                         catalogue_exist.update()
-
+                                    
                                     uploaded_skus.append(db_row['sku'])
                                 else:
                                     invalid_rows.append(str(row_index+1))
 
                             else:
-                                newCatalogue = Catalogue(user_id=current_user.id, **db_row)
-                                newCatalogue.insert()
-
-                                uploaded_skus.append(db_row['sku'])
+                                try:
+                                    newCatalogue = Catalogue(user_id=current_user.id, **db_row)              
+                                    newCatalogue.insert()
+                                    uploaded_skus.append(db_row['sku'])
+                                except:
+                                    flash('invalid row found {}'.format(db_row['sku']), 'danger')
+                                    invalid_rows.append(str(row_index+1))
+                                    continue
 
                         except Exception as e:
                             # if error it broke the next rows rollback and continue
@@ -110,16 +123,17 @@ def import_catalogues_excel():
             success = False
 
     except Exception as e:
-        print('System Error import_catalogues_excel: {} , info: {}'.format(e, sys.exc_info()))
+
+        print('System Error import_catalogues_excel: {} '.format(e))
         message = 'Unable to import excel data please try again later'
         success = False
         raise e
-    
 
     finally:
         status = 'success' if success else 'danger'
         flash(message, status)
         return redirect(url_for('routes.catalogues'))
+
 
 
 # export listing

@@ -79,6 +79,12 @@ def get_mapped_catalogues_dicts(excel_array):
                            catalogues_columns[heading] = headingIndex
                            continue
                else:
+                   price_type = type(current_row[catalogues_columns['price']])
+                   sale_price_type = type(current_row[catalogues_columns['sale_price']])
+                   
+                   price_n = current_row[catalogues_columns['price']] if price_type is float or price_type is int else 0.00
+                   sale_price_n = current_row[catalogues_columns['sale_price']] if sale_price_type is float or sale_price_type is int else 0.00 
+
                    """ fastest way can done to convert get_array to db sqlalchemy objects,index (dynamic mapping) by client's excel file uploaded, sku title in first column or in last ignore additonal columns for flexiblty just 1 loop (validation for ux) """
                    db_row = {
                    "sku": current_row[catalogues_columns['sku']], 
@@ -86,8 +92,8 @@ def get_mapped_catalogues_dicts(excel_array):
                    "product_description": current_row[catalogues_columns['product_description']], 
                    "brand": current_row[catalogues_columns['brand']], 
                    "category": current_row[catalogues_columns['category']], 
-                   "price": current_row[catalogues_columns['price']], 
-                   "sale_price": current_row[catalogues_columns['sale_price']], 
+                   "price": price_n, 
+                   "sale_price": sale_price_n, 
                    "quantity": current_row[catalogues_columns['quantity']], 
                    "product_model": current_row[catalogues_columns['product_model']], 
                    "condition": current_row[catalogues_columns['condition']], 

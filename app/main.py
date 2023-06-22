@@ -35,6 +35,7 @@ def import_catalogues_excel():
             
             imported_rows = request.get_array(field_name='excel_file', encoding='utf-8')
 
+
             # remove empty rows
             excel_rows = []
             for row in imported_rows:
@@ -49,18 +50,16 @@ def import_catalogues_excel():
             #return str(mapped_catalogues)
             
             if mapped_catalogues['success']:
+
                 for row_index in range(len(mapped_catalogues['db_rows'])):
 
                     db_row = mapped_catalogues['db_rows'][row_index]
 
+                    row_info = "{}|{}".format(row_index+1, db_row['sku'])
                     if db_row['sku'] not in uploaded_skus:
                         try:
-
-
-
-                            
+                       
                             catalogue_exist = Catalogue.query.filter_by(sku=db_row['sku']).first()
-                            #return str(catalogue_exist)
 
                             if catalogue_exist:
 
@@ -87,23 +86,21 @@ def import_catalogues_excel():
                                     
                                     uploaded_skus.append(db_row['sku'])
                                 else:
-                                    invalid_rows.append(str(row_index+1))
+                                    invalid_rows.append(row_info)
+                                    
 
-                            else:
-                                try:
-                                    newCatalogue = Catalogue(user_id=current_user.id, **db_row)              
-                                    newCatalogue.insert()
-                                    uploaded_skus.append(db_row['sku'])
-                                except:
-                                    flash('invalid row found {}'.format(db_row['sku']), 'danger')
-                                    invalid_rows.append(str(row_index+1))
-                                    continue
+                            else:                                
+                                newCatalogue = Catalogue(user_id=current_user.id, **db_row)                      
+                                newCatalogue.insert()
+                                uploaded_skus.append(db_row['sku'])
 
-                        except Exception as e:
+                        except Exception as theerror:
+                            # sometimes this error encoding is can not passed to print so ignore issues for it or ignore print it and enogh exc_info
                             # if error it broke the next rows rollback and continue
+                            utf8_encoded_error = str(theerror).encode('utf-8', 'ignore')          
                             db.session.rollback()
-                            print('System Error row ignored, import_catalogues_excel : {} , info: {}'.format(e, sys.exc_info()))
-                            invalid_rows.append(str(row_index+1))
+                            invalid_rows.append(row_info)
+                            print('System Error row ignored, import_catalogues_excel: {} , info: {}'.format(utf8_encoded_error, sys.exc_info()))
                             continue
                     else:
                         duplicated_skus.append(str(db_row['product_name']))
@@ -123,11 +120,10 @@ def import_catalogues_excel():
             success = False
 
     except Exception as e:
-
+        # here big issues like db connection or invalid extensions
         print('System Error import_catalogues_excel: {} '.format(e))
         message = 'Unable to import excel data please try again later'
         success = False
-        raise e
 
     finally:
         status = 'success' if success else 'danger'

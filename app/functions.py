@@ -773,3 +773,20 @@ def get_charts(db, current_user, charts_ids=[]):
         result_array.append({})
     finally:
         return result_array
+
+# function uses flask excel to get uploaded excel data rows by tring diffrent known encoding methods
+def get_excel_rows(request, field_name=''):
+    imported_rows = None
+    avail_encodings = ['utf-8', 'ISO-8859-1', 'latin', 'mac_cyrillic', 'cp1252', 'latin1', 'latin2', 'utf_16']
+    for encoding_method in avail_encodings:
+        try:
+           imported_rows = request.get_array(field_name=field_name, encoding=encoding_method)
+           break
+        except Exception as e:
+            imported_rows = None
+            continue
+    # if none of all encoding worked raise error cus can not read the uploaded file with any method
+    if imported_rows is None:
+        raise ValueError('can not import file unknown encoded used try convert it to xlsx')
+    
+    return imported_rows

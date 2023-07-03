@@ -184,7 +184,7 @@
 </div>
 
 <div class="modal fade" id="removeCatalogues">
-  <div class="modal-dialog">
+  <div class="modal-dialog modal-xl">
     <div class="modal-content">
     
       <!-- Modal Header -->
@@ -198,7 +198,7 @@
         <p><span>You are going to delete</span><strong><span class="badge badge-danger mx-1" id="catalogues_ids_total">0</span></strong><span>items</span></p>
         <form id="remove_catalogues" action="{{url_for('routes.delete_catalogues')}}" method="post">
             {{delete_catalogues.hidden_tag()}}
-            <div id="items" class="d-flex justify-content-start align-items-center flex-wrap p-2"></div>
+            <div id="items" class="d-flex justify-content-start align-items-center flex-wrap p-2" style="overflow:auto;"></div>
             {{delete_catalogues.delete_catalogues(class='btn btn-danger btn-sm mt-3 btn-block')}}
         </form>
         {% else %}

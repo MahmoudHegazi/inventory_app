@@ -5,7 +5,7 @@ from flask import Flask, Blueprint, session, redirect, url_for, flash, Response,
 from .models import *
 from .forms import CatalogueExcelForm, ExportDataForm
 from . import vendor_permission, admin_permission, db, excel
-from .functions import get_mapped_catalogues_dicts, getTableColumns, getFilterBooleanClauseList, ExportSqlalchemyFilter, get_export_data, get_charts
+from .functions import get_mapped_catalogues_dicts, getTableColumns, getFilterBooleanClauseList, ExportSqlalchemyFilter, get_export_data, get_charts, get_excel_rows
 from flask_login import login_required, current_user
 import flask_excel
 import pyexcel
@@ -15,6 +15,7 @@ from sqlalchemy import or_, and_, func , asc, desc, text
 
 
 main = Blueprint('main', __name__, template_folder='templates', static_folder='static')
+
 
 @main.route('/import_catalogues_excel', methods=['POST', 'GET'])
 @login_required
@@ -30,11 +31,8 @@ def import_catalogues_excel():
         empty_rows = 0
         message = ''
         if catalogue_excel_form.validate_on_submit():
-            # convert flask_excel request.get_array to mapped db rows dicts with same name of sqlalchemy class **
-            # this simpler and more professional than request.save_to_database  and clear add or not add this row
-            
-            imported_rows = request.get_array(field_name='excel_file', encoding='utf-8')
-
+            # try import excel file with diffrent encodings 'utf-8', 'ISO-8859-1', 'latin', 'mac_cyrillic', 'latin1', 'latin2', 'cp1252', 'utf_16' can add more dynamic encodings methods to function
+            imported_rows = get_excel_rows(request, 'excel_file')
 
             # remove empty rows
             excel_rows = []

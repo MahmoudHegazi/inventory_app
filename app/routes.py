@@ -4,11 +4,12 @@ import os
 import random
 from flask import Flask, Blueprint, session, redirect, url_for, flash, Response, request, render_template, jsonify, abort
 from flask_wtf import Form
-from .models import User, Supplier, Dashboard, Listing, Catalogue, Purchase, Order, Platform, ListingPlatform
+from .models import User, Supplier, Dashboard, Listing, Catalogue, Purchase, Order, Platform, ListingPlatform, WarehouseLocations
 from .forms import addListingForm, editListingForm, addCatalogueForm, editCatalogueForm, \
 removeCatalogueForm, removeListingForm, addSupplierForm, editSupplierForm, removeSupplierForm, \
 addPurchaseForm, editPurchaseForm, removePurchaseForm, addOrderForm, editOrderForm, removeOrderForm, CatalogueExcelForm, \
-addPlatformForm, editPlatformForm, removePlatformForm, removeCataloguesForm, removeListingsForm
+removeCataloguesForm, removeListingsForm, removeAllCataloguesForm, addPlatformForm, editPlatformForm, removePlatformForm, \
+addLocationForm, editLocationForm, removeLocationForm
 from . import vendor_permission, db
 from .functions import get_safe_redirect, updateDashboardListings, updateDashboardOrders, updateDashboardPurchasesSum, secureRedirect, get_charts
 from sqlalchemy.exc import IntegrityError
@@ -52,7 +53,7 @@ def makePagination(page=1, query_obj=None, callback=()):
 
         return {'data': data, 'pagination_btns': pagination_btns}
     except Exception as e:
-        print('System Error makePagination: {} , info: {}'.format(e, sys.exc_info()))
+        print('System Error makePagination: {}'.format(sys.exc_info()))
         flash('System Error Unable to display Pagination data, please report this problem to us error: 1001', 'danger')
         return {'data': [], 'pagination_btns': []}
 
@@ -72,12 +73,9 @@ def index():
                 'top_purchases_suppliers', 'orders_yearly_performance',
             ]
         )
-        add_platform =  addPlatformForm(action_redirect=url_for('routes.index'), dashboard_id=current_user.dashboard.id)
-        edit_platform =  editPlatformForm(action_redirect=url_for('routes.index'))
-        delete_platform =  removePlatformForm(action_redirect=url_for('routes.index'))
-        return render_template('index.html', dashboard=current_user.dashboard, charts_data=charts_data, add_platform=add_platform, edit_platform=edit_platform, delete_platform=delete_platform)
+        return render_template('index.html', dashboard=current_user.dashboard, charts_data=charts_data)
     except Exception as e:
-        print('System Error: {} , info: {}'.format(e, sys.exc_info()))
+        print('System Error: {}'.format(sys.exc_info()))
         # flash('Unknown error unable to view product', 'danger')
         abort(500)
         return 'system error', 500
@@ -95,11 +93,12 @@ def catalogues():
         )
         catalogues_excel = CatalogueExcelForm()
         delete_catalogues = removeCataloguesForm()
+        delete_all_catalogues = removeAllCataloguesForm()
         #return str(delete_catalogues.hidden_tag())+str(delete_catalogues.catalogues_ids)
         user_catalogues = pagination['data']
-        return render_template('catalogues.html', catalogues=user_catalogues,  catalogues_excel=catalogues_excel, pagination_btns=pagination['pagination_btns'], delete_catalogues=delete_catalogues)
+        return render_template('catalogues.html', catalogues=user_catalogues,  catalogues_excel=catalogues_excel, pagination_btns=pagination['pagination_btns'], delete_catalogues=delete_catalogues, delete_all_catalogues=delete_all_catalogues)
     except Exception as e:
-        print('System Error: {} , info: {}'.format(e, sys.exc_info()))
+        print('System Error: {}'.format(sys.exc_info()))
         flash('unable to display catalogues page', 'danger')
         return redirect(url_for('routes.index'))
 
@@ -117,7 +116,7 @@ def view_catalogue(catalogue_id):
             flash('Catalouge Not found or deleted', 'danger')
             return redirect(url_for('routes.catalogues'))
     except Exception as e:
-        print('System Error: {} , info: {}'.format(e, sys.exc_info()))
+        print('System Error: {}'.format(sys.exc_info()))
         flash('unable to display catalogues page', 'danger')
         return redirect(url_for('routes.catalogues'))
  
@@ -137,7 +136,7 @@ def add_catalogue():
             else:
                 success = False
         except Exception as e:
-            print('System Error: {} , info: {}'.format(e, sys.exc_info()))
+            print('System Error: {}'.format(sys.exc_info()))
             flash('Unknown Error unable to create new Catalogue', 'danger')
 
         finally:
@@ -153,7 +152,7 @@ def add_catalogue():
             form = addCatalogueForm()
             return render_template('crud/add_catalogue.html', form=form)
         except Exception as e:
-            print('System Error: {} , info: {}'.format(e, sys.exc_info()))
+            print('System Error: {}'.format(sys.exc_info()))
             flash('unable to display Add new Catalogue page', 'danger')
             return redirect(url_for('routes.catalogues'))
 
@@ -186,7 +185,7 @@ def edit_catalogue(catalogue_id):
             return redirect(url_for('routes.catalogues'))
          
     except Exception as e:
-        print('System Error: {} , info: {}'.format(e, sys.exc_info()))
+        print('System Error: {}'.format(sys.exc_info()))
         flash('Uknown error unable to Display catalogue edit form', 'danger')
         return redirect(url_for('routes.catalogues'))
 
@@ -239,7 +238,7 @@ def edit_catalogue(catalogue_id):
                 success = False
         
         except Exception as e:
-            print('System Error: {} , info: {}'.format(e, sys.exc_info()))
+            print('System Error: {}'.format(sys.exc_info()))
             # update event will done after success = True, so incase error in that event set success to False 
             success = None
 
@@ -260,7 +259,7 @@ def edit_catalogue(catalogue_id):
         try:
             return render_template('crud/edit_catalogue.html', form=form, catalogue_id=catalogue_id)
         except Exception as e:
-            print('System Error: {} , info: {}'.format(e, sys.exc_info()))
+            print('System Error: {}'.format(sys.exc_info()))
             flash('unable to display Edit Catalogue page', 'danger')
             return redirect(url_for('routes.catalogues'))
 
@@ -285,7 +284,7 @@ def delete_catalogue(catalogue_id):
         else:
             flash('Catalogue not found it maybe deleted, ID: {}'.format(catalogue_id))
     except Exception as e:
-        print('System Error: {} , info: {}'.format(e, sys.exc_info()))
+        print('System Error: {}'.format(sys.exc_info()))
         flash('Unknown error unable to delete catalogue', 'danger')
     finally:
         return redirect(url_for('routes.catalogues'))
@@ -323,12 +322,42 @@ def delete_catalogues():
         else:
             flash('Unable to delete Catalogues', 'danger')
     except Exception as e:
-        print('System Error: {} , info: {}'.format(e, sys.exc_info()))
+        print('System Error: {}'.format(sys.exc_info()))
         flash('Unknown error unable to delete catalogues', 'danger')
 
     finally:
         return redirect(url_for('routes.catalogues'))
 
+
+@routes.route('/catalogues/delete_all', methods=['POST'])
+@login_required
+@vendor_permission.require(http_exception=403)
+def delete_all_catalogues():
+    deleted = 0
+    try:
+        form = removeAllCataloguesForm()
+        
+        if form.validate_on_submit():
+            system_catalogues = Catalogue.query.filter_by(user_id=current_user.id).all()
+            for selected_catalogue in system_catalogues:
+                selected_catalogue.delete()
+                deleted +=1
+
+            if deleted > 0:
+                updateDashboardListings(current_user.dashboard)
+                updateDashboardOrders(db, Order, Listing, current_user.dashboard)
+                updateDashboardPurchasesSum(db, Purchase, Listing, current_user.dashboard)
+                flash('Successfully deleted Catalogues', 'success')
+            else:
+                flash('No Changes Detected', 'success')
+        else:
+            flash('Unable to delete Catalogues', 'danger')
+    except Exception as e:
+        print('System Error: {}'.format(sys.exc_info()))
+        flash('Unknown error unable to delete catalogues', 'danger')
+
+    finally:
+        return redirect(url_for('routes.catalogues'))
 
 
 ################ -------------------------- Dashboard Listings -------------------- ################
@@ -358,7 +387,7 @@ def listings():
         delete_listings = removeListingsForm()
         return render_template('listings.html', listings=user_dashboard_listings, pagination_btns=pagination['pagination_btns'], delete_listings=delete_listings)
     except Exception as e:
-        print('System Error: {} , info: {}'.format(e, sys.exc_info()))
+        print('System Error: {}'.format(sys.exc_info()))
         flash('Unknown error Unable to view Listings', 'danger')
         return redirect(url_for('routes.index'))
 
@@ -387,7 +416,7 @@ def view_listing(listing_id):
             message = 'The listing specified with id: {} could not be found. It may be removed or deleted.'.format(listing_id)
             success = False            
     except Exception as e:
-        print('System Error: {} , info: {}'.format(e, sys.exc_info()))
+        print('System Error: {}'.format(sys.exc_info()))
         message = 'Unknown error Unable to view Listing'
         success = False
     finally:
@@ -410,6 +439,7 @@ def add_listing():
         form.catalogue_id.choices = [(catalogue.id, catalogue.product_name) for catalogue in user_catalogues]
         form.platforms.choices = [(platform.id, platform.name) for platform in current_user.dashboard.platforms]
     except:
+        print('System Error: {}'.format(sys.exc_info()))
         flash('unable to display add listing form due to isssue in catalogues', 'danger')
         return redirect(url_for('routes.index'))
 
@@ -446,7 +476,7 @@ def add_listing():
                 success = False
                 
         except Exception as e:
-            print('System Error: {} , info: {}'.format(e, sys.exc_info()))
+            print('System Error: {}'.format(sys.exc_info()))
             flash('Unknown Error unable to create new Listing', 'danger')
             success = None
             raise e
@@ -504,7 +534,7 @@ def edit_listing(listing_id):
             flash('Unable to display Edit listing form, target listing maybe removed', 'danger')
             return redirect(url_for('routes.listings'))
     except Exception as e:
-        print('System Error: {} , info: {}'.format(e, sys.exc_info()))
+        print('System Error: {}'.format(sys.exc_info()))
         flash('unable to display edit listing form due to issue in data collection', 'danger')
         return redirect(url_for('routes.listings'))
     
@@ -588,7 +618,7 @@ def edit_listing(listing_id):
             else:
                 success = False
         except Exception as e:
-            print('System Error: {} , info: {}'.format(e, sys.exc_info()))
+            print('System Error: {}'.format(sys.exc_info()))
             success = None
 
         finally:
@@ -648,7 +678,7 @@ def delete_listing(listing_id):
         else:
             flash('Listing not found it maybe deleted, ID: {}'.format(listing_id))
     except Exception as e:
-        print('System Error: {} , info: {}'.format(e, sys.exc_info()))
+        print('System Error: {}'.format(sys.exc_info()))
         flash('Unknown error unable to delete Listing', 'danger')
     finally:
         return redirect(url_for('routes.listings'))
@@ -710,7 +740,7 @@ def delete_listings():
             flash('Unable to delete Listings', 'danger')
 
     except Exception as e:
-        print('System Error: {} , info: {}'.format(e, sys.exc_info()))
+        print('System Error: {}'.format(sys.exc_info()))
         flash('Unknown error unable to delete Listing', 'danger')
 
     finally:
@@ -748,7 +778,7 @@ def view_purchase_listing(listing_id, purchase_id):
             message = 'unable to find selected purchase with id: ({}), it maybe deleted or you use invalid url'
 
     except Exception as e:
-        print('System Error: {} , info: {}'.format(e, sys.exc_info()))
+        print('System Error: {}'.format(sys.exc_info()))
         message = 'Unknown error unable to display Purchase with id: {}'.format(purchase_id)
         success = False
     finally:
@@ -801,7 +831,7 @@ def add_purchase_listing(listing_id):
         form.supplier_id.choices = [(supplier.id, supplier.name) for supplier in current_user.suppliers]
 
     except Exception as e:
-        print('System Error: {} , info: {}'.format(e, sys.exc_info()))
+        print('System Error: {}'.format(sys.exc_info()))
         flash('Unknown error unable to display Add Purchase form', 'danger')
         return redirect(url_for('routes.view_listing', listing_id=listing_id))
     
@@ -829,7 +859,7 @@ def add_purchase_listing(listing_id):
             else:
                 success = False
         except Exception as e:
-            print('System Error: {} , info: {}'.format(e, sys.exc_info()))
+            print('System Error: {}'.format(sys.exc_info()))
             flash('Unknown error unable to Add Purchase', 'danger')
             success = None
         finally:
@@ -896,7 +926,7 @@ def edit_purchase_listing(listing_id, purchase_id):
         form.supplier_id.choices = [(supplier.id, supplier.name) for supplier in current_user.suppliers]
 
     except Exception as e:
-        print('System Error: {} , info: {}'.format(e, sys.exc_info()))
+        print('System Error: {}'.format(sys.exc_info()))
         flash('Unknown error unable to display Add Purchase form', 'danger')
         return redirect(url_for('routes.view_listing', listing_id=listing_id))
     
@@ -971,7 +1001,7 @@ def edit_purchase_listing(listing_id, purchase_id):
             else:
                 success = False
         except Exception as e:
-            print('System Error: {} , info: {}'.format(e, sys.exc_info()))
+            print('System Error: {}'.format(sys.exc_info()))
             flash('Unknown error unable to edit Purchase with id: {}'.format(purchase_id), 'danger')
             success = None
 
@@ -1041,7 +1071,7 @@ def delete_purchase_listing(listing_id, purchase_id):
         else:
             flash('Unable to delete purchase with ID: {} , it not found or delete'.format(purchase_id), 'danger')
     except Exception as e:
-        print('System Error: {} , info: {}'.format(e, sys.exc_info()))
+        print('System Error: {}'.format(sys.exc_info()))
         flash('Unknown error unable to edit purchase with id: {}'.format(purchase_id), 'danger')
         raise e
 
@@ -1082,7 +1112,7 @@ def view_order(listing_id, order_id):
             flash('unable to find selected order with id: ({}), it maybe deleted or you use invalid url', 'danger')
 
     except Exception as e:
-        print('System Error: {} , info: {}'.format(e, sys.exc_info()))
+        print('System Error: {}'.format(sys.exc_info()))
         flash('Unknown error unable to display Order with id: {}'.format(order_id), 'danger')
         success = False
     finally:
@@ -1133,7 +1163,7 @@ def add_order(listing_id):
         form.listing_id.choices = [(listing.id, '{} - ({})'.format(listing.product_name, listing.sku) ) for listing in dashboard_listings]
 
     except Exception as e:
-        print('System Error: {} , info: {}'.format(e, sys.exc_info()))
+        print('System Error: {}'.format(sys.exc_info()))
         flash('Unknown error unable to display Add Order form', 'danger')
         return redirect(url_for('routes.view_listing', listing_id=listing_id))
 
@@ -1178,7 +1208,7 @@ def add_order(listing_id):
             else:
                 success = False
         except Exception as e:
-            print('System Error: {} , info: {}'.format(e, sys.exc_info()))
+            print('System Error: {}'.format(sys.exc_info()))
             flash('Unknown error unable to create new Order', 'danger')        
             success = None
 
@@ -1250,7 +1280,7 @@ def edit_order(listing_id, order_id):
         form.listing_id.choices = [(listing.id, '{} - ({})'.format(listing.product_name, listing.sku) ) for listing in dashboard_listings]
 
     except Exception as e:
-        print('System Error: {} , info: {}'.format(e, sys.exc_info()))
+        print('System Error: {}'.format(sys.exc_info()))
         flash('Unknown error unable to display Add Order form', 'danger')
         return redirect(url_for('routes.view_listing', listing_id=listing_id))
     
@@ -1371,7 +1401,7 @@ def edit_order(listing_id, order_id):
                 success = False
             
         except Exception as e:
-            print('System Error: {} , info: {}'.format(e, sys.exc_info()))
+            print('System Error: {}'.format(sys.exc_info()))
             flash('Unknown error unable to display Edit Order form', 'danger')
 
         finally:
@@ -1432,7 +1462,7 @@ def delete_order(listing_id, order_id):
         else:
             flash('Unable to delete order with ID: {} , it not found or delete'.format(order_id), 'danger')
     except Exception as e:
-        print('System Error delete_order: {} , info: {}'.format(e, sys.exc_info()))
+        print('System Error delete_order: {}'.format(sys.exc_info()))
         flash('Unknown error unable to edit order with id: {}'.format(order_id), 'danger')
 
     finally:
@@ -1470,7 +1500,7 @@ def orders():
         return render_template('orders.html', orders=orders, pagination_btns=pagination['pagination_btns'], order_remove=order_remove, action_redirect=action_redirect)
 
     except Exception as e:
-        print('System Error orders: {} , info: {}'.format(e, sys.exc_info()))
+        print('System Error orders: {}'.format(sys.exc_info()))
         flash('Unknown error unable to display orders page', 'danger')
         return redirect(url_for('routes.index'))
 
@@ -1486,7 +1516,7 @@ def suppliers():
         deleteform = removeSupplierForm()
         suppliers = Supplier.query.filter_by(user_id=current_user.id).all()
     except Exception as e:
-        print('System Error: {} , info: {}'.format(e, sys.exc_info()))
+        print('System Error: {}'.format(sys.exc_info()))
         flash('Unknown error unable to display suppliers page', 'danger')
         success = False
     finally:
@@ -1514,7 +1544,7 @@ def view_supplier(supplier_id):
             success = False
 
     except Exception as e:
-        print('System Error: {} , info: {}'.format(e, sys.exc_info()))
+        print('System Error: {}'.format(sys.exc_info()))
         message = 'Unknown error unable to display suppliers page'        
         success = False
     finally:
@@ -1541,7 +1571,7 @@ def add_supplier():
                 flash('Error in {} : {}'.format(field, ','.join(errors)), 'danger')
             success = False
     except Exception as e:
-        print('System Error: {} , info: {}'.format(e, sys.exc_info()))
+        print('System Error: {}'.format(sys.exc_info()))
         flash('Unknown error unable to add supplier', 'danger')
         success = False
     
@@ -1588,7 +1618,7 @@ def edit_supplier(supplier_id):
                 flash('Error in {} : {}'.format(field, ','.join(errors)), 'danger')
             success = False
     except Exception as e:
-        print('System Error: {} , info: {}'.format(e, sys.exc_info()))
+        print('System Error: {}'.format(sys.exc_info()))
         flash('Unknown error unable to edit supplier', 'danger')
         success = False
     finally:
@@ -1612,7 +1642,7 @@ def delete_supplier(supplier_id):
         else:
             flash('Cupplier not found it maybe deleted, ID: {}'.format(supplier_id))
     except Exception as e:
-        print('System Error: {} , info: {}'.format(e, sys.exc_info()))
+        print('System Error: {}'.format(sys.exc_info()))
         flash('Unknown error unable to delete supplier', 'danger')
     finally:
         return redirect(url_for('routes.suppliers'))
@@ -1645,7 +1675,7 @@ def view_purchase_supplier(supplier_id, purchase_id):
             flash('unable to find selected purchase with id: ({}), it maybe deleted or you use invalid url', 'danger')
 
     except Exception as e:
-        print('System Error: {} , info: {}'.format(e, sys.exc_info()))
+        print('System Error: {}'.format(sys.exc_info()))
         flash('Unknown error unable to display Purchase with id: {}'.format(purchase_id), 'danger')
         success = False
     finally:
@@ -1682,7 +1712,7 @@ def add_purchase_supplier(supplier_id):
             return redirect(url_for('routes.suppliers'))
         
     except Exception as e:
-        print('System Error: {} , info: {}'.format(e, sys.exc_info()))
+        print('System Error: {}'.format(sys.exc_info()))
         flash('Unknown error unable to display Add Purchase form', 'danger')
         return redirect(url_for('routes.view_supplier', supplier_id=supplier_id))
 
@@ -1714,7 +1744,7 @@ def add_purchase_supplier(supplier_id):
             else:
                 success = False
         except Exception as e:
-            print('System Error: {} , info: {}'.format(e, sys.exc_info()))
+            print('System Error: {}'.format(sys.exc_info()))
             flash('Unknown error unable to Add Purchase', 'danger')
             success = None
 
@@ -1849,7 +1879,7 @@ def edit_purchase_supplier(supplier_id, purchase_id):
             else:
                 success = False
         except Exception as e:
-            print('System Error: {} , info: {}'.format(e, sys.exc_info()))
+            print('System Error: {}'.format(sys.exc_info()))
             flash('Unknown error unable to edit Purchase with id: {}'.format(purchase_id), 'danger')
             success = None
         finally:
@@ -1904,17 +1934,37 @@ def delete_purchase_supplier(supplier_id, purchase_id):
         else:
             flash('Unable to delete purchase with ID: {} , it not found or delete'.format(purchase_id), 'danger')
     except Exception as e:
-        print('System Error: {} , info: {}'.format(e, sys.exc_info()))
+        print('System Error: {}'.format(sys.exc_info()))
         flash('Unknown error unable to edit purchase with id: {}'.format(purchase_id), 'danger') 
     finally:
         return redirect(url_for('routes.view_supplier', supplier_id=supplier_id))
 
 
-###########################  Dashboard platforms  ##############################
+#########################################################  Setup  ############################################################
+@routes.route('/setup', methods=['GET'])
+@login_required
+@vendor_permission.require()
+def setup():
+    try:
+        add_platform =  addPlatformForm()
+        edit_platform =  editPlatformForm()
+        delete_platform =  removePlatformForm()
+
+        add_location =  addLocationForm()
+        edit_location =  editLocationForm()
+        delete_location =  removeLocationForm()
+        
+        return render_template('setup.html', dashboard=current_user.dashboard, add_platform=add_platform, edit_platform=edit_platform, delete_platform=delete_platform, add_location=add_location, edit_location=edit_location, delete_location=delete_location)
+    except Exception as e:
+        print("Error in setup page Error: {}".format(sys.exc_info()))
+        flash('Unknown error Unable to setup page', 'danger')
+        return redirect(url_for('routes.index'))
+
+###########################  Setup platforms  ##############################
 @routes.route('/platforms/add', methods=['POST'])
 @login_required
 @vendor_permission.require(http_exception=403)
-def add_platform():    
+def add_platform():
     try:
         form = addPlatformForm()
         if form.validate_on_submit():
@@ -1922,19 +1972,19 @@ def add_platform():
             new_platform.insert()
             flash('Successfully Created New Platform', 'success')
         else:
-            print(form.errors.items())
             for field, errors in form.errors.items():
                 if field == 'csrf_token':
+                    flash("Error can not create platform Please restart page and try again", "danger")
                     continue
                 if field == 'name_add':
                     field = 'name'
                 flash('Error in {} : {}'.format(field, ','.join(errors)), 'danger')
 
     except Exception as e:
-        print('System Error: {} , info: {}'.format(e, sys.exc_info()))
+        print('System Error: {}'.format(sys.exc_info()))
         flash('Unknown Error unable to create new Platform', 'danger')
     finally:       
-        return redirect(url_for('routes.index'))
+        return redirect(url_for('routes.setup'))
 
 @routes.route('/platforms/<int:platform_id>/edit', methods=['GET', 'POST'])
 @login_required
@@ -1958,6 +2008,7 @@ def edit_platform(platform_id):
         else:
             for field, errors in form.errors.items():
                 if field == 'csrf_token':
+                    flash("Error can not edit platform Please restart page and try again", "danger")
                     continue
 
                 if field == 'name_edit':
@@ -1966,11 +2017,11 @@ def edit_platform(platform_id):
                 flash('Error in {} : {}'.format(field, ','.join(errors)), 'danger')
             success = False
     except Exception as e:
-        print('System Error: {} , info: {}'.format(e, sys.exc_info()))
+        print('System Error: {}'.format(sys.exc_info()))
         flash('Unknown error unable to edit platform', 'danger')
         success = False
     finally:
-        return redirect(url_for('routes.index'))
+        return redirect(url_for('routes.setup'))
 
 @routes.route('/platforms/<int:platform_id>/delete', methods=['POST'])
 @login_required
@@ -1988,11 +2039,95 @@ def delete_platform(platform_id):
         else:
             flash('Platform not found it maybe deleted, ID: {}'.format(platform_id))
     except Exception as e:
-        print('System Error: {} , info: {}'.format(e, sys.exc_info()))
+        print('System Error: {}'.format(sys.exc_info()))
         flash('Unknown error unable to delete platform', 'danger')
     finally:
-        return redirect(url_for('routes.index'))
+        return redirect(url_for('routes.setup'))
+
+###########################  Setup Locations  ##############################
+@routes.route('/locations/add', methods=['POST'])
+@login_required
+@vendor_permission.require(http_exception=403)
+def add_location():
+    try:
+        form = addLocationForm()
+        if form.validate_on_submit():
+            new_location = WarehouseLocations(name=form.location_name_add.data, dashboard_id=current_user.dashboard_id)
+            new_location.insert()
+            flash('Successfully Created New Location', 'success')
+        else:
+            for field, errors in form.errors.items():
+                if field == 'csrf_token':
+                    flash("Error can not create location Please restart page and try again", "danger")
+                    continue
+                if field == 'location_name_add':
+                    field = 'name'
+                flash('Error in {} : {}'.format(field, ','.join(errors)), 'danger')
+
+    except Exception as e:
+        print('System Error: {}'.format(sys.exc_info()))
+        flash('Unknown Error unable to create new Location', 'danger')
+    finally:       
+        return redirect(url_for('routes.setup'))
+
+@routes.route('/locations/<int:location_id>/edit', methods=['GET', 'POST'])
+@login_required
+@vendor_permission.require()
+def edit_location(location_id):
+    success = True
+    actions = 0
+    try:
+        form = editLocationForm()
+        if form.validate_on_submit():
+            target_location = WarehouseLocations.query.filter_by(id=location_id, dashboard_id=current_user.dashboard.id).one_or_none()
+            if target_location is not None:
+                if target_location.name != form.location_name_edit.data:
+                    target_location.name = form.location_name_edit.data
+                    target_location.update()
+                    flash('Successfully edit location ID:({})'.format(location_id), 'success')
+                else:
+                    flash('No changes Detected.', 'success')
+            else:
+                flash('Location with ID: ({})  not found or deleted'.format(location_id))
+        else:
+            for field, errors in form.errors.items():
+                if field == 'csrf_token':
+                    flash("Error can not edit location Please restart page and try again", "danger")
+                    continue
+
+                if field == 'location_name_edit':
+                    field = 'name'
+
+                flash('Error in {} : {}'.format(field, ','.join(errors)), 'danger')
+            success = False
+    except Exception as e:
+        print('System Error: {}'.format(sys.exc_info()))
+        flash('Unknown error unable to edit location', 'danger')
+        success = False
+    finally:
+        return redirect(url_for('routes.setup'))
     
+
+@routes.route('/locations/<int:location_id>/delete', methods=['POST'])
+@login_required
+@vendor_permission.require(http_exception=403)
+def delete_location(location_id):
+    try:
+        form = removeLocationForm()
+        target_location = WarehouseLocations.query.filter_by(id=location_id, dashboard_id=current_user.dashboard.id).one_or_none()
+        if target_location is not None:
+            if form.validate_on_submit():
+                target_location.delete()
+                flash('Successfully deleted Location ID: {}'.format(location_id), 'success')
+            else:
+                flash('Unable to delete Location, ID: {}'.format(location_id), 'danger')
+        else:
+            flash('Location not found it maybe deleted, ID: {}'.format(location_id))
+    except Exception as e:
+        print('System Error: {}'.format(sys.exc_info()))
+        flash('Unknown error unable to delete location', 'danger')
+    finally:
+        return redirect(url_for('routes.setup'))
 """
 @routes.errorhandler(403)
 def method_not_allowed(e):

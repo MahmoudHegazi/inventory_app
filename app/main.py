@@ -45,7 +45,7 @@ def import_catalogues_excel():
 
             
             mapped_catalogues = get_mapped_catalogues_dicts(excel_rows)
-            #return str(mapped_catalogues)
+
             
             if mapped_catalogues['success']:
 
@@ -57,7 +57,7 @@ def import_catalogues_excel():
                     if db_row['sku'] not in uploaded_skus:
                         try:
                        
-                            catalogue_exist = Catalogue.query.filter_by(sku=db_row['sku']).first()
+                            catalogue_exist = Catalogue.query.filter_by(sku=db_row['sku'], user_id=current_user.id).first()
 
                             if catalogue_exist:
 
@@ -119,9 +119,10 @@ def import_catalogues_excel():
 
     except Exception as e:
         # here big issues like db connection or invalid extensions
-        print('System Error import_catalogues_excel: {} '.format(e))
+        print('System Error import_catalogues_excel: {} '.format(sys.exc_info()))
         message = 'Unable to import excel data please try again later'
         success = False
+
 
     finally:
         status = 'success' if success else 'danger'
@@ -148,7 +149,7 @@ def listing_export():
             return redirect(url_for('routes.index'))
     except Exception as e:
         # redirect used to display the flash message incase of error , becuase this GET request and it processed in the same rendered page (so flash can not displayed without refresh)
-        print('System Error listing_export: {} , info: {}'.format(e, sys.exc_info()))
+        print('System Error listing_export: {}'.format(sys.exc_info()))
         flash('Unknown error Your request could not be processed right now, please try again later.', 'danger')
         return redirect(url_for('routes.index'))
 
@@ -169,7 +170,7 @@ def reports():
         export_form = ExportDataForm()  
         return render_template('reports.html', charts_data=charts_data, export_form=export_form)
     except Exception as e:
-        print('System Error: {} , info: {}'.format(e, sys.exc_info()))
+        print('System Error: {}'.format(sys.exc_info()))
         flash('unable to display reports page', 'danger')
         return redirect(url_for('routes.index'))
 
@@ -186,7 +187,7 @@ def get_filter_columns():
         data = export_sqlalchemy_filter.tables_data[requested_table] if requested_table in export_sqlalchemy_filter.tables_data else None
         return jsonify({'code': 200, 'data': data})
     except Exception as e:
-        print('System Error get_filter_columns: {} , info: {}'.format(e, sys.exc_info()))
+        print('System Error get_filter_columns: {}'.format(sys.exc_info()))
         flash('Unknown error Your request could not be processed right now, please try again later.', 'danger')
         return jsonify({'code': 500, 'message': 'system error'})
 
@@ -219,7 +220,7 @@ def reports_export():
             message = 'Invalid Data'
             success = False
     except Exception as e:
-        print('System Error reports_export: {} , info: {}'.format(e, sys.exc_info()))
+        print('System Error reports_export: {}'.format(sys.exc_info()))
         message = message if message != '' else 'Unknown Error Found While process your request'
         success = False
     
@@ -230,4 +231,4 @@ def reports_export():
             flash(message, 'danger')
             return redirect(url_for('main.reports'))
 
-    
+

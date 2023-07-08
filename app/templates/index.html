@@ -39,30 +39,7 @@
               {% include 'particles/charts_component.html' %}
           </div>
         </div>
-        <!-- Charts End -->
-
-        <!-- Platforms Start -->
-        <div class="container">
-          <div class="div border shadow rounded p-2">
-            <h5 class="mt-2 mb-3"><span>Platforms: </span> 
-              <button type="button" data-toggle="modal" data-target="#addPlatformModal" class="btn btn-success btn-sm" style="float:right;"><i class="fa fa-plus"></i></button></h5>
-            <div class="row" style="max-height:300px;overflow: auto;">
-              <!-- plateforms -->
-              {% for platform in dashboard.platforms %}
-              <div class="col-sm-12 row">
-                <div class="col-sm-6">
-                  <p style="word-break: break-word;">{{platform.name}}</p>
-                </div>
-                <div class="col-sm-6 text-right">
-                  <button data-toggle="modal" data-url="{{url_for('routes.edit_platform', platform_id=platform.id)}}" data-platform-id="{{platform.id}}" data-platform-name="{{platform.name}}" data-target="#editPlatformModal" class="btn btn-sm btn-warning edit_platform" type="button"><i class="fa fa-edit"></i></button>
-                  <button data-toggle="modal" data-url="{{url_for('routes.delete_platform', platform_id=platform.id)}}" data-platform-id="{{platform.id}}" data-target="#deletePlatformModal" class="btn btn-sm btn-danger wtform_modal_deletebtn" type="button"><i class="fa fa-remove"></i></button>
-                </div>
-              </div>
-              {% endfor %}
-            </div>
-          </div>
-        </div>
-        <!-- Platforms End -->        
+        <!-- Charts End -->        
       </div>
     </div>
 
@@ -73,8 +50,6 @@
   </div>
 </div>
 
-{% from 'forms.html' import home_forms %}
-{{ home_forms(add_platform=add_platform, edit_platform=edit_platform, delete_platform=delete_platform) }}
 {% endblock %}
 
 
@@ -83,21 +58,5 @@
 // noEffects = true;
 
 //searchComponent('mid', 'swing');
-
-addCollabseEndTableEffect(
-  rowsSelector='.searching_card',
-  closeOnlyBtn='.close_only_btn',
-  closeOpenBtn='.close_open_btn',
-  scrollIntoViewData={behavior: 'smooth', block: "center", inline: "nearest"}
-);
-
-
-collabse_listing_effect();
-
-deleteWtformsModalProccess(dataAttId='data-platform-id', formId='remove_platform_form', idInputId='platform_id_remove', modalId='deletePlatformModal');
-
-
-// handle fill edit modal form data
-fillEditPlatForm();
 </script>
 {% endblock page_scripts %}

@@ -26,6 +26,7 @@ class Dashboard(db.Model):
     updated_date = db.Column(db.DateTime, nullable=True, default=None, onupdate=datetime.datetime.utcnow)
     listings = db.relationship("Listing", backref="dashboard", cascade="all, delete", passive_deletes=True)
     platforms = db.relationship("Platform", backref="dashboard", cascade="all, delete", passive_deletes=True)
+    locations = db.relationship("WarehouseLocations", backref="dashboard", cascade="all, delete", passive_deletes=True)
     user = db.relationship("User", backref="dashboard", cascade="all, delete", passive_deletes=True, uselist=False)
 
 
@@ -589,7 +590,42 @@ class ListingPlatform(db.Model):
         'created_date': self.created_date,
         'updated_date': self.updated_date
         }
-    
+
+
+class WarehouseLocations(db.Model):
+    __tablename__ = 'warehouse_locations'
+    id = db.Column(db.Integer, primary_key=True, nullable=False)
+    name = db.Column(db.String(255), nullable=False)
+    dashboard_id = db.Column(db.Integer, db.ForeignKey('dashboard.id', ondelete="CASCADE", onupdate="CASCADE"), nullable=False)
+    created_date = db.Column(DateTime, nullable=False, default=datetime.datetime.utcnow)
+    updated_date = db.Column(DateTime, nullable=True, default=None, onupdate=datetime.datetime.utcnow)
+
+    def __init__(self, name, dashboard_id):
+        self.name = name
+        self.dashboard_id = dashboard_id
+
+    def insert(self):
+        db.session.add(self)
+        db.session.commit()
+
+    def update(self):
+        db.session.commit()
+
+    def delete(self):
+        db.session.delete(self)
+        db.session.commit()
+
+    def format(self):
+        return {
+        'id': self.id,
+        'name': self.name,
+        'dashboard_id': self.dashboard_id,
+        'created_date': self.created_date,
+        'updated_date': self.updated_date
+        }
+
+
+
 ################################ ---------- Tables for Dashboard Plateforms (End) ---------------- #########################
 
 

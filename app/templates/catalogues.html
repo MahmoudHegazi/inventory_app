@@ -34,9 +34,10 @@
       <a href="{{url_for('routes.add_catalogue')}}" type="button" class="btn btn-primary btn-sm">
         Add Catalogue
       </a>
-      <button type="buttom" data-target="#importExcelCatalogues" data-toggle="modal" class="ml-1 btn btn-warning btn-sm">
+      <button type="buttom" data-target="#importExcelCatalogues" data-toggle="modal" class="ml-1 btn btn-warning btn-sm mr-1">
         Import Catalogue From Excel
       </button>
+      <button data-toggle="modal" data-target="#removeAllCatalogues" class="btn btn-danger btn-sm">Delete All Catalogues</button>
       
     </div>
     {% if catalogues is defined %}
@@ -180,7 +181,7 @@
 </div>
 
 {% import 'forms.html' as forms %}
-{{ forms.catalogues_forms(catalogues_excel=catalogues_excel,delete_catalogues=delete_catalogues) }}
+{{ forms.catalogues_forms(catalogues_excel=catalogues_excel,delete_catalogues=delete_catalogues, delete_all_catalogues=delete_all_catalogues) }}
 {% endblock %}
 
 

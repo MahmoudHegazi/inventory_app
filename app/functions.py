@@ -45,6 +45,7 @@ def valid_catalogues(excel_array):
         
         return {'success': True, 'message': ''}
     except Exception as e:
+        print('System Error valid_catalogues: {}'.format(sys.exc_info()))
         raise e
     
 #{ "sku",  "product_name",  "product_description",  "brand",  "category",  "price",  "sale_price",  "quantity",  "product_model",  "condition",  "upc",  "location", }
@@ -107,7 +108,7 @@ def get_mapped_catalogues_dicts(excel_array):
            return catalogues_valid
            
     except Exception as e:
-        print('System Error get_mapped_catalogues_dicts: {} , info: {}'.format(e, sys.exc_info()))
+        print('System Error get_mapped_catalogues_dicts: {}'.format(sys.exc_info()))
         raise e
 
 def updateDashboardListings(user_dashboard):
@@ -120,7 +121,7 @@ def updateDashboardListings(user_dashboard):
         else:
             return False
     except Exception as e:
-        print('System Error updateDashboardListings: {} , info: {}'.format(e, sys.exc_info()))
+        print('System Error updateDashboardListings: {}'.format(sys.exc_info()))
         raise e
     
 
@@ -138,7 +139,7 @@ def updateDashboardOrders(db, Order, Listing, user_dashboard):
         user_dashboard.update()
         return total_dashboard_orders
     except Exception as e:
-        print('System Error updateDashboardOrders: {} , info: {}'.format(e, sys.exc_info()))
+        print('System Error updateDashboardOrders: {}'.format(sys.exc_info()))
         raise e
 
 def updateDashboardPurchasesSum(db, Purchase, Listing, user_dashboard):
@@ -154,7 +155,7 @@ def updateDashboardPurchasesSum(db, Purchase, Listing, user_dashboard):
         user_dashboard.update()
         return sum_dashboard_purchases
     except Exception as e:
-        print('System Error updateDashboardPurchasesSum: {} , info: {}'.format(e, sys.exc_info()))
+        print('System Error updateDashboardPurchasesSum: {}'.format(sys.exc_info()))
         raise e
 
 def getTableColumns(tableClass, expetColumns=[]):
@@ -184,7 +185,7 @@ def getTableColumns(tableClass, expetColumns=[]):
 
         return result
     except Exception as e:
-        print('System Error getTableColumns: {} , info: {}'.format(e, sys.exc_info()))
+        print('System Error getTableColumns: {}'.format(sys.exc_info()))
         raise (e)
     
 def secureRedirect(redirect_url):
@@ -280,7 +281,7 @@ class ExportSqlalchemyFilter():
             if target_class is None:
                 raise ValueError('invalid table asked to exported')
         except Exception as e:
-            print('error in getSqlalchemyClassByName, {}, {}'.format(e, sys.exc_info()))
+            print('error in getSqlalchemyClassByName, {}'.format(sys.exc_info()))
             raise e
         return target_class
 
@@ -313,7 +314,7 @@ class ExportSqlalchemyFilter():
                 raise ValueError('column not found')
             
         except Exception as e:
-            print('error in getSqlalchemyColumnByName, {}, {}'.format(e, sys.exc_info()))
+            print('error in getSqlalchemyColumnByName, {}'.format(sys.exc_info()))
             raise e
         
         return target_column
@@ -391,6 +392,7 @@ def getFilterBooleanClauseList(columns, operators, values, condition):
         filterBooleanClauseList = or_(*expertion_tuple) if condition == 'or' else and_(*expertion_tuple)
         return filterBooleanClauseList
     except Exception as e:
+        print('System Error getFilterBooleanClauseList: {}'.format(sys.exc_info()))
         raise e
 
 
@@ -768,7 +770,7 @@ def get_charts(db, current_user, charts_ids=[]):
                 result[str(index)] = False
                 result_array.append({})
     except Exception as e:
-        print('System Error get_filter_columns: {} , info: {}'.format(e, sys.exc_info()))
+        print('System Error get_filter_columns: {}'.format(sys.exc_info()))
         result[str(index)] = False
         result_array.append({})
     finally:

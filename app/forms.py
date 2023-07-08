@@ -112,6 +112,10 @@ class removeCataloguesForm(FlaskForm):
     catalogues_ids = HiddenField()
     delete_catalogues = SubmitField('Delete Catalgoues')
 
+# Using wtforms in all app + prevent any unknown delet request that can delete catalogues of system By depend on wtforms
+class removeAllCataloguesForm(FlaskForm):
+    delete_all = SubmitField('Delete All Catalgoues')
+
 # signup = SubmitField('Signup', default='checked')
 
 # Supplier Forms
@@ -196,22 +200,32 @@ class removeOrderForm(FlaskForm):
 
 
 # Platforms Forms
-class PlatformForm(FlaskForm):    
-    action_redirect = HiddenField()
-
-class addPlatformForm(PlatformForm):
-    dashboard_id = HiddenField(validators=[InputRequired()])
+class addPlatformForm(FlaskForm):
     name_add = StringField('Name', validators=[InputRequired(), Length(max=100)])
     add = SubmitField('Add')
 
-class editPlatformForm(PlatformForm):    
+class editPlatformForm(FlaskForm):    
     name_edit = StringField('Name', validators=[InputRequired(), Length(max=100)])
     platform_id_edit = HiddenField()
     edit = SubmitField('Edit')
 
-class removePlatformForm(PlatformForm):
+class removePlatformForm(FlaskForm):
     platform_id_remove = HiddenField()
     delete = SubmitField('Delete Order')
+
+# Locations forms
+class addLocationForm(FlaskForm):
+    location_name_add = StringField('Name', validators=[InputRequired(), Length(max=255)])
+    add = SubmitField('Add')
+
+class editLocationForm(FlaskForm):    
+    location_name_edit = StringField('Name', validators=[InputRequired(), Length(max=255)])
+    location_id_edit = HiddenField()
+    edit = SubmitField('Edit')
+
+class removeLocationForm(FlaskForm):
+    location_id_remove = HiddenField()
+    delete = SubmitField('Delete Location')
 
 
 ###############################  main Forms ###############################################

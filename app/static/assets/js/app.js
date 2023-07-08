@@ -409,53 +409,10 @@ function setFormRedirectByUrl(customRedirect=null){
 }
 
 
-
-/* this function used with bs4 collabse and table row collabsed large content it set active status to last closed and scroll to it for better xu */
-function addCollabseEndTableEffect(rowsSelector='.searching_card', closeOnlyBtn='.close_only_btn', closeOpenBtn='.close_open_btn', scrollIntoViewData={behavior: 'smooth', block: "center", inline: "nearest"}){
-  if (noEffects==true){
-    return false;
-  }
-
-  const setLastColapsedActive = (event)=> {
-      if ($(event.currentTarget).length && $(event.currentTarget).closest('tr').length && $(event.currentTarget).closest('tr').prev().length){
-        const targetRow = $(event.currentTarget).closest('tr').prev();
-        if (rowsSelector && $(rowsSelector).length){
-          $(rowsSelector).removeClass('bg-info');
-          $(rowsSelector).removeClass('text-white');
-          targetRow.addClass('bg-info');
-          targetRow.addClass('text-white');
-          targetRow[0].scrollIntoView(scrollIntoViewData);
-          setTimeout(()=>{
-            $(rowsSelector).removeClass('bg-info');
-            $(rowsSelector).removeClass('text-white');
-          }, 2000);
-          return true;
-        } else {
-          console.log('Not Started actions invalid selector as this function called only when there are rows already with btns');
-          return false;
-        }
-      } else {
-        console.log("can not set active when close show listing data");
-        return false;
-      }
-  };
-  if (closeOnlyBtn && $(closeOnlyBtn).length){
-    $(closeOnlyBtn).on('click', setLastColapsedActive);
-  }
-  
-  if (closeOpenBtn && $(closeOpenBtn).length){
-    $(closeOpenBtn).on('click', ()=>{
-      $(rowsSelector).removeClass('bg-info');
-      $(rowsSelector).removeClass('text-white');
-    });
-  }
-
-}
-
 /* fill edit platform form with data */
 function fillEditPlatForm(){
   $(".edit_platform").on('click', (event)=>{
-    if ($(event.currentTarget).length && $(event.currentTarget).attr('data-platform-id') && $("#name_edit").length && $("#platform_id_edit").length && $(`#edit_platform_form`)) {
+    if ($(event.currentTarget).length && $(event.currentTarget).attr('data-platform-id') && $("#name_edit").length && $("#platform_id_edit").length && $(`#edit_platform_form`) && $(event.currentTarget).attr('data-url') && $(event.currentTarget).attr('data-platform-name')) {
         const action_url = String($(event.currentTarget).attr('data-url')).trim();
         const platform_id = String($(event.currentTarget).attr('data-platform-id')).trim();
         const platform_name = String($(event.currentTarget).attr('data-platform-name')).trim();      
@@ -476,57 +433,31 @@ function fillEditPlatForm(){
   });
 }
 
-function collabse_listing_effect(){
-  if (noEffects === true){return false;}
-  const collabseData = {};
-  $(".close_open_btn, .close_only_btn").on('click', (e)=>{
-    if ($(e.currentTarget).length && $(e.currentTarget).attr('href').length && $(e.currentTarget).closest('tr').length){
-      const currentProp = collabseData[$(e.currentTarget).attr('href')];
-      if (currentProp){
-        if (currentProp === true){
-          collabseData[$(e.currentTarget).attr('href')] = false;
-        } else {
-          collabseData[$(e.currentTarget).attr('href')] = true;
-        }
-  
-      } else {
-        collabseData[$(e.currentTarget).attr('href')] = true;
-      }
-      
-      if (collabseData[$(e.currentTarget).attr('href')] === true){
-        $(document).trigger('collabse_start', $(e.currentTarget).closest('tr'));
-      } else {
-        $(document).trigger('collabse_end', $(e.currentTarget).closest('tr'));
-      }
+
+function fillEditLocation(){
+  $(".edit_location").on('click', (event)=>{
+    if ($(event.currentTarget).length && $(event.currentTarget).attr('data-location-id') && $("#location_name_edit").length && $("#location_id_edit").length && $(`#edit_location_form`) && $(event.currentTarget).attr('data-url') && $(event.currentTarget).attr('data-location-name')) {
+        const action_url = String($(event.currentTarget).attr('data-url')).trim();
+        const location_id = String($(event.currentTarget).attr('data-location-id')).trim();
+        const location_name = String($(event.currentTarget).attr('data-location-name')).trim();      
+        $("#location_id_edit").val(location_id);
+        $("#location_name_edit").val(location_name);
+        $(`#edit_location_form`).attr('action', action_url);
     }
   });
-  
-  $(document).on('collabse_start', (e, target)=>{
-    $("#info_part").css('position', 'absolute');
-    $("#info_part").css('left', '-10000px');
-    $("#main_part").removeClass('col-sm-8');
-    $("#main_part").addClass('col-sm-12');
-  });
-  
-  
-  $(document).on('collabse_end', (e, target)=>{
-    let end_now = true;
-    /* end only effect when all opend listing closed, need more than 1 listing open to test */
-    for (item in collabseData){
-      if (collabseData[item] === true){
-        end_now = false;
-      }
+
+  $(`#edit_location_form`).on('hidden.bs.modal', () => {
+    if ($("#location_id_edit").length){
+      $("#location_id_edit").val("");
     }
-    if (end_now){
-      $("#info_part").css('position', '');
-      $("#info_part").css('left', '');
-      $("#main_part").removeClass('col-sm-12');
-      $("#main_part").addClass('col-sm-8');
-      $("#info_part").show();
+    if ($("#location_name_edit").length){
+      $("#location_name_edit").val("");
     }
-    
+    $(`#edit_location_form`).attr('action', '');
   });
 }
+
+
 
 /* integerted with search throw 1 event cancel search, and visible elements (searchComponent use display none for process search result) */
 function multipleSelectComponent(checkboxSelector='', dataLabel='', actionModals=[], selectAllSelector=''){

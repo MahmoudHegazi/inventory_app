@@ -164,8 +164,8 @@ class Role(db.Model):
 class UserRoles(db.Model):
     __tablename__ = 'user_roles'
     id = db.Column(db.Integer, primary_key=True, nullable=False)
-    user_id = db.Column(db.Integer, db.ForeignKey('user.id', ondelete="CASCADE", onupdate="CASCADE"), nullable=False)
-    role_id = db.Column(db.Integer, db.ForeignKey('role.id', ondelete="CASCADE", onupdate="CASCADE"), nullable=False)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id', ondelete="SET NULL", onupdate="CASCADE"), nullable=False)
+    role_id = db.Column(db.Integer, db.ForeignKey('role.id', ondelete="SET NULL", onupdate="CASCADE"), nullable=False)
     created_date = db.Column(db.DateTime, nullable=False, default=datetime.datetime.utcnow)
     updated_date = db.Column(db.DateTime, nullable=True, default=None, onupdate=datetime.datetime.utcnow)
     def __init__(self, user_id, role_id):
@@ -257,14 +257,14 @@ class Catalogue(db.Model): # catelouge
     product_model = db.Column(db.String(255), nullable=True)
     condition = db.Column(db.String(255), nullable=True)
     upc = db.Column(db.String(255), nullable=True)
-    location = db.Column(db.String(255), nullable=True)
     product_image = db.Column(db.String(45), nullable=True, default='default_product.png')
     created_date = db.Column(DateTime, nullable=False, default=datetime.datetime.utcnow)
     updated_date = db.Column(DateTime, nullable=True, default=None, onupdate=datetime.datetime.utcnow)
     user_id = db.Column(db.Integer, db.ForeignKey('user.id', ondelete="CASCADE", onupdate="CASCADE"), nullable=False)
     listings = db.relationship("Listing", backref="catalogue", cascade="all, delete", passive_deletes=True)
+    locations = db.relationship("CatalogueLocations", backref='catalogue', cascade="all, delete", passive_deletes=True)
 
-    def __init__(self, sku, user_id, product_name=None, product_description=None, brand=None, category=None, price=0.00, sale_price=0.00, quantity=None, product_model=None, condition=None, upc=None, location=None):
+    def __init__(self, sku, user_id, product_name=None, product_description=None, brand=None, category=None, price=0.00, sale_price=0.00, quantity=None, product_model=None, condition=None, upc=None):
         self.sku = sku
         self.product_name = product_name
         self.user_id = user_id
@@ -277,8 +277,6 @@ class Catalogue(db.Model): # catelouge
         self.product_model = product_model
         self.condition = condition
         self.upc = upc
-        self.location = location
-
 
     def insert(self):
         db.session.add(self)
@@ -338,7 +336,6 @@ class Catalogue(db.Model): # catelouge
         'product_model': self.product_model,
         'condition': self.condition,
         'upc': self.upc,
-        'location': self.location,
         'product_image': self.product_image,
         }
 
@@ -597,12 +594,16 @@ class WarehouseLocations(db.Model):
     id = db.Column(db.Integer, primary_key=True, nullable=False)
     name = db.Column(db.String(255), nullable=False)
     dashboard_id = db.Column(db.Integer, db.ForeignKey('dashboard.id', ondelete="CASCADE", onupdate="CASCADE"), nullable=False)
+    default = db.Column(db.Boolean, nullable=True, default=False)
     created_date = db.Column(DateTime, nullable=False, default=datetime.datetime.utcnow)
     updated_date = db.Column(DateTime, nullable=True, default=None, onupdate=datetime.datetime.utcnow)
+    bins = db.relationship("LocationBins", backref="warehouse_location", cascade="all, delete", passive_deletes=True)
+    catalogues_locations = db.relationship("CatalogueLocations", backref="warehouse_location", cascade="all, delete", passive_deletes=True)
 
-    def __init__(self, name, dashboard_id):
+    def __init__(self, name, dashboard_id, default=False):
         self.name = name
         self.dashboard_id = dashboard_id
+        self.default = False
 
     def insert(self):
         db.session.add(self)
@@ -624,6 +625,100 @@ class WarehouseLocations(db.Model):
         'updated_date': self.updated_date
         }
 
+class LocationBins(db.Model):
+    __tablename__ = 'location_bins'
+    id = db.Column(db.Integer, primary_key=True, nullable=False)
+    name = db.Column(db.String(255), nullable=False)
+    location_id = db.Column(db.Integer, db.ForeignKey('warehouse_locations.id', ondelete="CASCADE", onupdate="CASCADE"), nullable=False)
+    created_date = db.Column(DateTime, nullable=False, default=datetime.datetime.utcnow)
+    updated_date = db.Column(DateTime, nullable=True, default=None, onupdate=datetime.datetime.utcnow)
+    catalogues_bins = db.relationship("CatalogueLocationsBins", backref="bin", cascade="all, delete", passive_deletes=True)
+
+    def __init__(self, name, location_id=None):
+        self.name = name
+        # some times use append to insert locations bins, incase not use it can accept direct insert
+        if location_id:
+            self.location_id = location_id
+    def insert(self):
+        db.session.add(self)
+        db.session.commit()
+
+    def update(self):
+        db.session.commit()
+
+    def delete(self):
+        db.session.delete(self)
+        db.session.commit()
+
+    def format(self):
+        return {
+        'id': self.id,
+        'name': self.name,
+        'location_id': self.location_id,
+        'created_date': self.created_date,
+        'updated_date': self.updated_date
+        }
+
+
+
+class CatalogueLocations(db.Model):
+    __tablename__ = 'catalogue_locations'
+    id = db.Column(db.Integer, primary_key=True, nullable=False)
+    catalogue_id = db.Column(db.Integer, db.ForeignKey('catalogue.id', ondelete="CASCADE", onupdate="CASCADE"), nullable=False)
+    location_id = db.Column(db.Integer, db.ForeignKey('warehouse_locations.id', ondelete="CASCADE", onupdate="CASCADE"), nullable=False)
+    created_date = db.Column(DateTime, nullable=False, default=datetime.datetime.utcnow)
+    updated_date = db.Column(DateTime, nullable=True, default=None, onupdate=datetime.datetime.utcnow)
+    bins = db.relationship("CatalogueLocationsBins", backref="catalogue_locations", cascade="all, delete", passive_deletes=True)
+
+
+
+    def insert(self):
+        db.session.add(self)
+        db.session.commit()
+
+    def update(self):
+        db.session.commit()
+
+    def delete(self):
+        db.session.delete(self)
+        db.session.commit()
+
+    def format(self):
+        return {
+        'id': self.id,
+        'catalogue_id': self.catalogue_id,
+        'location_id': self.location_id,
+        'created_date': self.created_date,
+        'updated_date': self.updated_date
+        }
+
+class CatalogueLocationsBins(db.Model):
+    __tablename__ = 'catalogue_locations_bins'
+    id = db.Column(db.Integer, primary_key=True, nullable=False)
+    location_id = db.Column(db.Integer, db.ForeignKey('catalogue_locations.id', ondelete="CASCADE", onupdate="CASCADE"), nullable=True)
+    bin_id = db.Column(db.Integer, db.ForeignKey('location_bins.id', ondelete="CASCADE", onupdate="CASCADE"), nullable=True)
+    created_date = db.Column(DateTime, nullable=False, default=datetime.datetime.utcnow)
+    updated_date = db.Column(DateTime, nullable=True, default=None, onupdate=datetime.datetime.utcnow)
+
+    def insert(self):
+        db.session.add(self)
+        db.session.commit()
+
+    def update(self):
+        db.session.commit()
+
+    def delete(self):
+        db.session.delete(self)
+        db.session.commit()
+
+    def format(self):
+        return {
+        'id': self.id,
+        'location_id': self.location_id,
+        'bin_id': self.bin_id,
+        'created_date': self.created_date,
+        'updated_date': self.updated_date
+        }
 
 
 ################################ ---------- Tables for Dashboard Plateforms (End) ---------------- #########################

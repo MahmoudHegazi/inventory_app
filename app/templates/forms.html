@@ -593,7 +593,7 @@
 </div>
 {% endmacro %}
 
-{% macro setup_forms(add_platform, edit_platform, delete_platform, add_location, edit_location, delete_location) %}
+{% macro setup_forms(add_platform, edit_platform, delete_platform, add_location, edit_location, delete_location, add_bin, edit_bin, delete_bin) %}
 <div class="modal fade" id="addPlatformModal">
   <div class="modal-dialog">
     <div class="modal-content">
@@ -772,6 +772,100 @@
         </form>
         {% else %}
         <div class="alert-danger">Unable to Display Remove Location form right now.</div>
+        {% endif %}
+      </div>
+      <!-- Modal footer -->
+      <div class="modal-footer">
+        <button type="button" class="btn btn-danger" data-dismiss="modal">Close</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+
+<div class="modal fade" id="addBinModal">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <!-- Modal Header -->
+      <div class="modal-header">
+        <h4 class="modal-title">Add Bin</h4>
+        <button type="button" class="close" data-dismiss="modal">&times;</button>
+      </div>
+      
+      <!-- Modal body -->
+      <div class="modal-body">
+        {% if add_bin %}
+        <form id="add_bin_form" method="post" action="">
+            {{add_bin.hidden_tag()}}                
+            <div class="form-group">
+              {{add_bin.bin_name_add.label}}
+              {{add_bin.bin_name_add(class='form-control', placeholder='Enter Bin Name', maxlength='255')}}
+            </div>
+            {{add_bin.add(class='btn btn-success btn-block')}}
+        </form>
+        {% else %}
+        <div class="alert-danger">Unable to Display Add Bin form right now.</div>
+        {% endif %}
+      </div>
+      <!-- Modal footer -->
+      <div class="modal-footer">
+        <button type="button" class="btn btn-danger" data-dismiss="modal">Close</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="editBinModal">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <!-- Modal Header -->
+      <div class="modal-header">
+        <h4 class="modal-title">Edit Bin</h4>
+        <button type="button" class="close" data-dismiss="modal">&times;</button>
+      </div>
+      
+      <!-- Modal body -->
+      <div class="modal-body">
+        {% if edit_bin %}
+        <form id="edit_bin_form" method="post" action="">
+            {{edit_bin.hidden_tag()}}                
+            <div class="form-group">
+              {{edit_bin.bin_name_edit.label}}
+              {{edit_bin.bin_name_edit(class='form-control', placeholder='Edit Bin Name', maxlength='255')}}
+            </div>
+            {{edit_bin.edit(class='btn btn-success btn-block')}}
+        </form>
+        {% else %}
+        <div class="alert-danger">Unable to Display Edit Bin form right now.</div>
+        {% endif %}
+      </div>
+      <!-- Modal footer -->
+      <div class="modal-footer">
+        <button type="button" class="btn btn-danger" data-dismiss="modal">Close</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="deleteBinModal">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <!-- Modal Header -->
+      <div class="modal-header">
+        <h4 class="modal-title">Remove Bin</h4>
+        <button type="button" class="close" data-dismiss="modal">&times;</button>
+      </div>
+
+      <!-- Modal body -->
+      <div class="modal-body">
+        {% if delete_bin %}
+        <form id="remove_bin_form" method="post" action="">
+         <p>Are you Sure you want remove Bin</p>
+         {{delete_bin.hidden_tag()}}
+         {{delete_bin.delete(class='btn btn-danger')}}
+        </form>
+        {% else %}
+        <div class="alert-danger">Unable to Display Remove Bin form right now.</div>
         {% endif %}
       </div>
       <!-- Modal footer -->

@@ -78,9 +78,9 @@ class DashboardModalView(InventoryModelView):
     form_excluded_columns = ['created_date', 'updated_date', 'listings']
 
 class catalogueModalView(InventoryModelView):
-    column_filters = ['created_date', 'updated_date', 'sku', 'product_name', 'product_description', 'brand', 'category', 'price', 'sale_price','quantity', 'product_model', 'condition', 'upc', 'location', 'user']
-    column_searchable_list = ['sku', 'product_name', 'brand', 'category', 'price', 'product_model', 'location']
-    column_editable_list = ['product_name', 'brand', 'category', 'price', 'sale_price', 'quantity', 'product_model', 'condition', 'upc', 'location']
+    column_filters = ['created_date', 'updated_date', 'sku', 'product_name', 'product_description', 'brand', 'category', 'price', 'sale_price','quantity', 'product_model', 'condition', 'upc', 'user']
+    column_searchable_list = ['sku', 'product_name', 'brand', 'category', 'price', 'product_model']
+    column_editable_list = ['product_name', 'brand', 'category', 'price', 'sale_price', 'quantity', 'product_model', 'condition', 'upc']
     form_excluded_columns = ['created_date', 'updated_date']
 
 

@@ -76,16 +76,18 @@ class removeListingsForm(FlaskForm):
 
 # Product Forms
 class catalogueModal(FlaskForm):
-    sku = StringField('SKU', validators=[InputRequired(), Length(max=16)])
-    product_name = StringField('Product Name',validators=[Length(max=255)])
-    product_description = TextAreaField('Product Description',validators=[Length(max=1000)])
-    brand = StringField('Brand',validators=[Length(max=45)])
-    category = StringField('Category',validators=[Length(max=45)])
+    sku = StringField('SKU', validators=[InputRequired(), Length(max=45)])
+    product_name = StringField('Product Name',validators=[Length(max=500)])
+    product_description = TextAreaField('Product Description',validators=[Length(max=5000)])
+    brand = StringField('Brand',validators=[Length(max=255)])
+    category = StringField('Category',validators=[Length(max=255)])
     quantity = IntegerField('Quantity')
-    product_model = StringField('Product Model',validators=[Length(max=45)])
-    condition = StringField('Condition',validators=[Length(max=45)])
+    product_model = StringField('Product Model',validators=[Length(max=255)])
+    condition = StringField('Condition',validators=[Length(max=255)])
     upc = StringField('UPC',validators=[Length(max=255)])
-    location = StringField('Location',validators=[Length(max=255)])
+    warehouse_locations = SelectMultipleField('Warehouses Locations', choices=[], coerce=int, validate_choice=True)
+    locations_bins = SelectMultipleField('Bins', choices=[], coerce=int, validate_choice=True, render_kw={'style': 'visibility:hidden;'})
+
     price = DecimalField(
         'Price',
         validators=[],
@@ -226,6 +228,21 @@ class editLocationForm(FlaskForm):
 class removeLocationForm(FlaskForm):
     location_id_remove = HiddenField()
     delete = SubmitField('Delete Location')
+
+# Bins forms
+class addBinForm(FlaskForm):
+    bin_name_add = StringField('Name', validators=[InputRequired(), Length(max=255)])
+    location_id = HiddenField()
+    add = SubmitField('Add')
+
+class editBinForm(FlaskForm):    
+    bin_name_edit = StringField('Name', validators=[InputRequired(), Length(max=255)])
+    bin_id_edit = HiddenField()
+    edit = SubmitField('Edit')
+
+class removeBinForm(FlaskForm):
+    bin_id_remove = HiddenField()
+    delete = SubmitField('Delete Bin')
 
 
 ###############################  main Forms ###############################################

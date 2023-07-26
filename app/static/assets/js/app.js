@@ -458,6 +458,29 @@ function fillEditLocation(){
 }
 
 
+function fillEditBin(){
+  $(".edit_bin").on('click', (event)=>{
+    if ($(event.currentTarget).length && $(event.currentTarget).attr('data-bin-id') && $("#bin_name_edit").length && $("#bin_id_edit").length && $(`#edit_bin_form`) && $(event.currentTarget).attr('data-url') && $(event.currentTarget).attr('data-bin-name')) {
+        const action_url = String($(event.currentTarget).attr('data-url')).trim();
+        const bin_id = String($(event.currentTarget).attr('data-bin-id')).trim();
+        const bin_name = String($(event.currentTarget).attr('data-bin-name')).trim();      
+        $("#bin_id_edit").val(bin_id);
+        $("#bin_name_edit").val(bin_name);
+        $(`#edit_bin_form`).attr('action', action_url);
+    }
+  });
+
+  $(`#edit_bin_form`).on('hidden.bs.modal', () => {
+    if ($("#bin_id_edit").length){
+      $("#bin_id_edit").val("");
+    }
+    if ($("#bin_name_edit").length){
+      $("#bin_name_edit").val("");
+    }
+    $(`#edit_bin_form`).attr('action', '');
+  });
+}
+
 
 /* integerted with search throw 1 event cancel search, and visible elements (searchComponent use display none for process search result) */
 function multipleSelectComponent(checkboxSelector='', dataLabel='', actionModals=[], selectAllSelector=''){

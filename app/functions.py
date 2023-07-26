@@ -70,6 +70,8 @@ def get_mapped_catalogues_dicts(excel_array):
            }
            
            db_rows = []
+           db_rows_locations = []
+           db_rows_bins = []
            for i in range(len(excel_array)):
                current_row = excel_array[i]
                if i == 0:
@@ -98,12 +100,12 @@ def get_mapped_catalogues_dicts(excel_array):
                    "quantity": current_row[catalogues_columns['quantity']], 
                    "product_model": current_row[catalogues_columns['product_model']], 
                    "condition": current_row[catalogues_columns['condition']], 
-                   "upc": current_row[catalogues_columns['upc']],
-                   "location": current_row[catalogues_columns['location']]
+                   "upc": current_row[catalogues_columns['upc']]
                    }
                    db_rows.append(db_row)
+                   db_rows_locations.append([current_row[catalogues_columns['location']]])
                    
-           return {'success': True, 'message': '', 'db_rows': db_rows}
+           return {'success': True, 'message': '', 'db_rows': db_rows, 'db_rows_locations': db_rows_locations}
        else:
            return catalogues_valid
            
@@ -158,6 +160,16 @@ def updateDashboardPurchasesSum(db, Purchase, Listing, user_dashboard):
         print('System Error updateDashboardPurchasesSum: {}'.format(sys.exc_info()))
         raise e
 
+def getAllowedColumns(column_names=[], ignored_columns=[]):
+    result = []
+    try:
+        for column_name in column_names:
+            if column_name not in ignored_columns:
+                result.append(column_name)
+        return result
+    except Exception as e:
+        raise e
+    
 def getTableColumns(tableClass, expetColumns=[]):
     try:
         ignoredIndexes = []
@@ -217,7 +229,7 @@ class ExportSqlalchemyFilter():
     opeartors = ['=', '!=', '>', '<', '>=', '<=', 'val%', '%val', '%val%']
     
     def __init__(self):
-        self.catalogue_columns = getTableColumns(Catalogue, ['user_id'])
+        self.catalogue_columns = getTableColumns(Catalogue, ['user_id', 'product_image'])
         self.listing_columns = getTableColumns(Listing, expetColumns=['image', 'platform', 'dashboard_id'])
         self.purchase_columns = getTableColumns(Purchase)
         self.order_columns = getTableColumns(Order)
@@ -413,7 +425,8 @@ def get_export_data(db, flask_excel, current_user_id, table_name, columns, opera
         # my sqlalchemy export filter lib simple as filter query, and it makes user securly by clicking btns create any sqlalchemy result securely with simple words, it can used in create custom charts dynamic
         response['data'] = db.session.query(Catalogue).filter(and_(Catalogue.user_id==current_user_id), filterBooleanClauseList).all()
         if response['data']:
-            response['column_names'] = Catalogue.__table__.columns.keys()
+            response['column_names'] = getAllowedColumns(column_names=Catalogue.__table__.columns.keys(), ignored_columns=['user_id', 'product_image'])
+            
             if usejson == False:
                 response['excel_response'] = flask_excel.make_response_from_query_sets(response['data'], response['column_names'], 'csv', file_name='catalogues')
         else:

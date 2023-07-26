@@ -4,12 +4,13 @@ import os
 import random
 from flask import Flask, Blueprint, session, redirect, url_for, flash, Response, request, render_template, jsonify, abort
 from flask_wtf import Form
-from .models import User, Supplier, Dashboard, Listing, Catalogue, Purchase, Order, Platform, ListingPlatform, WarehouseLocations
+from .models import User, Supplier, Dashboard, Listing, Catalogue, Purchase, Order, Platform, ListingPlatform, WarehouseLocations, LocationBins, \
+CatalogueLocations, CatalogueLocationsBins
 from .forms import addListingForm, editListingForm, addCatalogueForm, editCatalogueForm, \
 removeCatalogueForm, removeListingForm, addSupplierForm, editSupplierForm, removeSupplierForm, \
 addPurchaseForm, editPurchaseForm, removePurchaseForm, addOrderForm, editOrderForm, removeOrderForm, CatalogueExcelForm, \
 removeCataloguesForm, removeListingsForm, removeAllCataloguesForm, addPlatformForm, editPlatformForm, removePlatformForm, \
-addLocationForm, editLocationForm, removeLocationForm
+addLocationForm, editLocationForm, removeLocationForm, addBinForm, editBinForm, removeBinForm
 from . import vendor_permission, db
 from .functions import get_safe_redirect, updateDashboardListings, updateDashboardOrders, updateDashboardPurchasesSum, secureRedirect, get_charts
 from sqlalchemy.exc import IntegrityError
@@ -119,17 +120,50 @@ def view_catalogue(catalogue_id):
         print('System Error: {}'.format(sys.exc_info()))
         flash('unable to display catalogues page', 'danger')
         return redirect(url_for('routes.catalogues'))
- 
+
 @routes.route('/catalogues/add', methods=['GET', 'POST'])
 @login_required
 @vendor_permission.require(http_exception=403)
 def add_catalogue():
-    if request.method == 'POST':
+    form = addCatalogueForm()
+    locations_choices = []
+    locations_bins_data = []
+    allowed_bins_ids = []
+    try:
+        current_locations = WarehouseLocations.query.filter_by(dashboard_id=current_user.dashboard.id).all()
+        for location in current_locations:
+            current_location_obj = {'location': location.id, 'bins': [bin.id for bin in location.bins]}
+            locations_choices.append((location.id, location.name))
+            for bin in location.bins:
+                allowed_bins_ids.append((bin.id, '{}: {}'.format(location.name, bin.name)))
+            if request.method == 'GET':
+                locations_bins_data.append(current_location_obj)
+
         form = addCatalogueForm()
+        form.warehouse_locations.choices = locations_choices
+        form.locations_bins.choices = allowed_bins_ids
+    except Exception as e:
+        print('System Error: {}'.format(sys.exc_info()))
+        flash('unable to process your request', 'danger')
+        return redirect(url_for('routes.catalogues'))
+        
+    if request.method == 'POST':
         success = None
         try:
             if form.validate_on_submit():
-                new_catalogue = Catalogue(user_id=current_user.id, sku=form.sku.data, product_name=form.product_name.data, product_description=form.product_description.data, brand=form.brand.data, category=form.category.data, price=form.price.data, sale_price=form.sale_price.data, quantity=form.quantity.data, product_model=form.product_model.data, condition=form.condition.data, upc=form.upc.data, location=form.location.data)
+                # using sqlalchemy.orm.collections.instrumentedlist append technique to insert all relations one time if catalogue inserted, and in child locations as well so if error happend before inser which last thing all actions will ignored (1 commit for all)
+                new_catalogue = Catalogue(user_id=current_user.id, sku=form.sku.data, product_name=form.product_name.data, product_description=form.product_description.data, brand=form.brand.data, category=form.category.data, price=form.price.data, sale_price=form.sale_price.data, quantity=form.quantity.data, product_model=form.product_model.data, condition=form.condition.data, upc=form.upc.data)
+                for warehouse_location_id in form.warehouse_locations.data:
+                    valid_location = WarehouseLocations.query.filter_by(dashboard_id=current_user.dashboard.id, id=warehouse_location_id).one_or_none()
+                    if valid_location is not None:
+                        new_catalogue_location = CatalogueLocations(location_id=valid_location.id)
+                        for bin_id in form.locations_bins.data:
+                            valid_bin = LocationBins.query.filter_by(id=bin_id).one_or_none()
+                            if valid_bin is not None:
+                                new_location_bin = CatalogueLocationsBins(bin_id=valid_bin.id)
+                                new_catalogue_location.bins.append(new_location_bin)
+                        new_catalogue.locations.append(new_catalogue_location)
+
                 new_catalogue.insert()
                 success = True
                 flash('Successfully Created New Catalogue', 'success')
@@ -138,9 +172,10 @@ def add_catalogue():
         except Exception as e:
             print('System Error: {}'.format(sys.exc_info()))
             flash('Unknown Error unable to create new Catalogue', 'danger')
-
+            raise e
+        
         finally:
-            if success == True:                
+            if success == True:
                 return redirect(url_for('routes.catalogues'))
             elif success == None:
                 return redirect(url_for('routes.catalogues'))
@@ -149,8 +184,8 @@ def add_catalogue():
     else:
         # GET Requests
         try:
-            form = addCatalogueForm()
-            return render_template('crud/add_catalogue.html', form=form)
+            # get dashboard locations and bins data (advanced) (display locations with null bins to fill the warehouse location select options)
+            return render_template('crud/add_catalogue.html', form=form, locations_bins_data=locations_bins_data)
         except Exception as e:
             print('System Error: {}'.format(sys.exc_info()))
             flash('unable to display Add new Catalogue page', 'danger')
@@ -164,8 +199,30 @@ def edit_catalogue(catalogue_id):
     target_catalogue = None
     # setup route data and checking
     try:
+        locations_choices = []
+        locations_bins_data = []
+        allowed_bins_ids = []
+        allowed_locations_ids = []
+        allowed_locations_bins_ids = []
+        selected_locs_ids = []
+        selected_bins_ids = []
+        current_locations = WarehouseLocations.query.filter_by(dashboard_id=current_user.dashboard.id).all()
         target_catalogue = Catalogue.query.filter_by(id=catalogue_id, user_id=current_user.id).one_or_none()
         if target_catalogue is not None:
+            for location in current_locations:
+                current_location_obj = {'location': location.id, 'bins': [bin.id for bin in location.bins]}
+                locations_choices.append((location.id, location.name))
+                allowed_locations_ids.append(location.id)
+                for bin in location.bins:
+                    allowed_bins_ids.append((bin.id, '{}: {}'.format(location.name, bin.name)))
+                    allowed_locations_bins_ids.append(bin.id)
+                locations_bins_data.append(current_location_obj)
+
+            for cat_loc in target_catalogue.locations:
+                selected_locs_ids.append(cat_loc.location_id)
+                for loc_bin in cat_loc.bins:
+                    selected_bins_ids.append(loc_bin.bin_id)
+            
             form = editCatalogueForm(
                 sku = target_catalogue.sku,
                 product_name = target_catalogue.product_name,
@@ -176,10 +233,14 @@ def edit_catalogue(catalogue_id):
                 product_model = target_catalogue.product_model,
                 condition = target_catalogue.condition,
                 upc = target_catalogue.upc,
-                location = target_catalogue.location,
                 price = target_catalogue.price,
                 sale_price = target_catalogue.sale_price,
+                warehouse_locations=selected_locs_ids,
+                locations_bins=selected_bins_ids # sample as write hello world
                 )
+            form.warehouse_locations.choices = locations_choices
+            form.locations_bins.choices = allowed_bins_ids
+
         else:
             flash('Unable to find the selected catalogue, it maybe deleted', 'danger')
             return redirect(url_for('routes.catalogues'))
@@ -227,10 +288,73 @@ def edit_catalogue(catalogue_id):
                 if target_catalogue.upc != form.upc.data:
                     target_catalogue.upc = form.upc.data
 
-                if target_catalogue.location != form.location.data:
-                    target_catalogue.location = form.location.data
+                # location updates missing
+                # CatalogueLocationsBins.query.filter(location_id==cuurent_catalogue_location.location_id,bin_id=current_bin_in)
+                user_warehouse_locations_ids = form.warehouse_locations.data
+                user_locations_bin_ids = form.locations_bins.data
 
+                # loop of user catalogue locations (handle delete old not used)
+                for old_selected_loc_id in selected_locs_ids:
+                    # check if old loc id exist in the new array sent after sumbit form else delete it
+                    if old_selected_loc_id in user_warehouse_locations_ids:
+                        # if user selected same location id, need check if bins of current location in loop still used or user remove it after submit form
+                        not_changed_location = CatalogueLocations.query.filter_by(location_id=old_selected_loc_id, catalogue_id=target_catalogue.id).one_or_none()
+                        if not_changed_location:                            
+                            for old_bin in not_changed_location.bins:
+                                # if current user old bin id in the sent list from form conitnue else delete this old bin as user not selected it anymore
+                                if old_bin.bin_id in user_locations_bin_ids:
+                                    continue
+                                else:
+                                    old_bin.delete()
+                        else:
+                            continue
+                    else:
+                        # delete location if it was old location of catalogue but not sent in the new array
+                        removed_loc = CatalogueLocations.query.filter_by(location_id=old_selected_loc_id, catalogue_id=target_catalogue.id).one_or_none()
+                        if removed_loc:
+                            removed_loc.delete()
+               
+
+                # handle new inserts
+
+                # insert all new locations from locations ids list sent from user
+
+                for user_loc_id in user_warehouse_locations_ids:
+                    
+                    location_exist = CatalogueLocations.query.filter_by(location_id=user_loc_id, catalogue_id=target_catalogue.id).one_or_none()
+                    if location_exist is not None:
+                        continue
+                    else:
+                        # user added new loc                        
+                        new_inserted_catalogue_loc = CatalogueLocations(location_id=user_loc_id)                        
+                        target_catalogue.locations.append(new_inserted_catalogue_loc)
+                # after add all transit catalogue locations update catalogue.locations once also handle if exist
                 target_catalogue.update()
+                
+                # handle all new bins inserts (as before it I added all can locations always must found location when query it to append new bin)
+                all_catalogue_locations_ids = [catalogue_loc.id for catalogue_loc in target_catalogue.locations]
+                                
+                for user_bin_id in user_locations_bin_ids:                    
+                    # this solve the very hard problem as technquie I used must secured professional and detected as I sent to js all avail bins ids ignoring their parnt locations so must in insert validate and detect the location of the selected bin
+                    # this query says is there CatalogueLocationsBins recored that bin id same as bin_id sent from user form, and also its location id for location owned by target catalogue locations (the previous step make sure new locations inserted in beging to target_catalogue before insert bins so new selected location valid must be found)
+                    bin_exist = CatalogueLocationsBins.query.filter(CatalogueLocationsBins.bin_id==user_bin_id, CatalogueLocationsBins.location_id.in_(all_catalogue_locations_ids)).first()
+                    if bin_exist is not None:
+                        # if bin already exist not continue
+                        continue
+                    else:
+                        # here user selected new bin that need to be inserted
+                        
+                        target_bin = LocationBins.query.filter_by(id=user_bin_id).one_or_none()
+                        
+                        # get and validate submited bin and confirm its parent dashboardid same as user dashboard_id
+                        if target_bin is not None and target_bin.warehouse_location.dashboard_id == current_user.dashboard.id:
+                            catalogue_location = CatalogueLocations.query.filter_by(catalogue_id=target_catalogue.id, location_id=target_bin.warehouse_location.id).one_or_none()
+                            if catalogue_location is not None and (catalogue_location.warehouse_location.dashboard_id == current_user.dashboard.id):
+                                new_bin = CatalogueLocationsBins(bin_id=target_bin.id)                                
+                                catalogue_location.bins.append(new_bin)
+                                
+                                catalogue_location.update()
+
                 flash('Successfully updated catalogue data', 'success')
                 success = True
             else:
@@ -241,6 +365,8 @@ def edit_catalogue(catalogue_id):
             print('System Error: {}'.format(sys.exc_info()))
             # update event will done after success = True, so incase error in that event set success to False 
             success = None
+            raise e
+        
 
         finally:
             if success == True:                
@@ -248,16 +374,18 @@ def edit_catalogue(catalogue_id):
                 return redirect(url_for('routes.view_catalogue', catalogue_id=catalogue_id))
             elif success == False:
                 # not success due to wtforms render template to display errors
-                return render_template('crud/edit_catalogue.html', form=form, catalogue_id=catalogue_id)
+                # very important ntoe locations_bins_data is data sent to js
+                return render_template('crud/edit_catalogue.html', form=form, catalogue_id=catalogue_id, locations_bins_data=locations_bins_data)
             else:
                 # not success system error, log error and redirect to main page
                 flash('Unknown eror, unable to edit catalogue', 'danger')
                 return redirect(url_for('routes.catalogues'))
 
+
     else:
         # GET Requests
         try:
-            return render_template('crud/edit_catalogue.html', form=form, catalogue_id=catalogue_id)
+            return render_template('crud/edit_catalogue.html', form=form, catalogue_id=catalogue_id, locations_bins_data=locations_bins_data)
         except Exception as e:
             print('System Error: {}'.format(sys.exc_info()))
             flash('unable to display Edit Catalogue page', 'danger')
@@ -1054,17 +1182,18 @@ def delete_purchase_listing(listing_id, purchase_id):
                 purchase_quantity = int(target_purchase.quantity)
                                 
                 target_catalogue_quantity = current_quantity - purchase_quantity
-                # if target_catalogue_quantity < 0:
-                #     flash('Note, you need to delete one or more orders that created after the deleted purchase, based on it upcoming qunaity', 'danger')
-                target_catalogue_quantity = target_catalogue_quantity if target_catalogue_quantity >= 0 else 0
-                target_purchase.listing.catalogue.quantity = target_catalogue_quantity
+                if target_catalogue_quantity >= 0:
+                    target_catalogue_quantity = target_catalogue_quantity if target_catalogue_quantity >= 0 else 0
+                    target_purchase.listing.catalogue.quantity = target_catalogue_quantity
 
-                target_purchase.delete()
-                target_purchase.listing.catalogue.update()
-                
-                # update sum of dashboard's purchases
-                updateDashboardPurchasesSum(db, Purchase, Listing, user_dashboard)
-                flash('Successfully removed purchase with ID: {}'.format(purchase_id), 'success')
+                    target_purchase.delete()
+                    target_purchase.listing.catalogue.update()
+                    
+                    # update sum of dashboard's purchases
+                    updateDashboardPurchasesSum(db, Purchase, Listing, user_dashboard)
+                    flash('Successfully removed purchase with ID: {}'.format(purchase_id), 'success')
+                else:
+                    flash('can not remove purchase, note you need to delete one or more orders that created after the deleted purchase, based on it upcoming qunaity', 'danger')
             else:
                 # security wtform
                 flash('Unable to delete purchase with ID: {} , invalid Data'.format(purchase_id), 'danger')
@@ -1953,8 +2082,12 @@ def setup():
         add_location =  addLocationForm()
         edit_location =  editLocationForm()
         delete_location =  removeLocationForm()
+
+        add_bin = addBinForm()
+        edit_bin = editBinForm()
+        delete_bin = removeBinForm()
         
-        return render_template('setup.html', dashboard=current_user.dashboard, add_platform=add_platform, edit_platform=edit_platform, delete_platform=delete_platform, add_location=add_location, edit_location=edit_location, delete_location=delete_location)
+        return render_template('setup.html', dashboard=current_user.dashboard, add_platform=add_platform, edit_platform=edit_platform, delete_platform=delete_platform, add_location=add_location, edit_location=edit_location, delete_location=delete_location, add_bin=add_bin, edit_bin=edit_bin, delete_bin=delete_bin)
     except Exception as e:
         print("Error in setup page Error: {}".format(sys.exc_info()))
         flash('Unknown error Unable to setup page', 'danger')
@@ -1968,9 +2101,13 @@ def add_platform():
     try:
         form = addPlatformForm()
         if form.validate_on_submit():
-            new_platform = Platform(dashboard_id=current_user.dashboard.id, name=form.name_add.data)
-            new_platform.insert()
-            flash('Successfully Created New Platform', 'success')
+            platform_exist = Platform.query.filter_by(dashboard_id=current_user.dashboard.id, name=form.name_add.data).first()
+            if not platform_exist:
+                new_platform = Platform(dashboard_id=current_user.dashboard.id, name=form.name_add.data)
+                new_platform.insert()
+                flash('Successfully Created New Platform', 'success')
+            else:
+                flash('Can not add platform, platform with same name [{}] already exist'.format(form.name_add.data), 'danger')
         else:
             for field, errors in form.errors.items():
                 if field == 'csrf_token':
@@ -1998,13 +2135,17 @@ def edit_platform(platform_id):
             target_platform = Platform.query.filter_by(id=platform_id, dashboard_id=current_user.dashboard.id).one_or_none()
             if target_platform is not None:
                 if target_platform.name != form.name_edit.data:
-                    target_platform.name = form.name_edit.data
-                    target_platform.update()
-                    flash('Successfully edit platform ID:({})'.format(platform_id), 'success')
+                    platform_name_exist = Platform.query.filter_by(dashboard_id=current_user.dashboard.id, name=form.name_edit.data).first()
+                    if not platform_name_exist:
+                        target_platform.name = form.name_edit.data
+                        target_platform.update()
+                        flash('Successfully edit platform ID:({})'.format(platform_id), 'success')
+                    else:
+                        flash('Can not edit platform, platform with same name [{}] already exist'.format(form.name_edit.data), 'danger')
                 else:
                     flash('No changes Detected.', 'success')
             else:
-                flash('platform with ID: ({})  not found or deleted'.format(platform_id))
+                flash('platform with ID: ({}) not found or deleted'.format(platform_id), 'danger')
         else:
             for field, errors in form.errors.items():
                 if field == 'csrf_token':
@@ -2037,7 +2178,7 @@ def delete_platform(platform_id):
             else:
                 flash('Unable to delete platform, ID: {}'.format(platform_id), 'danger')
         else:
-            flash('Platform not found it maybe deleted, ID: {}'.format(platform_id))
+            flash('Platform not found it maybe deleted, ID: {}'.format(platform_id), 'danger')
     except Exception as e:
         print('System Error: {}'.format(sys.exc_info()))
         flash('Unknown error unable to delete platform', 'danger')
@@ -2052,9 +2193,13 @@ def add_location():
     try:
         form = addLocationForm()
         if form.validate_on_submit():
-            new_location = WarehouseLocations(name=form.location_name_add.data, dashboard_id=current_user.dashboard_id)
-            new_location.insert()
-            flash('Successfully Created New Location', 'success')
+            exist_location = WarehouseLocations.query.filter_by(name=form.location_name_add.data, dashboard_id=current_user.dashboard_id).first()
+            if not exist_location:
+                new_location = WarehouseLocations(dashboard_id=current_user.dashboard_id, name=form.location_name_add.data)
+                new_location.insert()
+                flash('Successfully Created New Location', 'success')
+            else:
+                flash('Can not add location, location with same name [{}] already exist'.format(form.location_name_add.data), 'danger')
         else:
             for field, errors in form.errors.items():
                 if field == 'csrf_token':
@@ -2082,13 +2227,17 @@ def edit_location(location_id):
             target_location = WarehouseLocations.query.filter_by(id=location_id, dashboard_id=current_user.dashboard.id).one_or_none()
             if target_location is not None:
                 if target_location.name != form.location_name_edit.data:
-                    target_location.name = form.location_name_edit.data
-                    target_location.update()
-                    flash('Successfully edit location ID:({})'.format(location_id), 'success')
+                    exist_location_name = WarehouseLocations.query.filter_by(name=form.location_name_edit.data, dashboard_id=current_user.dashboard.id).first()
+                    if not exist_location_name:
+                        target_location.name = form.location_name_edit.data
+                        target_location.update()
+                        flash('Successfully edit location ID:({})'.format(location_id), 'success')
+                    else:
+                        flash('Can not edit location, location with same name [{}] already exist'.format(form.location_name_edit.data), 'danger')
                 else:
                     flash('No changes Detected.', 'success')
             else:
-                flash('Location with ID: ({})  not found or deleted'.format(location_id))
+                flash('Location with ID: ({}) not found or deleted'.format(location_id), 'danger')
         else:
             for field, errors in form.errors.items():
                 if field == 'csrf_token':
@@ -2106,7 +2255,6 @@ def edit_location(location_id):
         success = False
     finally:
         return redirect(url_for('routes.setup'))
-    
 
 @routes.route('/locations/<int:location_id>/delete', methods=['POST'])
 @login_required
@@ -2122,12 +2270,122 @@ def delete_location(location_id):
             else:
                 flash('Unable to delete Location, ID: {}'.format(location_id), 'danger')
         else:
-            flash('Location not found it maybe deleted, ID: {}'.format(location_id))
+            flash('Location not found it maybe deleted, ID: {}'.format(location_id), 'danger')
     except Exception as e:
         print('System Error: {}'.format(sys.exc_info()))
         flash('Unknown error unable to delete location', 'danger')
     finally:
         return redirect(url_for('routes.setup'))
+
+
+
+###########################  Warehouse Locations Bins  ##############################
+@routes.route('/locations/<string:location_id>/bins/add', methods=['POST'])
+@login_required
+@vendor_permission.require(http_exception=403)
+def add_bin(location_id):
+    try:
+        form = addBinForm()
+        if form.validate_on_submit():
+            target_location = WarehouseLocations.query.filter_by(dashboard_id=current_user.dashboard.id, id=location_id).one_or_none()
+            if target_location is not None:
+                # bin name can not duplicated in same location eg, bin1 in location x if duplicated so delete this or add additionl info eg: roof1, first point incase of this name can full descriptive of bin roof 1, spot1 etc instead of spot1
+                exist_bin = LocationBins.query.filter_by(name=form.bin_name_add.data, location_id=target_location.id).first()
+                if not exist_bin:
+                    new_bin = LocationBins(name=form.bin_name_add.data, location_id=target_location.id)
+                    new_bin.insert()
+                    flash('Successfully Created New Bin', 'success')
+                else:
+                    flash('Can not add bin, bin with same name [{}] already exist in this warehouse location'.format(form.bin_name_add.data), 'danger')
+            else:
+                flash('Can not add bin, Location not found it maybe deleted, Location ID: {}'.format(location_id), 'danger')
+        else:
+            for field, errors in form.errors.items():
+                if field == 'csrf_token':
+                    flash("Error can not create bin Please restart page and try again", "danger")
+                    continue
+                if field == 'bin_name_add':
+                    field = 'name'
+                flash('Error in {} : {}'.format(field, ','.join(errors)), 'danger')
+
+    except Exception as e:
+        print('System Error: {}'.format(sys.exc_info()))
+        flash('Unknown Error unable to create new Bin', 'danger')
+    finally:       
+        return redirect(url_for('routes.setup'))
+
+@routes.route('/locations/<string:location_id>/bins/<string:bin_id>/edit', methods=['GET', 'POST'])
+@login_required
+@vendor_permission.require()
+def edit_bin(location_id, bin_id):
+    success = True
+    actions = 0
+    try:
+        form = editBinForm()
+        if form.validate_on_submit():
+            target_location = WarehouseLocations.query.filter_by(id=location_id, dashboard_id=current_user.dashboard.id).one_or_none()
+            if target_location is not None:
+                target_bin = LocationBins.query.filter_by(id=bin_id, location_id=target_location.id).one_or_none()
+                if target_bin is not None:
+                    if target_bin.name != form.bin_name_edit.data:
+                        exist_bin_name = LocationBins.query.filter_by(name=form.bin_name_edit.data, location_id=target_location.id).first()
+                        if not exist_bin_name:
+                            target_bin.name = form.bin_name_edit.data
+                            target_bin.update()
+                            flash('Successfully edit bin', 'success')
+                        else:
+                            flash('Can not edit bin, bin with same name [{}] already exist'.format(form.bin_name_edit.data), 'danger')
+                    else:
+                        flash('No changes Detected.', 'success')
+                else:
+                    flash('can not edit bin, Bin with ID: ({}) not found or deleted'.format(bin_id), 'danger')
+            else:
+                flash('can not edit bin, Location with ID: ({}) not found or deleted'.format(location_id), 'danger')
+        else:
+            for field, errors in form.errors.items():
+                if field == 'csrf_token':
+                    flash("Error can not edit bin Please restart page and try again", "danger")
+                    continue
+
+                if field == 'bin_name_edit':
+                    field = 'name'
+
+                flash('Error in {} : {}'.format(field, ','.join(errors)), 'danger')
+            success = False
+    except Exception as e:
+        print('System Error: {}'.format(sys.exc_info()))
+        flash('Unknown error unable to edit bin', 'danger')
+        success = False
+    finally:
+        return redirect(url_for('routes.setup'))
+    
+
+@routes.route('/locations/<string:location_id>/bins/<string:bin_id>/delete', methods=['POST'])
+@login_required
+@vendor_permission.require(http_exception=403)
+def delete_bin(location_id, bin_id):
+    try:
+        form = removeBinForm()
+        if form.validate_on_submit():
+            # there are cascade rule in sqlalchemy, and db can not found bin while its location deleted (!!! this high secuirty point)
+            target_location = WarehouseLocations.query.filter_by(id=location_id, dashboard_id=current_user.dashboard.id).one_or_none()
+            if target_location is not None:
+                target_bin = LocationBins.query.filter_by(id=bin_id, location_id=target_location.id).one_or_none()
+                if target_bin is not None:
+                    target_bin.delete()
+                    flash('Successfully deleted Bin', 'success')
+                else:
+                    flash('Unable to delete Bin with ID: {}, bin not found it maybe deleted'.format(bin_id), 'danger')
+            else:
+                flash('Unable to delete Bin, Location with ID: {}, not Found or deleted'.format(location_id), 'danger')
+        else:
+            flash('Unable to delete Bin, ID: {}'.format(bin_id), 'danger')
+    except Exception as e:
+        print('System Error: {}'.format(sys.exc_info()))
+        flash('Unknown error unable to delete bin', 'danger')
+    finally:
+        return redirect(url_for('routes.setup'))
+
 """
 @routes.errorhandler(403)
 def method_not_allowed(e):

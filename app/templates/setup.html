@@ -53,16 +53,27 @@
                           {{location.name}}
                           </a>
                        </div>
-                       <div id="location_{{location.id}}" class="collapse show" data-parent="#accordion">
+                       <div id="location_{{location.id}}" class="collapse{% if loop.index == 1 %} show{% endif %}" data-parent="#accordion">
                           <div class="card-body">
                             <div class="container row">
                                 <button class="btn btn-warning btn-sm mr-1 edit_location" data-toggle="modal" data-location-id="{{location.id}}" data-location-name="{{location.name}}" data-url="{{url_for('routes.edit_location', location_id=location.id)}}" data-target="#editLocationModal">Edit <i class="fa fa-edit"></i></button>
                                 <button class="btn btn-danger btn-sm wtform_modal_deletebtn" data-toggle="modal" data-target="#deleteLocationModal" data-url="{{url_for('routes.delete_location', location_id=location.id)}}" data-location-id="{{location.id}}">Delete <i class="fa fa-remove"></i></button>
                             </div>
                             <div class="container p-2 text-center">
-                                <h6>Bins:</h6>
-                                <div style="max-height:300px;">
-
+                                <h6 class="mt-2 mb-3"><span>Bins: </span>
+                                <button type="button" data-toggle="modal" data-target="#addBinModal" class="btn btn-success btn-sm wtform_modal_deletebtn" data-url="{{url_for('routes.add_bin', location_id=location.id)}}" data-location-id="{{location.id}}" style="float:right;">Add Bin <i class="fa fa-plus"></i></button></h6>
+                                <div style="max-height:300px;" class="container mt-5">
+                                {% for bin in location.bins %}
+                                  <div class="shadow p-2 row justify-content-between align-items-center">
+                                    <div>
+                                        <span>{{bin.name}}</span>
+                                    </div>
+                                    <div>
+                                        <button class="btn btn-warning btn-sm mr-1 edit_bin" data-toggle="modal" data-bin-id="{{bin.id}}" data-bin-name="{{bin.name}}" data-url="{{url_for('routes.edit_bin', location_id=location.id, bin_id=bin.id)}}" data-target="#editBinModal"><i class="fa fa-edit"></i></button>
+                                        <button class="btn btn-danger btn-sm wtform_modal_deletebtn" data-toggle="modal" data-target="#deleteBinModal" data-url="{{url_for('routes.delete_bin', location_id=location.id, bin_id=bin.id)}}" data-bin-id="{{bin.id}}"><i class="fa fa-remove"></i></button>
+                                    </div>
+                                  </div>
+                                {% endfor %}
                                 </div>
                             </div>
                           </div>
@@ -80,7 +91,7 @@
   </div>
 </div>
 {% from 'forms.html' import setup_forms %}
-{{ setup_forms(add_platform=add_platform, edit_platform=edit_platform, delete_platform=delete_platform, add_location=add_location, edit_location=edit_location, delete_location=delete_location) }}
+{{ setup_forms(add_platform=add_platform, edit_platform=edit_platform, delete_platform=delete_platform, add_location=add_location, edit_location=edit_location, delete_location=delete_location, add_bin=add_bin, edit_bin=edit_bin, delete_bin=delete_bin) }}
 {% endblock %}
 
 {% block page_scripts %}
@@ -89,9 +100,15 @@ deleteWtformsModalProccess(dataAttId='data-platform-id', formId='remove_platform
 
 deleteWtformsModalProccess(dataAttId='data-location-id', formId='remove_location_form', idInputId='location_id_remove', modalId='deleteLocationModal');
 
+// use this dynamic function to handle also add bin child of location
+deleteWtformsModalProccess(dataAttId='data-location-id', formId='add_bin_form', idInputId='location_id', modalId='addBinModal');
+
+deleteWtformsModalProccess(dataAttId='data-bin-id', formId='remove_bin_form', idInputId='bin_id_remove', modalId='deleteBinModal');
+
 // handle fill edit modal form data
 fillEditPlatForm();
 fillEditLocation();
+fillEditBin();
 </script>
 {% endblock page_scripts %}
 

@@ -143,18 +143,29 @@
                 {% endif %}
               </div>
               <div class="form-group">
-                {{form.location.label}}
-                {{form.location(class='form-control', placeholder='Location')}}
+                {{form.warehouse_locations.label}}
+                {{form.warehouse_locations(class='form-control', placeholder='Select Locations')}}
 
-                {% if form.location.errors %}
+                {% if form.warehouse_locations.errors %}
                 <ul class="errors bg-danger text-white">
-                    {% for error in form.location.errors %}
+                    {% for error in form.warehouse_locations.errors %}
                         <li class="p-1 mb-1">{{ error }}</li>
                     {% endfor %}
                 </ul>
                 {% endif %}
               </div>
+              <div class="form-group">
+                {{form.locations_bins.label}}
+                {{form.locations_bins(class='form-control', placeholder='Select Bin')}}
 
+                {% if form.locations_bins.errors %}
+                <ul class="errors bg-danger text-white">
+                    {% for error in form.locations_bins.errors %}
+                        <li class="p-1 mb-1">{{ error }}</li>
+                    {% endfor %}
+                </ul>
+                {% endif %}
+              </div>
               <div class="form-group">
                 {{form.product_description.label}}
                 {{form.product_description(class='form-control', placeholder='Product Description')}}
@@ -178,10 +189,28 @@
       </div>
     </div>
   </div>
+  
+  {% if locations_bins_data %}
+  <script src="{{url_for('static', filename='assets/js/many_to_many_selector.js')}}" type="text/javascript"></script>
+  <script>
+    const locations = [];
+    const locationsBinsData = {{locations_bins_data|tojson|safe}};
+    manyToManySelectorsComponent(
+      locations_bins_data=locationsBinsData, 
+      actionsCbs=[
+        (onWareHouseChange)=>{onWareHouseChange(event=null, handleBySelectedWareHouse=true);},
+        (onWareHouseChange)=>{$("#warehouse_locations").on("change", onWareHouseChange);}
+      ]);
+  </script>
+  {% endif %}
+
+  
+
   {% else %}
   <div class="alert alert-danger">Unable to Display Edit Catalogue form right now.</div>
   {% endif %}
 </div>
+
 
 {% endblock %}
 

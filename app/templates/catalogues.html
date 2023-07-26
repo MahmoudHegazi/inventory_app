@@ -138,7 +138,7 @@
               <td>
                 <p class="overflow_within"><img src="{{url_for('static', filename='assets/images/'~catalogue.product_image)}}" alt="listing icon" width="50" class="mxwidth-50" /></p>
               </td>                
-              <td>
+              <td style="max-width: 200px;">
                 <p class="overflow_within">{{catalogue.product_name}}</p>
               </td>
               <td>
@@ -148,16 +148,27 @@
                 <p class="overflow_within">{{catalogue.price}}</p>
               </td>
               <td>
-                <p class="overflow_within">{{catalogue.location}}</p>
+                <p class="overflow_within">
+                  {% for catalogue_location in catalogue.locations %}
+                  <div class="border border-secondary">
+                    <h6 title="this is the location {{catalogue_location.warehouse_location.name}} and it's bins under it" class="badge shadow" style="display:block;">{{catalogue_location.warehouse_location.name}}</h6>
+                    <div class="d-flex flex-row flex-wrap justify-content-between align-items-center p-2">
+                    {% for catalogue_locations_bin in catalogue_location.bins %}
+                      <span style="word-wrap: break-word;" title="This is Bin In Location {{catalogue_location.warehouse_location.name}}" class="badge badge-secondary">{{catalogue_locations_bin.bin.name}}</span>
+                    {% endfor %}
+                    </div>
+                  </div>
+                  {% endfor %}
+                </p>
               </td>                                          
               <td>
                 <div class="col-sm-12 row">
                   <div class="col-sm-12 d-flex justify-content-around align-items-center">
                     <div>
-                      <a href="{{url_for('routes.view_catalogue', catalogue_id=catalogue.id)}}" class="btn btn-primary btn-block">View</a>
+                      <a href="{{url_for('routes.view_catalogue', catalogue_id=catalogue.id)}}" class="btn btn-primary btn-block btn-sm"><i class="fa fa-eye"></i></a>
                     </div>
                     <div>
-                      <a href="{{url_for('routes.edit_catalogue', catalogue_id=catalogue.id)}}" class="btn btn-secondary btn-block">Edit</a>
+                      <a href="{{url_for('routes.edit_catalogue', catalogue_id=catalogue.id)}}" class="btn btn-secondary btn-block btn-sm"><i class="fa fa-edit"></i></a>
                     </div>              
                   </div>                               
                 </div>

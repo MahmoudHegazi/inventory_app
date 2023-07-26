@@ -90,8 +90,14 @@ def import_catalogues_excel():
                             else:                                
                                 newCatalogue = Catalogue(user_id=current_user.id, **db_row)                      
                                 newCatalogue.insert()
+
                                 uploaded_skus.append(db_row['sku'])
 
+                                # insert catalogue locations if not exist create locations
+                                if 'db_rows_locations' in mapped_catalogues and len(mapped_catalogues['db_rows_locations']) > row_index:
+                                    warehouse_location_exist = WarehouseLocations.query.filter_by(name=mapped_catalogues['db_rows_locations'][row_index], dashboard_id=current_user.dashboard.id).first()
+                                    print("here")
+                                    print(mapped_catalogues['db_rows_locations'][row_index])
                         except Exception as theerror:
                             # sometimes this error encoding is can not passed to print so ignore issues for it or ignore print it and enogh exc_info
                             # if error it broke the next rows rollback and continue

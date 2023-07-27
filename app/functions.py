@@ -103,7 +103,8 @@ def get_mapped_catalogues_dicts(excel_array):
                    "upc": current_row[catalogues_columns['upc']]
                    }
                    db_rows.append(db_row)
-                   db_rows_locations.append([current_row[catalogues_columns['location']]])
+                   # location relational data array
+                   db_rows_locations.append(current_row[catalogues_columns['location']])
                    
            return {'success': True, 'message': '', 'db_rows': db_rows, 'db_rows_locations': db_rows_locations}
        else:
@@ -805,3 +806,30 @@ def get_excel_rows(request, field_name=''):
         raise ValueError('can not import file unknown encoded used try convert it to xlsx')
     
     return imported_rows
+# get zero, one, or multiple locations names from string return list
+def get_locations_arr(locations_string):
+    locations_string = str(locations_string)
+    row_locations = []
+    try:
+        if ',' in locations_string:
+            print(type(locations_string))
+            print(locations_string)
+            row_locations = locations_string.split(",")
+        else:
+            row_locations.append(locations_string)
+    except Exception as e:
+        print('Error from get_locations_arr {}'.format(sys.exc_info()))
+    return row_locations
+
+def get_sheet_row_locations(mapped_catalogues_dict, row_index):
+    row_locations = []
+    try:
+        # insert catalogue locations if not exist create locations
+        if 'db_rows_locations' in mapped_catalogues_dict and len(mapped_catalogues_dict['db_rows_locations']) > row_index:
+            
+            sheet_location_str = mapped_catalogues_dict['db_rows_locations'][row_index]                                    
+            # add 0, one or multiple db locations from excel
+            row_locations = get_locations_arr(sheet_location_str)
+    except Exception as e:
+        print("Error in get_sheet_locations row index: {}, error_info: {}".format(row_index, sys.exc_info()))
+    return row_locations

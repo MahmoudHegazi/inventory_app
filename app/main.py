@@ -5,7 +5,7 @@ from flask import Flask, Blueprint, session, redirect, url_for, flash, Response,
 from .models import *
 from .forms import CatalogueExcelForm, ExportDataForm
 from . import vendor_permission, admin_permission, db, excel
-from .functions import get_mapped_catalogues_dicts, getTableColumns, getFilterBooleanClauseList, ExportSqlalchemyFilter, get_export_data, get_charts, get_excel_rows
+from .functions import get_mapped_catalogues_dicts, getTableColumns, getFilterBooleanClauseList, ExportSqlalchemyFilter, get_export_data, get_charts, get_excel_rows, get_sheet_row_locations
 from flask_login import login_required, current_user
 import flask_excel
 import pyexcel
@@ -15,7 +15,6 @@ from sqlalchemy import or_, and_, func , asc, desc, text
 
 
 main = Blueprint('main', __name__, template_folder='templates', static_folder='static')
-
 
 @main.route('/import_catalogues_excel', methods=['POST', 'GET'])
 @login_required
@@ -46,19 +45,20 @@ def import_catalogues_excel():
             
             mapped_catalogues = get_mapped_catalogues_dicts(excel_rows)
 
-            
+
             if mapped_catalogues['success']:
 
                 for row_index in range(len(mapped_catalogues['db_rows'])):
 
                     db_row = mapped_catalogues['db_rows'][row_index]
+                    # get locations name list of current row to insert db warehouse locations if not exist in edit and insert
+                    row_locations = get_sheet_row_locations(mapped_catalogues, row_index)
 
                     row_info = "{}|{}".format(row_index+1, db_row['sku'])
                     if db_row['sku'] not in uploaded_skus:
                         try:
                        
-                            catalogue_exist = Catalogue.query.filter_by(sku=db_row['sku'], user_id=current_user.id).first()
-
+                            catalogue_exist = Catalogue.query.filter_by(sku=db_row['sku'], user_id=current_user.id).first()                      
                             if catalogue_exist:
 
                                 # check if new quantity fit current catalogue orders
@@ -85,19 +85,33 @@ def import_catalogues_excel():
                                     uploaded_skus.append(db_row['sku'])
                                 else:
                                     invalid_rows.append(row_info)
-                                    
 
-                            else:                                
+                                for sheet_location_name in row_locations:
+                                    db_location = WarehouseLocations.query.filter_by(name=sheet_location_name, dashboard_id=current_user.dashboard.id).first()
+                                    if not db_location:
+                                        db_location = WarehouseLocations(name=sheet_location_name, dashboard_id=current_user.dashboard.id)
+                                        db_location.insert()
+                                    
+                                    catalogue_loc= CatalogueLocations.query.filter_by(catalogue_id=catalogue_exist.id, location_id=db_location.id).first()
+                                    if not catalogue_loc:
+                                        catalogue_exist.locations.append(CatalogueLocations(location_id=db_location.id))
+                                        catalogue_exist.update()
+                            else:         
                                 newCatalogue = Catalogue(user_id=current_user.id, **db_row)                      
-                                newCatalogue.insert()
+                                
 
                                 uploaded_skus.append(db_row['sku'])
 
                                 # insert catalogue locations if not exist create locations
-                                if 'db_rows_locations' in mapped_catalogues and len(mapped_catalogues['db_rows_locations']) > row_index:
-                                    warehouse_location_exist = WarehouseLocations.query.filter_by(name=mapped_catalogues['db_rows_locations'][row_index], dashboard_id=current_user.dashboard.id).first()
-                                    print("here")
-                                    print(mapped_catalogues['db_rows_locations'][row_index])
+                                for sheet_location_name in row_locations:
+                                    db_location = WarehouseLocations.query.filter_by(name=sheet_location_name, dashboard_id=current_user.dashboard.id).first()
+                                    if not db_location:
+                                        db_location = WarehouseLocations(name=sheet_location_name, dashboard_id=current_user.dashboard.id)                                        
+                                        db_location.insert()
+                                    newCatalogue.locations.append(CatalogueLocations(location_id=db_location.id))
+
+                                newCatalogue.insert()
+                                
                         except Exception as theerror:
                             # sometimes this error encoding is can not passed to print so ignore issues for it or ignore print it and enogh exc_info
                             # if error it broke the next rows rollback and continue
@@ -128,12 +142,11 @@ def import_catalogues_excel():
         print('System Error import_catalogues_excel: {} '.format(sys.exc_info()))
         message = 'Unable to import excel data please try again later'
         success = False
-
-
     finally:
         status = 'success' if success else 'danger'
         flash(message, status)
         return redirect(url_for('routes.catalogues'))
+
 
 
 

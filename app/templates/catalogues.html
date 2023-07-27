@@ -148,14 +148,14 @@
                 <p class="overflow_within">{{catalogue.price}}</p>
               </td>
               <td>
-                <p class="overflow_within">
+                <div class="overflow_within" style="max-height:180px !important;overflow: auto;word-wrap: break-word;">
                   {% for catalogue_location in catalogue.locations %}
                   <div class="border border-secondary">
                     <h6 title="this is the location {{catalogue_location.warehouse_location.name}} and it's bins under it" class="badge shadow" style="display:block;">{{catalogue_location.warehouse_location.name}}</h6>
                     <div class="d-flex flex-row flex-wrap justify-content-between align-items-center p-2">
-                    {% for catalogue_locations_bin in catalogue_location.bins %}
-                      <span style="word-wrap: break-word;" title="This is Bin In Location {{catalogue_location.warehouse_location.name}}" class="badge badge-secondary">{{catalogue_locations_bin.bin.name}}</span>
-                    {% endfor %}
+                      {% for catalogue_locations_bin in catalogue_location.bins %}
+                        <span style="word-wrap: break-word;" title="This is Bin In Location {{catalogue_location.warehouse_location.name}}" class="badge badge-secondary">{{catalogue_locations_bin.bin.name}}</span>
+                      {% endfor %}
                     </div>
                   </div>
                   {% endfor %}

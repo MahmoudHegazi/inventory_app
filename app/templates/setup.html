@@ -47,10 +47,12 @@
 
                 <div id="accordion" style="max-height:300px;">
                 {% for location in dashboard.locations %}
-                    <div class="card">
-                       <div class="card-header">
-                          <a class="card-link" data-toggle="collapse" href="#location_{{location.id}}">
-                          {{location.name}}
+                    <div class="card shadow mb-1">
+                       <div class="card-header" style="background-color: lavender;">
+                          <h5>
+                              <a class="card-link" data-toggle="collapse" href="#location_{{location.id}}">
+                              {{location.name}}
+                          </h5>
                           </a>
                        </div>
                        <div id="location_{{location.id}}" class="collapse{% if loop.index == 1 %} show{% endif %}" data-parent="#accordion">

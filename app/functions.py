@@ -2,7 +2,7 @@ import sys
 from urllib.parse import urlparse, urljoin
 from flask import request
 from sqlalchemy import func
-from .models import Supplier, Dashboard, Listing, Catalogue, Purchase, Order, Platform, ListingPlatform
+from .models import Supplier, Dashboard, Listing, Catalogue, Purchase, Order, Platform, ListingPlatform, CatalogueLocations, CatalogueLocationsBins, WarehouseLocations, LocationBins
 from sqlalchemy.sql import extract
 from sqlalchemy import or_, and_, func , asc, desc
 
@@ -236,15 +236,25 @@ class ExportSqlalchemyFilter():
         self.order_columns = getTableColumns(Order)
         self.supplier_columns = getTableColumns(Supplier, ['user_id'])
         self.platform_columns = getTableColumns(Platform, ['dashboard_id'])
+        
+        # locations tables (now it can used by vistors only not admin or developer or tester (tool can modifed for testing and anlaysis app))
+        self.warehouse_locations_columns = getTableColumns(WarehouseLocations, ['id', 'dashboard_id', 'created_date', 'updated_date'])
+        self.location_bins_columns = getTableColumns(LocationBins, ['id', 'location_id', 'created_date', 'updated_date'])
 
+        self.catalogue_locations_columns = getTableColumns(CatalogueLocations, ['id', 'created_date', 'updated_date', 'catalogue_id', 'location_id'])
+        self.catalogue_locations_bins_columns = getTableColumns(CatalogueLocationsBins, ['id', 'created_date', 'updated_date', 'location_id', 'bin_id'])
 
         # rendered with same order in js (filters_args_list ...(args))  (can change order of display in frontend)
-        catalogue_table_filters = [*self.catalogue_columns]
+        catalogue_table_filters = [*self.catalogue_columns, *self.warehouse_locations_columns, *self.location_bins_columns, *self.catalogue_locations_columns, *self.catalogue_locations_bins_columns]
         # call function here becuase i need custom ignored duplicated columns in Catalogue not the default (changed that for make test way for user without code, he can validate if catalogues data not changed) (actions done by event listeners)
         listing_table_filters = [
             *self.listing_columns,
             *self.catalogue_columns,
-            *self.platform_columns
+            *self.platform_columns,
+            *self.warehouse_locations_columns,
+            *self.location_bins_columns,
+            *self.catalogue_locations_columns,
+            *self.catalogue_locations_bins_columns
             ]
         # *getTableColumns(Catalogue, ['user_id', 'sku', 'product_name', 'product_description', 'brand', 'category', 'price', 'sale_price', 'quantity'])
         purchase_table_filters = [*self.purchase_columns, *self.supplier_columns, *self.listing_columns, *self.catalogue_columns]
@@ -252,13 +262,13 @@ class ExportSqlalchemyFilter():
         supplier_table_filters = [*self.supplier_columns]
         platform_table_filters = [*self.platform_columns]
 
+        # each export button have predefined group of allowed tables, can controled from here
         self.allowed_tables = {
-            'catalogue': [Catalogue],
-            'listing': [Listing, Catalogue, Platform],
+            'catalogue': [Catalogue, WarehouseLocations, LocationBins, CatalogueLocations, CatalogueLocationsBins],
+            'listing': [Listing, Catalogue, Platform, WarehouseLocations, LocationBins, CatalogueLocations, CatalogueLocationsBins],
             'purchase': [Purchase, Supplier, Listing, Catalogue],
             'order': [Order, Listing, Catalogue],
-            'supplier': [Supplier],
-            'platform': [Platform]
+            'supplier': [Supplier]
         }
 
         # all posible columns can used in filter acording also to allowed
@@ -269,18 +279,15 @@ class ExportSqlalchemyFilter():
             'order': order_table_filters,
             'supplier': supplier_table_filters,
             'platform': platform_table_filters
-        }
-    
+        }   
 
-
-    def getSqlalchemyClassByName(self, classname):
+    def getSqlalchemyClassByName(self, classname, target_table):
         # encryption of name can happend here
         try:
             target_class = None
-            classname_str = str(classname).strip().lower()
-
-            # (secure) validate if table class included in filter conidtions provided, example (purchase.id, supplier.id) but not supplier.user_id (vailidate recived column_name in allowed columns for current query)
-            table_classes = self.allowed_tables[classname_str] if classname_str in self.allowed_tables else None
+            
+            # (secure) validate if table class included in filter conidtions provided, example (purchase.id, supplier.id) but not supplier.user_id (vailidate recived column_name in allowed columns for current query) (each export button has group of allowed tables not allowed user to modify table names even if it works in other button, like order in listing or new way user create)
+            table_classes = self.allowed_tables[target_table] if target_table in self.allowed_tables else None
             if table_classes is None:
                 # secuirty
                 raise ValueError('Unknown Table error')
@@ -290,6 +297,7 @@ class ExportSqlalchemyFilter():
                  if table_name == classname:
                      target_class = table_class
                      break
+
             # all provided columns and tables must be vaild and renewed with ajax incase given class not found in alllowed some one try change inspect and provid unallowed table like user
             if target_class is None:
                 raise ValueError('invalid table asked to exported')
@@ -297,26 +305,23 @@ class ExportSqlalchemyFilter():
             print('error in getSqlalchemyClassByName, {}'.format(sys.exc_info()))
             raise e
         return target_class
-
-    def getSqlalchemyColumnByName(self, colname, table_name):
+    
+    # fixed work around the group of button opened (secuirty only not logic)
+    def getSqlalchemyColumnByName(self, colname, table_name, target_table):
         target_column = None
         try:
-            # table_name is tipical to class Order
-            tablename_lower = str(table_name).strip().lower()
-            current_columns = []
-
-            table_class = self.getSqlalchemyClassByName(table_name)
+            table_class = self.getSqlalchemyClassByName(table_name, target_table)
             if not table_class:
                 raise ValueError('found unknown table')
-
+            
             # column_full_name = 'Supplier.user_id' # secuirty check
             column_full_name = '{}.{}'.format(table_name, colname)
-            # check if Table.colname provided exist current table filters allowed option provided when init this class
-            secuirty_check = column_full_name in self.tables_data[tablename_lower]
+            # check if Table.colname provided exist current table filters allowed option provided when init this class (work around target_table selected to exported not the searched one which is part of join query)
+            secuirty_check = column_full_name in self.tables_data[target_table]
             if not secuirty_check:
                 # secuirty
                 raise ValueError('invalid column provided')
-
+            
 
             # handle each table ignore columns speartly most secure only given excuted else error
             for sqlalchemy_column in table_class.__table__.columns:
@@ -374,7 +379,7 @@ class ExportSqlalchemyFilter():
         return column_class
 
 # this most secure export filter no sql full sqlalchemy+full dynamic uses sqlalchmy core classes 
-def getFilterBooleanClauseList(columns, operators, values, condition):
+def getFilterBooleanClauseList(columns, operators, values, condition, target_table):
     try:
         # validate equal lists (3 lists have same length, check columns with operators must equal length, and also columns which equal to operators with values must equals, so operators and values equal)
         if len(columns) != len(operators) or len(columns) != len(values):
@@ -394,7 +399,7 @@ def getFilterBooleanClauseList(columns, operators, values, condition):
                 column_name = column_data[1]
 
                 # securely get table column
-                column_class = export_sqlalchemy.getSqlalchemyColumnByName(column_name, table_name)
+                column_class = export_sqlalchemy.getSqlalchemyColumnByName(column_name, table_name, target_table)
 
                 # add new binary expertion 'sqlalchemy.sql.elements.binaryexpression'
                 sqlalchemy_binaryexpression = export_sqlalchemy.createSqlalchemyConidtion(column_class, operator, value)
@@ -414,7 +419,7 @@ def get_export_data(db, flask_excel, current_user_id, table_name, columns, opera
     from .models import Supplier, Catalogue, Listing, Purchase, Order, Platform, ListingPlatform
     
     # this is list of sqlalchemy filter conidtions recived from message (sqlalchemy.sql.elements.booleanclauselist) (incase no values it will not make issues)
-    filterBooleanClauseList = getFilterBooleanClauseList(columns, operators, values, condition)
+    filterBooleanClauseList = getFilterBooleanClauseList(columns, operators, values, condition, target_table=table_name)
     export_tables = ['catalogue', 'listing', 'purchase', 'order', 'supplier']
     response =  {'success': True, 'message': '', 'data': [], 'column_names': [], 'excel_response': None}
 
@@ -424,12 +429,35 @@ def get_export_data(db, flask_excel, current_user_id, table_name, columns, opera
     # catalogue
     if table_name == 'catalogue':
         # my sqlalchemy export filter lib simple as filter query, and it makes user securly by clicking btns create any sqlalchemy result securely with simple words, it can used in create custom charts dynamic
-        response['data'] = db.session.query(Catalogue).filter(and_(Catalogue.user_id==current_user_id), filterBooleanClauseList).all()
+        response['data'] = db.session.query(Catalogue).join(
+            CatalogueLocations, CatalogueLocations.catalogue_id == Catalogue.id
+        ).join(
+            WarehouseLocations, CatalogueLocations.location_id == WarehouseLocations.id
+        ).join(            
+            CatalogueLocationsBins, CatalogueLocations.id == CatalogueLocationsBins.location_id
+        ).join(
+            LocationBins, CatalogueLocationsBins.bin_id == LocationBins.id
+        ).filter(and_(Catalogue.user_id==current_user_id), filterBooleanClauseList).all()
         if response['data']:
-            response['column_names'] = getAllowedColumns(column_names=Catalogue.__table__.columns.keys(), ignored_columns=['user_id', 'product_image'])
+            export_data = []
+
+            response['column_names'] = getAllowedColumns(column_names=Catalogue.__table__.columns.keys(), ignored_columns=['user_id', 'product_image', 'created_date', 'updated_date'])
+            response['column_names'] = [*response['column_names'], 'location']
+            export_data.append(response['column_names'])
+
+            for item in response['data']:
+                locations_arr = []
+                # easy can export bins too if needed
+                for cat_location in item.locations:
+                    locations_arr.append(str(cat_location.warehouse_location.name))
+                locations = ','.join(locations_arr)
+                export_data.append([item.id, item.sku, item.product_name, item.product_description, item.brand, item.category, item.price, item.sale_price, item.quantity, item.product_model, item.condition, item.upc, locations])
+            # modfied array to return the addiontal relational data like locations or bins
+            response['data'] = export_data
             
             if usejson == False:
-                response['excel_response'] = flask_excel.make_response_from_query_sets(response['data'], response['column_names'], 'csv', file_name='catalogues')
+                response['excel_response'] = flask_excel.make_response_from_array(response['data'], 'csv', file_name='catalogues')
+                # response['excel_response'] = flask_excel.make_response_from_query_sets(response['data'], response['column_names'], 'csv', file_name='catalogues')
         else:
             response['success'] = False
             response['message'] = 'No Matched Results Found (catalogues)'
@@ -437,11 +465,19 @@ def get_export_data(db, flask_excel, current_user_id, table_name, columns, opera
     # listing
     elif table_name == 'listing':
         response['data'] = db.session.query(Listing).join(
-            Catalogue
+            Catalogue, Listing.catalogue_id==Catalogue.id
         ).join(
             ListingPlatform, Listing.id==ListingPlatform.listing_id
         ).join(
             Platform, ListingPlatform.platform_id==Platform.id
+        ).join(
+            CatalogueLocations, CatalogueLocations.catalogue_id == Catalogue.id
+        ).join(
+            WarehouseLocations, CatalogueLocations.location_id == WarehouseLocations.id
+        ).join(
+            CatalogueLocationsBins, CatalogueLocations.id == CatalogueLocationsBins.location_id
+        ).join(
+            LocationBins, CatalogueLocationsBins.bin_id == LocationBins.id
         ).filter(
             and_(Catalogue.user_id == current_user_id),
             filterBooleanClauseList
@@ -812,8 +848,6 @@ def get_locations_arr(locations_string):
     row_locations = []
     try:
         if ',' in locations_string:
-            print(type(locations_string))
-            print(locations_string)
             row_locations = locations_string.split(",")
         else:
             row_locations.append(locations_string)

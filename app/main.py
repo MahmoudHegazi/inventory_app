@@ -219,8 +219,6 @@ def reports_export():
     message = ''
     success = True
     excel_response = None
-    data = []
-    column_names = []
     try:
         export_form = ExportDataForm()
         if export_form.validate_on_submit():
@@ -242,12 +240,13 @@ def reports_export():
         print('System Error reports_export: {}'.format(sys.exc_info()))
         message = message if message != '' else 'Unknown Error Found While process your request'
         success = False
-    
+
     finally:
         if success == True and excel_response:
             return excel_response
         else:
             flash(message, 'danger')
             return redirect(url_for('main.reports'))
+
 
 

@@ -39,7 +39,7 @@
         </div>
         <!-- Platforms End -->
         <!-- Locations start --> 
-        <div class="container mt-3">
+        <div class="container mt-3 mb-5" style="overflow: auto;">
             <div class="div border shadow rounded p-2">
                 {% if dashboard is defined and dashboard.locations is defined %}
                 <h5 class="mt-2 mb-3"><span>Locations: </span>
@@ -47,7 +47,7 @@
 
                 <div id="accordion" style="max-height:300px;">
                 {% for location in dashboard.locations %}
-                    <div class="card shadow mb-1">
+                    <div class="card shadow mb-3">
                        <div class="card-header" style="background-color: lavender;">
                           <h5>
                               <a class="card-link" data-toggle="collapse" href="#location_{{location.id}}">

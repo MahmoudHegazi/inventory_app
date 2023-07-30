@@ -191,14 +191,14 @@
 {% if locations_bins_data %}
 <script src="{{url_for('static', filename='assets/js/many_to_many_selector.js')}}" type="text/javascript"></script>
 <script>
-  const locations = [];
-  const locationsBinsData = {{locations_bins_data|tojson|safe}};
-  // wtforms validate_choice true, many to many multiple select fields based on parent location selected
-  manyToManySelectorsComponent(
-    locations_bins_data=locationsBinsData, 
-    actionsCbs=[
-      (onWareHouseChange)=>{$("#warehouse_locations").on("change", onWareHouseChange);}
-    ]);
+    const locations = [];
+    const locationsBinsData = {{locations_bins_data|tojson|safe}};
+    manyToManySelectorsComponent(
+      locations_bins_data=locationsBinsData, 
+      actionsCbs=[
+        (onWareHouseChange)=>{onWareHouseChange(event=null, handleBySelectedWareHouse=true);},
+        (onWareHouseChange)=>{$("#warehouse_locations").on("change", onWareHouseChange);}
+      ]);
 </script>
 {% endif %}
 {% endblock %}

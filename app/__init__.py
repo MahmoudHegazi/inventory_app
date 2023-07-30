@@ -12,8 +12,8 @@ UPLOAD_FOLDER = os.path.join(os.path.dirname(__file__), '/static/assets/uploads'
 app = Flask(__name__, template_folder='templates', static_folder='static')
 app.config['SECRET_KEY'] = 'hGjj6dq4fvnsyMBMpcXlh8-faN3EhMKRvYG1T-l5-YzHHtdFa4sqp9wJH0kwE0lIBmonkEY4mT1j3ZjyFQD1badAZukd5w62gVTQ1MgTLRa61kcNhcTGIj9cDh8chUVllIIY'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = True
-app.config['SQLALCHEMY_DATABASE_URI'] = 'mysql://mr204h:Ilda2011@localhost/inventory123?charset=utf8mb4'
-# app.config['SQLALCHEMY_DATABASE_URI'] = 'mysql://dbmasteruser:Success2023!@ls-78a3019a69abb8942e164ba31b7f79d941a5b928.cm1krsomo3zh.ca-central-1.rds.amazonaws.com/inventory123?charset=utf8mb4'
+# app.config['SQLALCHEMY_DATABASE_URI'] = 'mysql://mr204h:Ilda2011@localhost/inventory123?charset=utf8mb4'
+app.config['SQLALCHEMY_DATABASE_URI'] = 'mysql://dbmasteruser:Success2023!@ls-78a3019a69abb8942e164ba31b7f79d941a5b928.cm1krsomo3zh.ca-central-1.rds.amazonaws.com/inventory123?charset=utf8mb4'
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 app.config['MAX_CONTENT_LENGTH'] = 50 * 1024 * 1024
 app.config['AUTH_ALLOWED_FILES'] = {'png', 'jpg', 'jpeg', 'gif'}

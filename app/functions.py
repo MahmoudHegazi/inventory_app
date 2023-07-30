@@ -209,7 +209,7 @@ def secureRedirect(redirect_url):
         return '/home'
 
 """  Filter Class and its function (this class access direct functions deacleard in functions.py) """
-
+# note this class, filter technique accept any new dynamic depest relational , but must follow the best relational points (all logical, and inhirted from related parent not found 1 table contains 2 or more relations to make small code or less tables this will not work here in this filter as it except logical relational query by simplest to Table.column==val incase of 2 tables or diffrent relational db will not follow this dynamic logic.) 
 class ExportSqlalchemyFilter():
     # user sqlalchemy to create secure sqlalchemy filters arugments list (controlled easy)
     supplier_columns = []
@@ -277,8 +277,8 @@ class ExportSqlalchemyFilter():
             'listing': listing_table_filters,
             'purchase': purchase_table_filters,
             'order': order_table_filters,
-            'supplier': supplier_table_filters,
-            'platform': platform_table_filters
+            'supplier': supplier_table_filters
+            # 'platform': platform_table_filters
         }   
 
     def getSqlalchemyClassByName(self, classname, target_table):
@@ -489,7 +489,7 @@ def get_export_data(db, flask_excel, current_user_id, table_name, columns, opera
             export_data.append(response['column_names'])
             
             for item in response['data']:
-                platforms = ",".join(["{}.{}".format(listing_platform.platform.id, listing_platform.platform.name) for listing_platform in item.platforms])
+                platforms = ",".join(["{}".format(listing_platform.platform.name) for listing_platform in item.platforms])
                 export_data.append([item.id, item.sku, item.product_name, item.product_description, item.brand, item.category, item.price, item.sale_price, item.quantity, item.created_date, item.updated_date, item.dashboard_id, item.catalogue_id, platforms])
             
             response['data'] = export_data

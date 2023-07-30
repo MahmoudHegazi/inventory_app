@@ -288,18 +288,16 @@ function displayPaginationComponent(paginationBtns, paginationPage, containerIDs
 
   let isLastPage = false;
   let lastPage = [];
-
+  let isFirstPage = false;
+  let firstPage = [];
 
   
   for (let r = 0; r < totalPagBtnsGroups; r++) {
       paginationRanges.push([r * pagBtnsLimit, (r + 1) * pagBtnsLimit]);
   }
-  // 3 cases of last, if only 1 page, if in last group, if in loaded first time in last group eg: loaded on page 9 and 9 in last group 
-  if ((totalPagBtnsGroups == paginationGroupI+1 && paginationGroupI != -1) ||  (paginationGroupI == -1 && paginationBtns.length == btnIndex+1) || (paginationRanges.length == 1) ){
-    isLastPage = true;
-  }
+
   
-  console.log(isLastPage);
+  
 
 
   if (paginationGroupI === -1) {
@@ -308,10 +306,7 @@ function displayPaginationComponent(paginationBtns, paginationPage, containerIDs
           const currentRangeList = paginationRanges[pr];
           if ((btnIndex >= currentRangeList[0]) && (btnIndex < currentRangeList[1])) {
           
-          // handle last page
-          if (isLastPage === false && paginationBtns.length > 0){
-            lastPage = [String(paginationBtns.length), paginationBtns[paginationBtns.length-1]]
-          }
+
               /*get sliced group of target buttons based on index of button */
               currentBtnsGroup = paginationBtns.slice(currentRangeList[0], currentRangeList[1]);
               currentBtnGroupI = pr;
@@ -327,10 +322,6 @@ function displayPaginationComponent(paginationBtns, paginationPage, containerIDs
       /*Direct set data to specfic group this called from click on previous or next buttons*/
 
       if (paginationGroupI < paginationRanges.length) {
-          // handle last page
-          if (!isLastPage && paginationBtns.length > 0){
-            lastPage = [String(paginationBtns.length), paginationBtns[paginationBtns.length-1]]
-          }
           
           const currentRangeList = paginationRanges[paginationGroupI];
           currentBtnsGroup = paginationBtns.slice(currentRangeList[0], currentRangeList[1]);
@@ -343,12 +334,41 @@ function displayPaginationComponent(paginationBtns, paginationPage, containerIDs
       }
   }
 
+  // 3 cases of last, if only 1 page, if in last group, if in loaded first time in last group eg: loaded on page 9 and 9 in last group 
+  if ( paginationRanges.length-1 == currentBtnGroupI ){
+    isLastPage = true;
+  }
+
+  if (currentBtnGroupI == 0){
+    isFirstPage = true;
+  }
+
+  // handle last page
+  if (isLastPage === false && paginationBtns.length > 0){
+    lastPage = [String(paginationBtns.length), paginationBtns[paginationBtns.length-1]];
+  }
+
+
+  // handle first page
+  if (isFirstPage === false && paginationBtns.length > 0){
+    firstPage = [1, paginationBtns[0]];
+  }
+
+
+  //console.log(isLastPage, paginationRanges.length-1, currentBtnGroupI, 'here');
+  console.log(isFirstPage, firstPage, currentBtnGroupI, 'here first');
+  //console.log(currentBtnGroupI, 'hi');
 
   let pagantionHTML = '<ul class="pagination">';
 
   let previousClasses = (currentBtnGroupI == 0) ? 'previous page-item disabled' : 'previous page-item';
   let previousPaginationGroupI = (currentBtnGroupI > 0) ? currentBtnGroupI - 1 : 0;
   pagantionHTML += `<li class="${previousClasses}"><button type="button" class="page-link">Previous</button></li>`;
+  // handle add first page button
+  if (firstPage.length == 2){    
+    pagantionHTML += `<li class="page-item"><a class="page-link" href="${firstPage[1]}">${firstPage[0]}</a></li>`;
+    pagantionHTML += `<li class="page-item"><a class="page-link" href="javascript:void(0)">...</a></li>`;
+  }
 
   currentBtnsGroup.forEach((BtnUrl, btnUrlIndex) => {
       const btnPageIndex = currentBtnsGroupIndexes[btnUrlIndex];

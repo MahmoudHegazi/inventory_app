@@ -127,6 +127,7 @@ def view_catalogue(catalogue_id):
 def add_catalogue():
     form = addCatalogueForm()
     locations_choices = []
+    # locations_bins_data is json object string sent to javascript client side to handle bin
     locations_bins_data = []
     allowed_bins_ids = []
     try:
@@ -136,8 +137,8 @@ def add_catalogue():
             locations_choices.append((location.id, location.name))
             for bin in location.bins:
                 allowed_bins_ids.append((bin.id, '{}: {}'.format(location.name, bin.name)))
-            if request.method == 'GET':
-                locations_bins_data.append(current_location_obj)
+
+            locations_bins_data.append(current_location_obj)
 
         form = addCatalogueForm()
         form.warehouse_locations.choices = locations_choices
@@ -146,7 +147,7 @@ def add_catalogue():
         print('System Error: {}'.format(sys.exc_info()))
         flash('unable to process your request', 'danger')
         return redirect(url_for('routes.catalogues'))
-        
+
     if request.method == 'POST':
         success = None
         try:
@@ -180,7 +181,7 @@ def add_catalogue():
             elif success == None:
                 return redirect(url_for('routes.catalogues'))
             else:
-                return render_template('crud/add_catalogue.html', form=form)
+                return render_template('crud/add_catalogue.html', form=form, locations_bins_data=locations_bins_data)
     else:
         # GET Requests
         try:

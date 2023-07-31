@@ -106,6 +106,7 @@ function searchComponent(speed='slow',easing='swing', cp=function(){return true;
     $(`#search_by${addon} option.search_column${addon}`).length && typeof(cp) == 'function'){
       
       $(`#cancel_search${addon}`).hide();
+
       /*get dynamic data-search attributes and options value for column name*/
       $(`#search_by${addon} option.search_column${addon}`).each( (_i, dataSearchAttr)=>{
           const columnName = $(dataSearchAttr).val().trim();
@@ -114,6 +115,8 @@ function searchComponent(speed='slow',easing='swing', cp=function(){return true;
             searchColumnsIndex += 1;
           }
       });
+
+
   
       /* check if nesesery add submit event or no search columns found*/
       if (searchColumnsIndex < 1){
@@ -123,7 +126,7 @@ function searchComponent(speed='slow',easing='swing', cp=function(){return true;
   
       /* add class css to overide bs, and added to card after hide effect completed in callback */
       $("body").append(`<style>.hidden_search_card${addon}{ display: none !important; }</style>`);
-
+      
       
       /* function to remove hidden cards with same effect and callback */
       function cancelSearch(speed, easing, cp){
@@ -149,7 +152,7 @@ function searchComponent(speed='slow',easing='swing', cp=function(){return true;
         
         const searchValue = $(`#search_value${addon}`).val().trim();
         const searchColumn = $(`#search_by${addon}`).val().trim();
-        const dataAttrName = dataSearchAttrs[searchColumn];
+        const dataAttrName = dataSearchAttrs[searchColumn];       
         if (dataAttrName && searchValue){
           /* html selector search condition set */
           const targetCards = $(`.searching_card${addon}[${dataAttrName}${condition}'${searchValue}']`);
@@ -167,6 +170,7 @@ function searchComponent(speed='slow',easing='swing', cp=function(){return true;
             }
           });
           $(`#cancel_search${addon}`).show();
+          
         } else {
           cancelSearch(speed, easing, cp);
           $(`#cancel_search${addon}`).hide();
@@ -353,11 +357,6 @@ function displayPaginationComponent(paginationBtns, paginationPage, containerIDs
   if (isFirstPage === false && paginationBtns.length > 0){
     firstPage = [1, paginationBtns[0]];
   }
-
-
-  //console.log(isLastPage, paginationRanges.length-1, currentBtnGroupI, 'here');
-  console.log(isFirstPage, firstPage, currentBtnGroupI, 'here first');
-  //console.log(currentBtnGroupI, 'hi');
 
   let pagantionHTML = '<ul class="pagination">';
 

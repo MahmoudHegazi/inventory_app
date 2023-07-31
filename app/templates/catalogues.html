@@ -45,8 +45,8 @@
     <div class="row mt-2 mb-2">
       <div class="col-sm-11 mx-auto" title="search by id, sku, price, location">
         <form id="search_form" class="row">
-          <input class="form-control col-sm-5" type="text" name="search_value" id="search_value" placeholder="search by id, sku, price, location" value=""/>
-          <select class="form-control col-sm-4" name="search_by" id="search_by">
+          <input class="form-control col-sm-3" type="text" name="search_value" id="search_value" placeholder="search by id, sku, price, location" value=""/>
+          <select class="form-control col-sm-3" name="search_by" id="search_by">
             <option value="">Search BY</option>
             <option class="search_column" value="id">ID</option>
             <option class="search_column" value="sku">SKU</option>
@@ -70,7 +70,7 @@
     <!-- catalogues Pagination start -->
     <div id="catalogues_pag1" class="d-flex justify-content-center align-items-center mt-2"></div>
     <!-- Pagination end-->
-
+    
     <!-- Card Display (For Mobile, small screen Devices ) -->
     <div class="row" id="card_display" style="display:none;">      
       {% for catalogue in catalogues %}

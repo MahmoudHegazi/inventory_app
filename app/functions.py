@@ -209,7 +209,7 @@ def secureRedirect(redirect_url):
         return '/home'
 
 """  Filter Class and its function (this class access direct functions deacleard in functions.py) """
-# note this class, filter technique accept any new dynamic depest relational , but must follow the best relational points (all logical, and inhirted from related parent not found 1 table contains 2 or more relations to make small code or less tables this will not work here in this filter as it except logical relational query by simplest to Table.column==val incase of 2 tables or diffrent relational db will not follow this dynamic logic.) 
+
 class ExportSqlalchemyFilter():
     # user sqlalchemy to create secure sqlalchemy filters arugments list (controlled easy)
     supplier_columns = []
@@ -277,8 +277,8 @@ class ExportSqlalchemyFilter():
             'listing': listing_table_filters,
             'purchase': purchase_table_filters,
             'order': order_table_filters,
-            'supplier': supplier_table_filters
-            # 'platform': platform_table_filters
+            'supplier': supplier_table_filters,
+            'platform': platform_table_filters
         }   
 
     def getSqlalchemyClassByName(self, classname, target_table):
@@ -429,18 +429,18 @@ def get_export_data(db, flask_excel, current_user_id, table_name, columns, opera
     # catalogue
     if table_name == 'catalogue':
         # my sqlalchemy export filter lib simple as filter query, and it makes user securly by clicking btns create any sqlalchemy result securely with simple words, it can used in create custom charts dynamic
-        response['data'] = db.session.query(Catalogue).join(
+        response['data'] = db.session.query(Catalogue).outerjoin(
             CatalogueLocations, CatalogueLocations.catalogue_id == Catalogue.id
-        ).join(
+        ).outerjoin(
             WarehouseLocations, CatalogueLocations.location_id == WarehouseLocations.id
-        ).join(            
+        ).outerjoin(            
             CatalogueLocationsBins, CatalogueLocations.id == CatalogueLocationsBins.location_id
-        ).join(
+        ).outerjoin(
             LocationBins, CatalogueLocationsBins.bin_id == LocationBins.id
         ).filter(and_(Catalogue.user_id==current_user_id), filterBooleanClauseList).all()
         if response['data']:
             export_data = []
-
+            
             response['column_names'] = getAllowedColumns(column_names=Catalogue.__table__.columns.keys(), ignored_columns=['user_id', 'product_image', 'created_date', 'updated_date'])
             response['column_names'] = [*response['column_names'], 'location']
             export_data.append(response['column_names'])
@@ -455,7 +455,7 @@ def get_export_data(db, flask_excel, current_user_id, table_name, columns, opera
             # modfied array to return the addiontal relational data like locations or bins
             response['data'] = export_data
             
-            if usejson == False:
+            if usejson == False:                
                 response['excel_response'] = flask_excel.make_response_from_array(response['data'], 'csv', file_name='catalogues')
                 # response['excel_response'] = flask_excel.make_response_from_query_sets(response['data'], response['column_names'], 'csv', file_name='catalogues')
         else:
@@ -466,17 +466,17 @@ def get_export_data(db, flask_excel, current_user_id, table_name, columns, opera
     elif table_name == 'listing':
         response['data'] = db.session.query(Listing).join(
             Catalogue, Listing.catalogue_id==Catalogue.id
-        ).join(
+        ).outerjoin(
             ListingPlatform, Listing.id==ListingPlatform.listing_id
-        ).join(
+        ).outerjoin(
             Platform, ListingPlatform.platform_id==Platform.id
-        ).join(
+        ).outerjoin(
             CatalogueLocations, CatalogueLocations.catalogue_id == Catalogue.id
-        ).join(
+        ).outerjoin(
             WarehouseLocations, CatalogueLocations.location_id == WarehouseLocations.id
-        ).join(
+        ).outerjoin(
             CatalogueLocationsBins, CatalogueLocations.id == CatalogueLocationsBins.location_id
-        ).join(
+        ).outerjoin(
             LocationBins, CatalogueLocationsBins.bin_id == LocationBins.id
         ).filter(
             and_(Catalogue.user_id == current_user_id),
@@ -502,6 +502,7 @@ def get_export_data(db, flask_excel, current_user_id, table_name, columns, opera
         return response
 
     elif table_name == 'purchase':
+        # it's required to have supplier, listing, catalogue, to get purchases object so it faster and better to keep join not outerjoin
         response['data'] = db.session.query(
             Purchase
         ).join(

@@ -196,7 +196,7 @@ def reports():
 
 @main.route('/get_filter_columns', methods=['GET'])
 @login_required
-@admin_permission.require()
+@vendor_permission.require()
 def get_filter_columns():
     try:
         requested_table = request.args.get('table', '')
@@ -214,7 +214,7 @@ def get_filter_columns():
 # full sqlalchemy dynamic export table data
 @main.route('/reports/export', methods=['POST'])
 @login_required
-@admin_permission.require()
+@vendor_permission.require()
 def reports_export():
     message = ''
     success = True
@@ -247,6 +247,7 @@ def reports_export():
         else:
             flash(message, 'danger')
             return redirect(url_for('main.reports'))
+
 
 
 

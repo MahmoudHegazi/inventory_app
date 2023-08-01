@@ -321,22 +321,23 @@ class Catalogue(db.Model): # catelouge
         db.session.commit()
 
 
-    def format(self):
+    def format(self):      
         return {
         'id': self.id,
-        'user_id': self.user_id,
         'sku': self.sku,
         'product_name': self.product_name,
         'product_description': self.product_description,
         'brand': self.brand,
         'category': self.category,
-        'price': self.price,
-        'sale_price': self.sale_price,
+        'price': str(self.price),
+        'sale_price': str(self.sale_price),
         'quantity': self.quantity,
         'product_model': self.product_model,
         'condition': self.condition,
-        'upc': self.upc,
         'product_image': self.product_image,
+        'upc': self.upc,
+        'location': ",".join([loc.warehouse_location.name for loc in self.locations]),
+        'locations': [{'location_name': catalogue_loc.warehouse_location.name, 'bins': [catalogue_loc_bin.bin.name for catalogue_loc_bin in catalogue_loc.bins]} for catalogue_loc in self.locations]
         }
 
 class Listing(db.Model):
@@ -420,6 +421,7 @@ class Listing(db.Model):
         db.session.commit()
 
     def format(self):
+        listing_platforms = [listing_platform.platform.name for listing_platform in self.platforms]
         return {
         'id': self.id,
         'dashboard_id': self.dashboard_id,
@@ -429,10 +431,12 @@ class Listing(db.Model):
         'product_description': self.product_description,
         'brand': self.brand,
         'category': self.category,
-        'price': self.price,
-        'sale_price': self.sale_price,
+        'price': str(self.price),
+        'sale_price': str(self.sale_price),
         'quantity': self.quantity,
-        'image': self.image
+        'image': self.image,
+        'platform': ",".join(listing_platforms),
+        'platforms': listing_platforms
         }
 
 class Purchase(db.Model):
@@ -469,8 +473,9 @@ class Purchase(db.Model):
         'id': self.id,
         'quantity': self.quantity,
         'date': self.date,
+        'supplier_name': self.supplier.name,
         'supplier_id': self.supplier_id,
-        'listing_id': self.listing_id,    
+        'listing_id': self.listing_id,        
         'created_date': self.created_date,
         'updated_date': self.updated_date
         }
@@ -504,13 +509,13 @@ class Order(db.Model):
     def delete(self):
         db.session.delete(self)
         db.session.commit()
-
+    # important convert date to string when sent to js in json format to get the same date displayed by jinja2
     def format(self):
         return {
         'id': self.id,
         'listing_id': self.listing_id,
         'quantity': self.quantity,
-        'date': self.date,
+        'date': str(self.date),
         'customer_firstname': self.customer_firstname,
         'customer_lastname': self.customer_lastname,
         'created_date': self.created_date,

@@ -55,6 +55,10 @@
             <option class="search_column" value="location">location</option>
           </select>
           <button type="button" id="cancel_search" class="btn btn-sm col-sm-1 btn-danger" style="display:none;"><i class="fa fa-close"></i></button>
+          <select class="form-control col-sm-3" id="search_type">
+            <option value="current">Current Page</option>
+            <option value="all">all Pages</option>
+          </select>
           <button type="submit" class="btn btn-success col-sm-2">Search</button>
         </form>
       </div>
@@ -127,18 +131,28 @@
               <th>Action</th>
             </tr>
           </thead>
+          
           <tbody>
             {% for catalogue in catalogues %}
+
+            {# additional for current search get locations string #}
+            {% set locations_arr = [] %}
+            {% for catalogue_loc in catalogue.locations %}
+            {% if locations_arr.append(catalogue_loc.warehouse_location.name) %}
+            {% endif %}
+            {% endfor %}
+            {% set location_string = locations_arr|join(',') %}
+
             <tr class="searching_card"
             data-search-id="{{catalogue.id}}" data-search-sku="{{catalogue.sku}}" data-search-product_name="{{catalogue.product_name}}"
-            data-search-price="{{catalogue.price}}"  data-search-location="{{catalogue.location}}">
+            data-search-price="{{catalogue.price}}"  data-search-location="{{location_string}}">
               <td>
                 <p class="overflow_within"><input type="checkbox" data-check-catalogue="{{catalogue.product_name}}" class="deleted_catalogues form-control w-75" name="deleted_catalogues" value="{{catalogue.id}}" /></p>
               </td>
               <td>
                 <p class="overflow_within"><img src="{{url_for('static', filename='assets/images/'~catalogue.product_image)}}" alt="listing icon" width="50" class="mxwidth-50" /></p>
               </td>                
-              <td style="max-width: 200px;">
+              <td style="max-width: 200px;">{{ locations_string }}
                 <p class="overflow_within">{{catalogue.product_name}}</p>
               </td>
               <td>
@@ -159,7 +173,6 @@
                     </div>
                   </div>
                   {% endfor %}
-                </p>
               </td>                                          
               <td>
                 <div class="col-sm-12 row">
@@ -190,7 +203,7 @@
     {% endif %}    
   </div>
 </div>
-
+{{url_for('routes.view_catalogue', catalogue_id=1)}}
 {% import 'forms.html' as forms %}
 {{ forms.catalogues_forms(catalogues_excel=catalogues_excel,delete_catalogues=delete_catalogues, delete_all_catalogues=delete_all_catalogues) }}
 {% endblock %}
@@ -204,24 +217,99 @@
 const paginationBtns = {% if pagination_btns %}{{pagination_btns|tojson|safe}}{% else %}[]{% endif %};
 const paginationPage = {{ request.args.get('page', 1) }};
 displayPaginationComponent(paginationBtns, paginationPage, ['catalogues_pag1', 'catalogues_pag2']);
-
 toggleSettingsToast();
 
-searchComponent('mid', 'swing', cp=function(){return true;}, addon='', condition='*=');
 
 
-  const actionModalsArray = [
-    {
-      modalId: '#removeCatalogues',
-      formId: '#remove_catalogues',
-      actionLabesSelctor: '#items',
-      formInputSelector: '#catalogues_ids',
-      startActionBtn: '#deleteCataloguesOpen',
-      totalElement: '#catalogues_ids_total'
-    }
-  ];
+const actionModalsArray = [
+  {
+    modalId: '#removeCatalogues',
+    formId: '#remove_catalogues',
+    actionLabesSelctor: '#items',
+    formInputSelector: '#catalogues_ids',
+    startActionBtn: '#deleteCataloguesOpen',
+    totalElement: '#catalogues_ids_total'
+  }
+];
+// incase component started he will allow return some public functions can accessed and used in other components called after incase component not started it will return undefined; not value
+const selectComponent = multipleSelectComponent(checkboxSelector=".deleted_catalogues",  dataLabel="data-check-catalogue", actionModals=actionModalsArray, selectAllSelector="#selectAll");
 
-  multipleSelectComponent(checkboxSelector=".deleted_catalogues",  dataLabel="data-check-catalogue", actionModals=actionModalsArray, selectAllSelector="#selectAll");
+// get the public function from selectComponent, to add it to change event for integeret select all component
+let publicOnChangeCheckBoxSelectAll = null;
+if (selectComponent && typeof(selectComponent.onChangeCheckBoxSelectAll) === 'function'){ 
+  publicOnChangeCheckBoxSelectAll = selectComponent.onChangeCheckBoxSelectAll;
+}
+
+/* search (each type of page have callback to create the rows depend on the style and data and cbs) */
+function rowBuildCB(catalogue){
+  // if component select all started and return the public function add the event to checkbox
+  const delete_change_event = (typeof(publicOnChangeCheckBoxSelectAll) == 'function' ? `onchange="publicOnChangeCheckBoxSelectAll(event)" ` : '');
+
+  let rowHTML = '';
+  if (catalogue && catalogue.id !== undefined && catalogue.sku !== undefined && catalogue.product_name !== undefined && catalogue.price !== undefined && catalogue.location !== undefined && catalogue.product_image_url !== undefined && catalogue.view_catalogue && catalogue.edit_catalogue && Array.isArray(catalogue.locations) ){
+    rowHTML = `<tr class="searching_card search_all_card"
+            data-search-id="${catalogue.id}" data-search-sku="${catalogue.sku}" data-search-product_name="${catalogue.product_name}"
+            data-search-price="${catalogue.price}"  data-search-location="${catalogue.location}" style="background: gainsboro!important;" title="This Row not belong to this page it returned from search all">
+              <td>
+                <p class="overflow_within">
+                  <input type="checkbox" data-check-catalogue="${catalogue.product_name}" class="deleted_catalogues form-control w-75"
+                   name="deleted_catalogues" value="${catalogue.id}" ${delete_change_event}/>
+                </p>
+              </td>
+              <td>
+                <p class="overflow_within"><img src="${catalogue.product_image_url}" alt="listing icon" width="50" class="mxwidth-50" /></p>
+              </td>                
+              <td style="max-width: 200px;">
+                <p class="overflow_within">${catalogue.product_name}</p>
+              </td>
+              <td>
+                <p class="overflow_within">${catalogue.sku}</p>
+              </td>
+              <td>
+                <p class="overflow_within">${catalogue.price}</p>
+              </td>
+              <td>
+                <div class="overflow_within" style="max-height:180px !important;overflow: auto;word-wrap: break-word;">`;
+                for (let l=0; l<catalogue.locations.length; l++){
+                  const catalogue_location = catalogue.locations[l];
+                  rowHTML += `
+                  <div class="border border-secondary">
+                    <h6 title="this is the location ${catalogue_location.location_name} and it's bins under it" class="badge shadow" style="display:block;">${catalogue_location.location_name}</h6>
+                    <div class="d-flex flex-row flex-wrap justify-content-between align-items-center p-2">`;
+                      if (Array.isArray(catalogue_location.bins)){
+                        for (let b=0; b<catalogue_location.bins.length; b++){
+                          const catalogue_locations_bin = catalogue_location.bins[b];
+                          rowHTML += `
+                                <span style="word-wrap: break-word;" title="This is Bin In Location ${catalogue_location.location_name}" class="badge badge-secondary">${catalogue_locations_bin}</span>
+                          `;
+                        }
+                      }
+                  rowHTML += `
+                    </div>
+                  </div>
+                  `;
+                }
+                  
+    rowHTML     += `
+              </td>                                          
+              <td>
+                <div class="col-sm-12 row">
+                  <div class="col-sm-12 d-flex justify-content-around align-items-center">
+                    <div>
+                      <a href="${catalogue.view_catalogue}" class="btn btn-primary btn-block btn-sm"><i class="fa fa-eye"></i></a>
+                    </div>
+                    <div>
+                      <a href="${catalogue.edit_catalogue}" class="btn btn-secondary btn-block btn-sm"><i class="fa fa-edit"></i></a>
+                    </div>              
+                  </div>                               
+                </div>
+              </td>
+          </tr>`;
+  }
+  return rowHTML;
+}
+
+searchComponent('fast', 'swing', cp=function(){return true;}, addon='', condition='*=', rowBuildCB=rowBuildCB, table='catalogue');
 
 </script>
 {% endblock page_scripts %}

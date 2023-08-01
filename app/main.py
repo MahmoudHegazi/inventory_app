@@ -248,6 +248,184 @@ def reports_export():
             flash(message, 'danger')
             return redirect(url_for('main.reports'))
 
+# this search function works with js search component dynamic for all app searchs
+@main.route('/search', methods=['GET', 'POST'])
+@login_required
+@vendor_permission.require()
+def search():
+    request_data = request.get_json()
+    allowed_search_tables = ['catalogue', 'listing', 'order', 'listing_orders', 'listing_purchases']
+    column = request_data['column'] if 'column' in request_data else None
+    value = request_data['value'] if 'value' in request_data else None
+    target_table = request_data['table'] if 'table' in request_data and request_data['table'] in allowed_search_tables else None
+    parent_id = ''
+    if 'parent_id' in request_data and request_data['parent_id'] and str(request_data['parent_id']).isnumeric():
+        parent_id = request_data['parent_id']
 
+    if column is not None and value is not None and target_table is not None:
+        if target_table == 'catalogue':
+            direct_search_columns = {
+                'id': Catalogue.id,
+                'sku': Catalogue.sku,
+                'product_name': Catalogue.product_name,
+                'price': Catalogue.price,
+                'location': WarehouseLocations.name,
+                'bin': LocationBins.name
+            }
+            if column in direct_search_columns:
+                search_val = '%{}%'.format(value)
+                sqlalchemy_expression = direct_search_columns[column].ilike(search_val)
+                data = [data_obj.format() for data_obj in db.session.query(Catalogue).outerjoin(
+                    CatalogueLocations, Catalogue.id == CatalogueLocations.catalogue_id
+                ).outerjoin(
+                    WarehouseLocations, CatalogueLocations.location_id == WarehouseLocations.id
+                ).outerjoin(
+                    CatalogueLocationsBins, CatalogueLocations.id == CatalogueLocationsBins.location_id
+                ).outerjoin(
+                    LocationBins, CatalogueLocationsBins.bin_id == LocationBins.id
+                ).filter(
+                    and_(Catalogue.user_id==current_user.id),
+                    and_(sqlalchemy_expression)
+                ).all()]
+                for i in range(len(data)):
+                    data[i]['view_catalogue'] = url_for('routes.view_catalogue', catalogue_id=data[i]['id'])
+                    data[i]['edit_catalogue'] = url_for('routes.edit_catalogue', catalogue_id=data[i]['id'])
+                    data[i]['product_image_url'] = url_for('static', filename='assets/images/{}'.format(data[i]['product_image']))
 
+                return jsonify({'code': 200, 'succeess': True, 'column': column, 'value': value, 'data': data})
+            else:
+                return jsonify({'code': 400, 'succeess': False, 'message': 'invalid search request, unknown search column'})
+            
+        elif target_table == 'listing':
+            direct_search_columns = {
+                'id': Listing.id,
+                'catalogue_id': Listing.catalogue_id,
+                'sku': Listing.sku,
+                'product_name': Listing.product_name,
+                'price': Listing.price,
+                'sale_price': Listing.sale_price,
+                'quantity': Listing.quantity,
+                'platform': Platform.name,
+                'location': WarehouseLocations.name,
+                'bin': LocationBins.name
+            }
+            # eg: lower(listing.product_name) LIKE lower(:product_name_1)
+            if column in direct_search_columns:
+                search_val = '%{}%'.format(value)
+                sqlalchemy_expression = direct_search_columns[column].ilike(search_val)
 
+                data = [data_obj.format() for data_obj in db.session.query(Listing).join(
+                    Catalogue, Listing.catalogue_id == Catalogue.id
+                ).outerjoin(
+                    ListingPlatform, Listing.id==ListingPlatform.listing_id
+                ).outerjoin(
+                    Platform, ListingPlatform.platform_id==Platform.id
+                ).outerjoin(
+                    CatalogueLocations, Catalogue.id == CatalogueLocations.id
+                ).outerjoin(
+                    WarehouseLocations, CatalogueLocations.location_id == WarehouseLocations.id
+                ).outerjoin(
+                    CatalogueLocationsBins, CatalogueLocations.id == CatalogueLocationsBins.location_id
+                ).outerjoin(
+                    LocationBins, CatalogueLocationsBins.bin_id == LocationBins.id
+                ).filter(
+                    and_(Catalogue.user_id==current_user.id),
+                    and_(sqlalchemy_expression)
+                ).all()]
+                for i in range(len(data)):
+                    data[i]['view_listing'] = url_for('routes.view_listing', listing_id=data[i]['id'])
+                    data[i]['edit_listing'] = url_for('routes.edit_listing', listing_id=data[i]['id'])
+                    data[i]['listing_image_url'] = url_for('static', filename='assets/images/{}'.format(data[i]['image']))
+                return jsonify({'code': 200, 'succeess': True, 'data': data})
+            else:
+                return jsonify({'code': 400, 'succeess': False, 'message': 'invalid search request, unknown search column'})
+        elif target_table == 'order':
+            direct_search_columns = {
+                'id': Order.id,
+                'quantity': Order.quantity,
+                'date': Order.date,
+                'listing_id': Order.listing_id,
+                'customer_firstname': Order.customer_firstname,
+                'customer_lastname': Order.customer_lastname
+            }
+
+            if column in direct_search_columns:                
+                search_val = '%{}%'.format(value)
+                sqlalchemy_expression = direct_search_columns[column].ilike(search_val)
+                data = [data_obj.format() for data_obj in db.session.query(Order).join(
+                    Listing, Order.listing_id == Listing.id
+                ).join(
+                    Catalogue, Listing.catalogue_id == Catalogue.id
+                ).filter(
+                    and_(Catalogue.user_id==current_user.id),
+                    and_(sqlalchemy_expression)
+                )]
+                for i in range(len(data)):
+                    data[i]['view_order'] = url_for('routes.view_order', listing_id=data[i]['listing_id'], order_id=data[i]['id'])
+                    data[i]['edit_order'] = url_for('routes.edit_order', listing_id=data[i]['listing_id'], order_id=data[i]['id'])
+                    data[i]['delete_order'] = url_for('routes.delete_order', listing_id=data[i]['listing_id'], order_id=data[i]['id'])
+                    data[i]['order_image_url'] = url_for('static', filename='assets/images/default_order.png')
+
+                return jsonify({'code': 200, 'succeess': True, 'data': data})
+            else:
+                return jsonify({'code': 400, 'succeess': False, 'message': 'invalid search request, unknown search column'})
+        elif target_table == 'listing_orders':
+            direct_search_columns = {
+                'id': Order.id,
+                'quantity': Order.quantity,
+                'first_name': Order.customer_firstname,
+                'last_name': Order.customer_lastname
+            }
+            if column in direct_search_columns:
+                search_val = '%{}%'.format(value)
+                sqlalchemy_expression = direct_search_columns[column].ilike(search_val)
+                # parent_id must provided in this page and will not effect security as it after user_id
+                data = [data_obj.format() for data_obj in db.session.query(Order).join(
+                    Listing, Order.listing_id == Listing.id
+                ).join(
+                    Catalogue, Listing.catalogue_id == Catalogue.id
+                ).filter(
+                    and_(Catalogue.user_id==current_user.id),
+                    and_(Order.listing_id==parent_id),
+                    and_(sqlalchemy_expression)
+                )]
+                for i in range(len(data)):
+                    data[i]['view_order'] = url_for('routes.view_order', listing_id=data[i]['listing_id'], order_id=data[i]['id'])
+                    data[i]['edit_order'] = url_for('routes.edit_order', listing_id=data[i]['listing_id'], order_id=data[i]['id'])
+                    data[i]['delete_order'] = url_for('routes.delete_order', listing_id=data[i]['listing_id'], order_id=data[i]['id'])
+                    
+                return jsonify({'code': 200, 'succeess': True, 'data': data})
+            else:
+                return jsonify({'code': 400, 'succeess': False, 'message': 'invalid search request, unknown search column'})
+        elif target_table == 'listing_purchases':
+            direct_search_columns = {
+                'id': Purchase.id,
+                'quantity': Purchase.quantity,
+                'supplier_name': Supplier.name
+            }
+            if column in direct_search_columns:
+                search_val = '%{}%'.format(value)
+                sqlalchemy_expression = direct_search_columns[column].ilike(search_val)
+                # this way force only display search for valid purchases that has catalogue, incase some data not has catalouge for any reason this will not diplsayed but user not need invalid data and it must not happend incase only db edit
+                data = [data_obj.format() for data_obj in db.session.query(Purchase).join(
+                    Listing, Purchase.listing_id == Listing.id
+                ).join(
+                    Catalogue, Listing.catalogue_id == Catalogue.id
+                ).outerjoin(
+                    Supplier, Purchase.supplier_id == Supplier.id
+                ).filter(
+                    and_(Catalogue.user_id==current_user.id),
+                    and_(Purchase.listing_id==parent_id),
+                    and_(sqlalchemy_expression)
+                )]
+                for i in range(len(data)):
+                    data[i]['view_purchase_listing'] = url_for('routes.view_purchase_listing', listing_id=data[i]['listing_id'], purchase_id=data[i]['id'])
+                    data[i]['edit_purchase_listing'] = url_for('routes.edit_purchase_listing', listing_id=data[i]['listing_id'], purchase_id=data[i]['id'])
+                    data[i]['delete_purchase_listing'] = url_for('routes.delete_purchase_listing', listing_id=data[i]['listing_id'], purchase_id=data[i]['id'])
+                return jsonify({'code': 200, 'succeess': True, 'data': data})
+            else:
+                return jsonify({'code': 400, 'succeess': False, 'message': 'invalid search request, unknown search column'})
+        else:
+            return jsonify({'code': 404, 'succeess': False, 'message': 'invalid search, unknown table'})
+    else:
+        return jsonify({'code': 400, 'succeess': False, 'message': 'invalid search request'})

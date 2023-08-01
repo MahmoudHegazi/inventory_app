@@ -582,7 +582,7 @@ def get_charts(db, current_user, charts_ids=[]):
                 if chart_id == 'top_ordered_products':
                     # chart 1
                     chart_query = db.session.query(
-                        Listing.product_name,
+                        Listing.sku,
                         func.sum(Order.quantity).label('total_quantities')
                     ).join(
                         Catalogue, Listing.catalogue_id == Catalogue.id
@@ -609,7 +609,7 @@ def get_charts(db, current_user, charts_ids=[]):
                 elif chart_id == 'less_ordered_products':
                     # chart 1
                     chart_query = db.session.query(
-                        Listing.product_name,
+                        Listing.sku,
                         func.sum(Order.quantity).label('total_quantities')
                     ).join(
                         Catalogue, Listing.catalogue_id == Catalogue.id
@@ -636,7 +636,7 @@ def get_charts(db, current_user, charts_ids=[]):
                 elif chart_id == 'most_purchased_products':
                     # chart 2
                     chart_query = db.session.query(
-                        Listing.product_name,
+                        Listing.sku,
                         func.sum(Purchase.quantity).label('total_quantities')
                     ).join(
                         Purchase, Listing.id == Purchase.listing_id
@@ -662,7 +662,7 @@ def get_charts(db, current_user, charts_ids=[]):
     
                     # chart 3
                     chart_query = db.session.query(
-                        Listing.product_name,
+                        Listing.sku,
                         func.sum(Purchase.quantity).label('total_quantities')
                     ).join(
                         Purchase, Listing.id == Purchase.listing_id

@@ -94,21 +94,25 @@
           <div class="row mt-2 mb-2">
             <div class="col-sm-11 mx-auto" title="search by id, quantity, Supplier Name">
               <form id="search_form" class="row">
-                <input class="form-control col-sm-5" type="text" name="search_value" id="search_value" placeholder="search by id, quantity, Supplier Name" value=""/>
-                <select class="form-control col-sm-4" name="search_by" id="search_by">
+                <input class="form-control col-sm-3" type="text" name="search_value" id="search_value" placeholder="search by id, quantity, Supplier Name" value=""/>
+                <select class="form-control col-sm-3" name="search_by" id="search_by">
                   <option value="">Search BY</option>
                   <option class="search_column" value="id">ID</option>
                   <option class="search_column" value="quantity">Quantity</option>
                   <option class="search_column" value="supplier_name">Supplier Name</option>
                 </select>
                 <button type="button" id="cancel_search" class="btn btn-sm col-sm-1 btn-danger" style="display:none;"><i class="fa fa-close"></i></button>
+                <select class="form-control col-sm-3" id="search_type">
+                  <option value="current">Current Page</option>
+                  <option value="all">all Pages</option>
+                </select>
                 <button type="submit" class="btn btn-success col-sm-2">Search</button>
               </form>
             </div>
           </div>
           <!-- search component end -->
           <div class="overflow-350">
-              <table class="table table-bordered">
+              <table class="table table-bordered" id="table_display">
                 <thead>
                   <tr>
                     <th>Id</th>
@@ -154,8 +158,8 @@
             <div class="row mt-2 mb-2">
               <div class="col-sm-11 mx-auto" title="search by id, quantity, First Name, Last Name">
                 <form id="search_form2" class="row">
-                  <input class="form-control col-sm-5" type="text" name="search_value" id="search_value2" placeholder="search by id, quantity, First Name, Last Name" value=""/>
-                  <select class="form-control col-sm-4" name="search_by2" id="search_by2">
+                  <input class="form-control col-sm-3" type="text" name="search_value" id="search_value2" placeholder="search by id, quantity, First Name, Last Name" value=""/>
+                  <select class="form-control col-sm-3" name="search_by2" id="search_by2">
                     <option value="">Search BY</option>
                     <option class="search_column2" value="id">ID</option>
                     <option class="search_column2" value="quantity">Quantity</option>
@@ -163,13 +167,17 @@
                     <option class="search_column2" value="last_name">Last Name</option>
                   </select>
                   <button type="button" id="cancel_search2" class="btn btn-sm col-sm-1 btn-danger" style="display:none;"><i class="fa fa-close"></i></button>
+                  <select class="form-control col-sm-3" id="search_type2">
+                    <option value="current">Current Page</option>
+                    <option value="all">all Pages</option>
+                  </select>
                   <button type="submit" class="btn btn-success col-sm-2">Search</button>
                 </form>
               </div>
             </div>
             <!-- search component end -->            
             <div class="overflow-350">
-                <table class="table table-bordered">
+                <table class="table table-bordered" id="table_display2">
                   <thead>
                     <tr>
                       <th>Id</th>
@@ -220,9 +228,11 @@
 
 
 {% block page_scripts %}
+{% if listing.id %}
 <script>
-
 // noEffects = true;
+const listingId = {{listing.id}};
+
 $('#deleteListingModal').on('shown.bs.modal', ()=>{toggleLoadingCircle(false, 'block');});
 $('#deletePurchaseModal').on('shown.bs.modal', ()=>{toggleLoadingCircle(false, 'block');});
 $('#deleteOrderModal').on('shown.bs.modal', ()=>{toggleLoadingCircle(false, 'block');});
@@ -230,11 +240,73 @@ $('#deleteOrderModal').on('shown.bs.modal', ()=>{toggleLoadingCircle(false, 'blo
 /* function to dynamic fill wtform for delete any model using it's id and set dynamic url for form aswell (can used in any page) */
 deleteWtformsModalProccess(dataAttId='data-listing-id', formId='remove_listing', idInputId='listing_id', modalId='deleteListingModal');
 
-deleteWtformsModalProccess(dataAttId='data-purchase-id', formId='remove_purchase', idInputId='purchase_id', modalId='deletePurchaseModal');
+let publicOnDeleteBtnClickPurchase = deleteWtformsModalProccess(dataAttId='data-purchase-id', formId='remove_purchase', idInputId='purchase_id', modalId='deletePurchaseModal');
 
-deleteWtformsModalProccess(dataAttId='data-order-id', formId='remove_order', idInputId='order_id', modalId='deleteOrderModal');
+let publicOnDeleteBtnClickOrder = deleteWtformsModalProccess(dataAttId='data-order-id', formId='remove_order', idInputId='order_id', modalId='deleteOrderModal');
+// search row ajax creation cb (based on desgin of each)
+function rowOrderBuildCB(order){
+    let rowHTML = '';
+    if (order && order.id !== undefined && order.quantity !== undefined && order.date !== undefined && order.listing_id !== undefined && order.customer_firstname !== undefined &&  order.customer_lastname !== undefined && order.view_order !== undefined && order.edit_order !== undefined && order.delete_order !== undefined){
+      
+      const delete_click_event = (typeof(publicOnDeleteBtnClickOrder) == 'function' ? 'publicOnDeleteBtnClickOrder(event);' : '');
+      console.log(delete_click_event);
+      rowHTML = `
+                  <tr class="searching_card2 search_all_card2"
+                    data-search-id="${order.id}" data-search-quantity="${order.quantity}" data-search-first_name="${order.customer_firstname}"
+                    data-search-last_name="${order.customer_lastname}" style="background: gainsboro!important;" title="This Row not belong to this page it returned from search all">
 
-searchComponent('mid', 'swing');
-searchComponent('mid', 'swing', ()=>{return true;}, '2');
+                      <td title="${order.date}" class="cursor-pointer">${order.id}</td>
+                      <td>${order.quantity}</td>                      
+                      <td>${order.customer_firstname} ${order.customer_lastname}</td>
+                      <td>
+                        <div class="d-flex justify-content-around align-items-center">
+                          <a href="${order.view_order}" class="btn btn-primary btn-sm"><i class="fa fa-eye"></i></a>
+                          <a href="${order.edit_order}" class="btn btn-secondary btn-sm"><i class="fa fa-edit"></i></a>
+
+                          <button data-url="${order.delete_order}" data-toggle="modal" 
+                          data-target="#deleteOrderModal" data-order-id="${order.id}" onclick="toggleLoadingCircle(true, 'block');${delete_click_event}" 
+                          class="wtform_modal_deletebtn btn btn-danger btn-sm"><i class="fa fa-trash"></i></button>
+                          </div>
+                        </div>
+                      </td>
+                  </tr>
+                  `;
+    }
+    return rowHTML;
+}
+
+function rowPurchaseBuildCB(purchase){
+    let rowHTML = '';
+    if (purchase && purchase.id !== undefined && purchase.quantity !== undefined && purchase.date !== undefined && purchase.supplier_name !== undefined && purchase.view_purchase_listing !== undefined && purchase.edit_purchase_listing !== undefined && purchase.delete_purchase_listing !== undefined){
+      
+      const delete_click_event = (typeof(publicOnDeleteBtnClickPurchase) == 'function' ? 'publicOnDeleteBtnClickPurchase(event);' : '');
+      console.log(delete_click_event);
+      rowHTML = `
+                <tr class="searching_card search_all_card"
+                  data-search-id="${purchase.id}" data-search-quantity="${purchase.quantity}" data-search-supplier_name="${purchase.supplier_name}" style="background: gainsboro!important;" title="This Row not belong to this page it returned from search all">
+                    <td title="${purchase.date}" class="cursor-pointer">${purchase.id}</td>
+                    <td>${purchase.quantity}</td>
+                    <td>${purchase.supplier_name}</td>
+                    <td>
+                      <div class="d-flex justify-content-around align-items-center">
+                        <a href="${purchase.view_purchase_listing}" class="btn btn-primary btn-sm"><i class="fa fa-eye"></i></a>
+                        <a href="${purchase.edit_purchase_listing}" class="btn btn-secondary btn-sm"><i class="fa fa-edit" ></i></a>
+                        <button data-url="${purchase.delete_purchase_listing}" data-toggle="modal" 
+                        data-target="#deletePurchaseModal" data-purchase-id="${purchase.id}" onclick="toggleLoadingCircle(true, 'block');${delete_click_event}" 
+                        class="wtform_modal_deletebtn btn btn-danger btn-sm"><i class="fa fa-trash"></i></button>
+                        </div>
+                      </div>
+                    </td>
+                </tr>
+                `;
+    }
+    return rowHTML;
+}
+
+searchComponent('mid', 'swing', ()=>{return true;}, addon='', condition='*=', rowBuildCB=rowPurchaseBuildCB, table='listing_purchases', parent_id=listingId);
+
+searchComponent('mid', 'swing', ()=>{return true;}, addon='2', condition='*=', rowBuildCB=rowOrderBuildCB, table='listing_orders', parent_id=listingId);
+
 </script>
+{% endif %}
 {% endblock page_scripts %}

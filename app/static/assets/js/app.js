@@ -1,6 +1,7 @@
 /* Consts */
 let noEffects = false;
 
+
 /* Helper Functions */
 function toggleLoadingCircle(on=false, displayCSS='', containerSelector='.content_container', imageSelector='.loading_circle'){
     if (noEffects === true){return false;}
@@ -76,12 +77,30 @@ function SearchByJS(
     return cb(searchSupplier);
 }
 
+const postData = async(url = '', data = {}) => {
+	const response = await fetch(url, {
+		method: 'POST',
+		credentials: 'same-origin',
+		headers: {
+			'Content-Type': 'application/json',
+		},
+		// Body data type must match "Content-Type" header
+		body: JSON.stringify(data),
+	});
+	try {
+		const newData = await response.json();
+		return newData;
+	} catch (error) {
+		console.log("error", error);
+	}
+}
+
 
 /* (searchComponent) simple full jquery/html dom function that can complete search for any number of database columns 
 eg:99m and html cards search done using DOM so it speed after setup like DOM selector (no css required and work with bs4 and not remove elements or styles)
 */
 /* this addon used to enable calling this function multiple times to handle the selectors */
-function searchComponent(speed='slow',easing='swing', cp=function(){return true;}, addon='', condition='='){
+function searchComponent(speed='slow',easing='swing', cp=function(){return true;}, addon='', condition='=', rowBuildCB=()=>{}, table='', parent_id=0){
     const stopSearchForm = function(){
         if ($(`form#search_form${addon}`).length){
             $(`form#search_form${addon}`).on('submit', (ev)=>{
@@ -102,10 +121,12 @@ function searchComponent(speed='slow',easing='swing', cp=function(){return true;
     /* Full JQuery component */
     const dataSearchAttrs = {};
     let searchColumnsIndex = 0;
+    let selectType = 'current';    
     if ($("body").length && $(`form#search_form${addon}`).length && $(`#cancel_search${addon}[type='button']`).length && $(`#search_value${addon}`).length &&
     $(`#search_by${addon} option.search_column${addon}`).length && typeof(cp) == 'function'){
       
-      $(`#cancel_search${addon}`).hide();
+      $(`#cancel_search${addon}`).hide();      
+
 
       /*get dynamic data-search attributes and options value for column name*/
       $(`#search_by${addon} option.search_column${addon}`).each( (_i, dataSearchAttr)=>{
@@ -130,6 +151,8 @@ function searchComponent(speed='slow',easing='swing', cp=function(){return true;
       
       /* function to remove hidden cards with same effect and callback */
       function cancelSearch(speed, easing, cp){
+        /* remove search card added from searver (the best async is to keep current spreate over server to keep function smooth and every part work alone as sperate component with not relation in cdoe) */
+        $(`.search_all_card${addon}`).remove();
         /* this for jquery works with bs4 becuase added css class with display:none !important so remove it and start make jquery effect that will run even if bs display element as it slow eg can not after display use: $(oldHidden).hide();*/
         const oldHidden = $(`.hidden_search_card${addon}`);
         $(`.hidden_search_card${addon}`).removeClass(`hidden_search_card${addon}`);
@@ -142,23 +165,37 @@ function searchComponent(speed='slow',easing='swing', cp=function(){return true;
           }
         });
         
-      };
+      }
+      // get insesntive search list, by loop over elements instead of it was using query selector, no insesntive operator in js selector *= only
+      function getQueryInsensitiveList(searchTerm, dataAttrName){
+        searchTerm = searchTerm.toLowerCase();
+        let result = [];
+        $(`.searching_card${addon}[${dataAttrName}]`).each( (i, item)=>{
+            const stringLower = $(item).attr(dataAttrName).toLowerCase();
+            if (stringLower.includes(searchTerm)){
+                result.push(item);
+            }
+        });
+        return result;
+      }
 
       /* event listener for search (all hide actions) */
-      $(`form#search_form${addon}`).on('submit', (event)=>{
+      $(`form#search_form${addon}`).on('submit', async (event)=>{
         event.preventDefault();
         /* to allow reaserch not pass cp (clean and old search which hide cards, before start new search) */
         cancelSearch(speed, easing, ()=>{});
-        
+        selectType = ($(`select#search_type${addon}`).length) ? $(`select#search_type${addon}`).val() : 'current';
         const searchValue = $(`#search_value${addon}`).val().trim();
         const searchColumn = $(`#search_by${addon}`).val().trim();
-        const dataAttrName = dataSearchAttrs[searchColumn];       
-        if (dataAttrName && searchValue){
-          /* html selector search condition set */
-          const targetCards = $(`.searching_card${addon}[${dataAttrName}${condition}'${searchValue}']`);
-          const targetCardsArr = $(targetCards).toArray();
+        const dataAttrName = dataSearchAttrs[searchColumn];
+        
+        if (dataAttrName && searchValue && selectType == 'current'){
+          /* html selector search condition set (stoping this way targetCards to make Insensitive search as no selector js for insesntive *= easy add i*= == 'your insestive search add new operator string sure there are insesntive core c++ std::regex pattern(".*a.*", std::regex_constants::icase);' */
+          //const targetCards = $(`.searching_card${addon}[${dataAttrName}${condition}'${searchValue}']`);
+          //const targetCardsArr = $(targetCards).toArray();
+          const targetCardsArr = getQueryInsensitiveList(searchValue, dataAttrName);
           $(`.searching_card${addon}`).each( (s, searchingCard)=>{
-            if (!targetCardsArr.includes($(searchingCard)[0])){
+            if ( !targetCardsArr.includes($(searchingCard)[0])){
               /* this is how hide any bs4 (d-flex, row) with jquery effect css + callback*/
               $(searchingCard).hide(speed, easing, ()=>{
                 $(searchingCard).addClass(`hidden_search_card${addon}`);
@@ -171,6 +208,44 @@ function searchComponent(speed='slow',easing='swing', cp=function(){return true;
           });
           $(`#cancel_search${addon}`).show();
           
+        } else if (searchColumn && searchValue && selectType == 'all' && typeof(rowBuildCB) === 'function') {
+
+          // hide current page or previous cards (targetCardsArr will be data from server in this scope)
+          $(`.searching_card${addon}`).each( (s, searchingCard)=>{
+              /* this is how hide any bs4 (d-flex, row) with jquery effect css + callback in clearn search before server start set speed to 1 as it addiotonal clean*/
+              $(searchingCard).hide(1, easing, ()=>{
+                $(searchingCard).addClass(`hidden_search_card${addon}`);
+                /* call usercb */
+                if (s+1 == $(`.searching_card${addon}`).length){
+                  cp();                  
+                }
+              });
+          });
+          
+          const searchResponse = await postData('/search', {column: searchColumn, value: searchValue, table: table, parent_id: parent_id});
+          if (searchResponse && searchResponse.code == 200 && Array.isArray(searchResponse.data)){
+            const serverData = searchResponse.data;
+            const targetTableBody = $(`#table_display${addon} tbody`);
+            if ($(targetTableBody).length){
+              serverData.forEach( (ServerDataObj)=>{
+                // rowBuildCB return empty string if invali row in it
+                const newRowHTML = rowBuildCB(ServerDataObj);
+                if (newRowHTML){
+                  $(targetTableBody).append(newRowHTML);
+                }
+              });
+            }
+
+          } else if (searchResponse && searchResponse.code != 200 && searchResponse.message) {
+            displayAjaxError(searchResponse.message, 'danger');
+          } else {
+            console.log(searchResponse);
+            displayAjaxError("unable to search server right now", 'danger');
+          }
+
+          $(`#cancel_search${addon}`).show();
+          // send search data and get result using ajax
+          //alert("hello server search feature"+searchColumn+searchValue);
         } else {
           cancelSearch(speed, easing, cp);
           $(`#cancel_search${addon}`).hide();
@@ -184,7 +259,10 @@ function searchComponent(speed='slow',easing='swing', cp=function(){return true;
         $(`#search_value${addon}`).val('');
         /* this normal event fired when cancel search happend, usefull for integerate search with diffrent components, like multiple select */
         $(window).trigger('searchComponent.cancelSearch');        
-      });      
+      });
+
+      /* cancel search and remove search server card when siwtch to search current page */
+
       return true;
     }
   
@@ -197,17 +275,20 @@ function searchComponent(speed='slow',easing='swing', cp=function(){return true;
 
 /* function to dynamic fill wtform for delete any model using it's id and set dynamic url for form aswell (can used in any page) */
 function deleteWtformsModalProccess(dataAttId, formId, idInputId, modalId) {
-    $(".wtform_modal_deletebtn").on('click', (event) => {
-        if ($(event.currentTarget).length) {
-            const formAction = String($(event.currentTarget).attr('data-url')).trim();
-            const dashboardId = String($(event.currentTarget).attr(dataAttId)).trim();
-            if ($(`#${formId}`).length && $(`#${formId} input#${idInputId}`).length && formAction && dashboardId) {
-                /* set target id and action url of delete model */
-                $(`#${formId} input#${idInputId}`).val(dashboardId);
-                $(`#${formId}`).attr('action', formAction);
-            }
+
+    function onDeleteBtnClick(event){
+      if ($(event.currentTarget).length) {
+        const formAction = String($(event.currentTarget).attr('data-url')).trim();
+        const dashboardId = String($(event.currentTarget).attr(dataAttId)).trim();
+        if ($(`#${formId}`).length && $(`#${formId} input#${idInputId}`).length && formAction && dashboardId) {
+            /* set target id and action url of delete model */
+            $(`#${formId} input#${idInputId}`).val(dashboardId);
+            $(`#${formId}`).attr('action', formAction);
         }
-    });
+      }
+    }
+
+    $(".wtform_modal_deletebtn").on('click', onDeleteBtnClick);
 
     $(`#${modalId}`).on('hidden.bs.modal', () => {
         if ($(`#${formId}`).length) {
@@ -217,6 +298,8 @@ function deleteWtformsModalProccess(dataAttId, formId, idInputId, modalId) {
             $(`#${formId} input#${idInputId}`).val('');
         }
     });
+
+    return onDeleteBtnClick;
 }
 
 /* function to toggle settings menu */
@@ -534,6 +617,7 @@ function multipleSelectComponent(checkboxSelector='', dataLabel='', actionModals
   let selectedLabels = [];
   // true means can start select all
   let selectAllStatus = true;
+  const publicFunction = {};
 
   /* validate actions modals objects (to make function dyanmic focus only with select provid array of objects for each action modal eg:delete_catalogue, update_catalogue_catagory, or any other action provided) */
   let allActionsReady = (Array.isArray(actionModals) && actionModals.length > 0) ? true : false;
@@ -568,53 +652,49 @@ function multipleSelectComponent(checkboxSelector='', dataLabel='', actionModals
     $(checkboxSelector).prop('checked', false);
     $(checkboxSelector).trigger('change');
    });
+
+   function onChangeCheckBoxSelectAll(e){
+      checkedCheckBoxes = Array.from($(`${checkboxSelector}:checked:visible`)).filter( (elm)=>{
+        /* must provide items labels for next action */
+        if ($(elm).length && $(elm).attr('value') && $(elm).val() && $(elm).attr(dataLabel)){
+          return $(elm);
+        }
+      });
+
+      selectedValues = checkedCheckBoxes.map((checkBox)=>{
+          return $(checkBox).val();
+      });
+
+      selectedLabels = checkedCheckBoxes.map( (checkBox)=>{
+        return $(checkBox).attr(dataLabel);
+      });
+
+      if (checkedCheckBoxes.length > 0){
+        // if one or more than one item checked display all actions buttons
+        actionModals.forEach( (actionModal)=>{
+          $(actionModal.startActionBtn).show('fast');
+        });
+      } else {
+        actionModals.forEach( (actionModal)=>{
+          $(actionModal.startActionBtn).hide('fast');
+        });
+      }
+
+      if (selectAllSelector && $(selectAllSelector).length){
+         /* always work with visible elements only to easy integerate with search */
+        if ($(`${checkboxSelector}:visible`).length == checkedCheckBoxes.length){
+          // total visible elements same as total visible elements checked
+          selectAllStatus = false;
+          $(selectAllSelector).text('Unselect All');
+        } else {
+          selectAllStatus = true;
+          $(selectAllSelector).text('Select All');
+        }
+      }
+   }
    
-   $(checkboxSelector).on('change', function(e){      
-
-     checkedCheckBoxes = Array.from($(`${checkboxSelector}:checked:visible`)).filter( (elm)=>{
-       /* must provide items labels for next action */
-       if ($(elm).length && $(elm).attr('value') && $(elm).val() && $(elm).attr(dataLabel)){
-         return $(elm);
-       }
-     });
-
-     selectedValues = checkedCheckBoxes.map((checkBox)=>{
-         return $(checkBox).val();
-     });
-
-     selectedLabels = checkedCheckBoxes.map( (checkBox)=>{
-       return $(checkBox).attr(dataLabel);
-     });
-
-
-     if (checkedCheckBoxes.length > 0){
-       // if one or more than one item checked display all actions buttons
-       actionModals.forEach( (actionModal)=>{
-         $(actionModal.startActionBtn).show('fast');
-       });
-     } else {
-       actionModals.forEach( (actionModal)=>{
-         $(actionModal.startActionBtn).hide('fast');
-       });
-     }
-
-
-
-     if (selectAllSelector && $(selectAllSelector).length){
-        
-        /* always work with visible elements only to easy integerate with search */
-       if ($(`${checkboxSelector}:visible`).length == checkedCheckBoxes.length){
-         // total visible elements same as total visible elements checked
-         selectAllStatus = false;
-         $(selectAllSelector).text('Unselect All');
-       } else {
-         selectAllStatus = true;
-         $(selectAllSelector).text('Select All');
-       }
-
-     }
-
-   });
+   $(checkboxSelector).on('change', onChangeCheckBoxSelectAll);
+   publicFunction['onChangeCheckBoxSelectAll'] = onChangeCheckBoxSelectAll;
 
    actionModals.forEach( (actionModal)=>{
        $(actionModal.modalId).on('shown.bs.modal', function(e) {
@@ -671,6 +751,7 @@ function multipleSelectComponent(checkboxSelector='', dataLabel='', actionModals
        }
      });
    }
+   return publicFunction;
   } else {
    console.log('multipleSelectComponent not started');
   }

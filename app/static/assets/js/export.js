@@ -187,7 +187,7 @@ function getFilterData(url='', type='GET', data={}) {
              $("#filter_content").css("display", "block");
              /*!note user can export all data without filters*/
              filterColumns = data.data;
-             console.log("?", data.data);
+             //console.log("?", data.data);
           } else {
             let responseMsg = (data && data.message) ? data.message : 'The filter data could not be loaded, no Column selected';
             $("#filter_content").css("display", "none");

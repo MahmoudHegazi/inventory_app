@@ -36,8 +36,8 @@
     <div class="row mt-2 mb-2">
       <div class="col-sm-11 mx-auto" title="search by id, quantity, date, listing id, customer firstname, customer lastname">
         <form id="search_form" class="row">
-          <input class="form-control col-sm-5" type="text" name="search_value" id="search_value" placeholder="search by id, quantity, date, listing id, customer firstname, customer lastname" value=""/>
-          <select class="form-control col-sm-4" name="search_by" id="search_by">
+          <input class="form-control col-sm-3" type="text" name="search_value" id="search_value" placeholder="search by id, quantity, date, listing id, customer firstname, customer lastname" value=""/>
+          <select class="form-control col-sm-3" name="search_by" id="search_by">
             <option value="">Search BY</option>
             <option class="search_column" value="id">ID</option>
             <option class="search_column" value="quantity">Quantity</option>
@@ -47,6 +47,10 @@
             <option class="search_column" value="customer_lastname">Customer last name</option>
           </select>
           <button type="button" id="cancel_search" class="btn btn-sm col-sm-1 btn-danger" style="display:none;"><i class="fa fa-close"></i></button>
+          <select class="form-control col-sm-3" id="search_type">
+            <option value="current">Current Page</option>
+            <option value="all">all Pages</option>
+          </select>
           <button type="submit" class="btn btn-success col-sm-2">Search</button>
         </form>
       </div>
@@ -203,11 +207,66 @@ displayPaginationComponent(paginationBtns, paginationPage, ['orders_pag1', 'orde
 
 toggleSettingsToast();
 
-searchComponent('mid', 'swing');
-
-
 $('#removeOrderModal').on('shown.bs.modal', ()=>{toggleLoadingCircle(false, 'block');});
-deleteWtformsModalProccess(dataAttId='data-order-id', formId='remove_order_form', idInputId='order_id', modalId='removeOrderModal');
+// this way pass any public functions from the required component to pass it to other components callback like search
+let publicOnDeleteBtnClick = deleteWtformsModalProccess(dataAttId='data-order-id', formId='remove_order_form', idInputId='order_id', modalId='removeOrderModal');
+
+
+function rowBuildCB(order){
+    let rowHTML = '';
+    if (order && order.id !== undefined && order.quantity !== undefined && order.date !== undefined && order.listing_id !== undefined && order.customer_firstname !== undefined &&  order.customer_lastname !== undefined && order.view_order !== undefined && order.edit_order !== undefined && order.order_image_url !== undefined){
+
+      const delete_click_event = (typeof(publicOnDeleteBtnClick) == 'function' ? 'publicOnDeleteBtnClick(event);' : '');
+      rowHTML = `
+      <tr class="searching_card search_all_card" data-search-id="${order.id}" data-search-quantity="${order.quantity}" data-search-date="${order.date}"
+              data-search-listing_id="${order.listing_id}"  data-search-customer_firstname="${order.customer_firstname}" data-search-customer_lastname="${order.customer_lastname}" style="background: gainsboro!important;" title="This Row not belong to this page it returned from search all">
+              <td>
+                <p class="overflow_within">${order.id}</p>
+              </td>
+              <td>
+                <p class="overflow_within"><img src="${order.order_image_url}" alt="listing icon" width="50" class="mxwidth-50" /></p>
+              </td>                
+              <td>
+                <p class="overflow_within">${order.quantity}</p>
+              </td>
+              <td>
+                <p class="overflow_within">${order.date}</p>
+              </td>
+              <td>
+                <p class="overflow_within">${order.listing_id}</p>
+              </td>
+              <td>
+                <p class="overflow_within">${order.customer_firstname}</p>
+              </td>
+              <td>
+                <p class="overflow_within">${order.customer_lastname}</p>
+              </td>                                          
+              <td>
+                <div class="col-sm-12 row">
+                  <div class="col-sm-12 d-flex justify-content-around align-items-center">
+                    <div>
+                      <a href="${order.view_order}" class="btn btn-primary btn-block">View</a>
+                    </div>
+                    <div>
+                      <a href="${order.edit_order}" class="btn btn-secondary btn-block">Edit</a>
+                    </div>
+                    <div>
+                        <button data-url="${order.delete_order}" data-toggle="modal" 
+                          data-target="#removeOrderModal" data-order-id="${order.id}" onclick="toggleLoadingCircle(true, 'block');${delete_click_event}" 
+                          class="wtform_modal_deletebtn btn btn-danger">Delete
+                        </button>                        
+                    </div>
+                  </div>              
+                </div>
+              </td>
+            </tr>
+      `
+    }
+    return rowHTML;
+}
+
+searchComponent('mid', 'swing', cp=function(){return true;}, addon='', condition='*=', rowBuildCB=rowBuildCB, table='order');
+
 
 
 </script>

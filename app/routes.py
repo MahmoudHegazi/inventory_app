@@ -2,6 +2,8 @@ import json
 import sys
 import os
 import random
+import decimal
+import flask_excel
 from flask import Flask, Blueprint, session, redirect, url_for, flash, Response, request, render_template, jsonify, abort
 from flask_wtf import Form
 from .models import User, Supplier, Dashboard, Listing, Catalogue, Purchase, Order, Platform, ListingPlatform, WarehouseLocations, LocationBins, \
@@ -15,7 +17,6 @@ from . import vendor_permission, db
 from .functions import get_safe_redirect, updateDashboardListings, updateDashboardOrders, updateDashboardPurchasesSum, secureRedirect, get_charts
 from sqlalchemy.exc import IntegrityError
 from flask_login import login_required, current_user
-import flask_excel
 from flask import request as flask_request
 
 
@@ -1316,7 +1317,12 @@ def add_order(listing_id):
                             quantity=form.quantity.data,
                             date=form.date.data,
                             customer_firstname=form.customer_firstname.data,
-                            customer_lastname=form.customer_lastname.data
+                            customer_lastname=form.customer_lastname.data,
+                            tax=form.tax.data,
+                            shipping=form.shipping.data,
+                            shipping_tax=form.shipping_tax.data,
+                            commission=form.commission.data,
+                            total_cost=form.total_cost.data
                         )
                         new_order.insert()
                         #manual
@@ -1394,7 +1400,12 @@ def edit_order(listing_id, order_id):
             quantity=target_order.quantity,
             date=target_order.date,
             customer_firstname=target_order.customer_firstname,
-            customer_lastname=target_order.customer_lastname
+            customer_lastname=target_order.customer_lastname,
+            tax=target_order.tax,
+            shipping=target_order.shipping,
+            shipping_tax=target_order.shipping_tax,
+            commission=target_order.commission,
+            total_cost=target_order.total_cost
         )
         # user using this route can only use the listing of selected dashboard so not allow another dashboard's listing to be submited some how using this route as it not provided
         dashboard_listings = db.session.query(
@@ -1459,7 +1470,23 @@ def edit_order(listing_id, order_id):
                             if target_order.listing_id != form.listing_id.data:
                                 target_order.listing_id = form.listing_id.data
 
+                            if target_order.tax != form.tax.data:
+                                target_order.tax = form.tax.data
 
+                            if target_order.shipping != form.shipping.data:
+                                target_order.shipping = form.shipping.data
+
+                            if target_order.shipping_tax != form.shipping_tax.data:
+                                target_order.shipping_tax = form.shipping_tax.data
+
+                            if target_order.commission != form.commission.data:
+                                target_order.commission = form.commission.data
+
+                            # for more control on previous and new total_cost value, and keep the logic of user can optional set total cost handle total cost here
+                            if target_order.total_cost != form.total_cost.data:  
+                                target_order.total_cost = form.total_cost.data
+                            else:
+                                target_order.total_cost = decimal.Decimal(target_order.listing.price) + decimal.Decimal(target_order.tax) + decimal.Decimal(target_order.shipping) + decimal.Decimal(target_order.shipping_tax) + decimal.Decimal(target_order.commission)
 
                             target_order.listing.catalogue.quantity = orginal_quantity0
                             selected_listing.catalogue.quantity = new_quantity0
@@ -1472,6 +1499,8 @@ def edit_order(listing_id, order_id):
                             flash('Unable to add edit, the order quantity is greater than the new catalog quantity', 'warning')
                             success = False
                     else:
+                        # this variable to calculate total_cost action change as it run in case of total_cost changed or incase shipping, tax, etc changed
+                        total_cost_actions = 0
                         # order's listing not changed                    
                         if target_order.quantity != form.quantity.data:
                             current_order_quantity = target_order.quantity
@@ -1494,6 +1523,36 @@ def edit_order(listing_id, order_id):
                         if target_order.listing_id != form.listing_id.data:
                             target_order.listing_id = form.listing_id.data
                             actions += 1
+
+                        if target_order.tax != form.tax.data:
+                            target_order.tax = form.tax.data
+                            actions += 1
+                            total_cost_actions += 1
+
+                        if target_order.shipping != form.shipping.data:
+                            target_order.shipping = form.shipping.data
+                            actions += 1
+                            total_cost_actions += 1
+
+                        if target_order.shipping_tax != form.shipping_tax.data:
+                            target_order.shipping_tax = form.shipping_tax.data
+                            actions += 1
+                            total_cost_actions += 1
+
+                        if target_order.commission != form.commission.data:
+                            target_order.commission = form.commission.data
+                            actions += 1
+                            total_cost_actions += 1
+
+                        if target_order.total_cost != form.total_cost.data:
+                            # set total cost manual by user
+                            target_order.total_cost = form.total_cost.data
+                            actions += 1
+                        else:
+                            if total_cost_actions > 0:
+                                # dynamic calcuate total_cost
+                                target_order.total_cost = decimal.Decimal(target_order.listing.price) + decimal.Decimal(target_order.tax) + decimal.Decimal(target_order.shipping) + decimal.Decimal(target_order.shipping_tax) + decimal.Decimal(target_order.commission)
+                                actions += 1
 
                         if actions > 0:
                             
@@ -1521,7 +1580,7 @@ def edit_order(listing_id, order_id):
                                 flash('Successfully Updated The order', 'success')
                         else:
                             # nothing changed user opened the edit page and click edit
-                            flash('Successfully Updated The order', 'success')
+                            flash('No changes detected', 'success')
 
                 else:
                     flash('Unable to edit order invalid listing provided', 'danger')

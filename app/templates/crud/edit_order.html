@@ -87,7 +87,66 @@
                     {% endfor %}
                 </ul>
                 {% endif %}
-              </div>              
+              </div>
+              <div class="form-group">
+                {{form.tax.label}}
+                {{form.tax(class='form-control', placeholder='Tax')}}
+                
+                {% if form.tax.errors %}
+                <ul class="errors bg-danger text-white">
+                    {% for error in form.tax.errors %}
+                        <li class="p-1 mb-1">{{ error }}</li>
+                    {% endfor %}
+                </ul>
+                {% endif %}
+              </div>
+              <div class="form-group">
+                {{form.shipping.label}}
+                {{form.shipping(class='form-control', placeholder='Shipping')}}
+                
+                {% if form.shipping.errors %}
+                <ul class="errors bg-danger text-white">
+                    {% for error in form.shipping.errors %}
+                        <li class="p-1 mb-1">{{ error }}</li>
+                    {% endfor %}
+                </ul>
+                {% endif %}
+              </div>
+              <div class="form-group">
+                {{form.shipping_tax.label}}
+                {{form.shipping_tax(class='form-control', placeholder='Shipping Tax')}}
+                
+                {% if form.shipping_tax.errors %}
+                <ul class="errors bg-danger text-white">
+                    {% for error in form.shipping_tax.errors %}
+                        <li class="p-1 mb-1">{{ error }}</li>
+                    {% endfor %}
+                </ul>
+                {% endif %}
+              </div>
+              <div class="form-group">
+                {{form.commission.label}}
+                {{form.commission(class='form-control', placeholder='Commission')}}
+                
+                {% if form.commission.errors %}
+                <ul class="errors bg-danger text-white">
+                    {% for error in form.commission.errors %}
+                        <li class="p-1 mb-1">{{ error }}</li>
+                    {% endfor %}
+                </ul>
+                {% endif %}
+              </div>
+              <div class="form-group">
+                {{form.total_cost.label}}
+                {{form.total_cost(class='form-control', placeholder='Total Cost optional', title="How it works, if you change the total cost the app will not calculate the total cost and change the set value even if you change tax, shipping price, shipping tax and commission, but if you don't change the total cost but change one among these values ​​which include tax and shiping and tax shipping and commission, the application will determine the total cost and set its value.")}}                
+                {% if form.total_cost.errors %}
+                <ul class="errors bg-danger text-white">
+                    {% for error in form.total_cost.errors %}
+                        <li class="p-1 mb-1">{{ error }}</li>
+                    {% endfor %}
+                </ul>
+                {% endif %}
+              </div>
               <div class="d-flex justify-content-center align-items-center w-50 mx-auto">
                 {{form.edit(class='btn btn-success w-50')}}
                 <a id="cancel_link" href="{{url_for('routes.view_listing', listing_id=listing_id)}}" class="btn btn-primary w-50">Cancel</a>

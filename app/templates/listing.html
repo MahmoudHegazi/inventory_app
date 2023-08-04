@@ -37,28 +37,43 @@
               <p class="overflow_within"><span class="badge badge-dark">Quantity: </span><span> {{listing.quantity}}</span></p>
             </div>
             <div class="col-sm-12">
-              <p class="overflow_within"><span class="badge badge-dark">Price: </span><span> {{listing.price}}</span></p>
+              <p class="overflow_within"><span class="badge badge-info">Price: </span><span> {{listing.price}}</span></p>
             </div>
             <div class="col-sm-12">
-              <p class="overflow_within"><span class="badge badge-info">Sale Price: </span><span> {{listing.sale_price}}</span></p>
+              <p class="overflow_within"><span class="badge badge-dark">Sale Price: </span><span> {{listing.sale_price}}</span></p>
             </div>
             <div class="col-sm-12">
-              <p class="overflow_within"><span class="badge badge-dark">Product Name: </span><span class="p-1 shadow break_word"> {{listing.product_name}}</span></p>
+              <p class="overflow_within"><span class="badge badge-info">Product Name: </span><span class="p-1 shadow break_word"> {{listing.product_name}}</span></p>
             </div>
             <div class="col-sm-12">
-              <div class="overflow_within"><span class="badge badge-info">Product Description: </span>
+              <div class="overflow_within"><span class="badge badge-dark">Product Description: </span>
                 <p class="p-1 shadow break_word overflow-350"> {{listing.product_description}}</p>
               </div>
             </div>
             <div class="col-sm-12">
-              <p class="overflow_within"><span class="badge badge-dark">Brand: </span><span class="p-1 shadow"> {{listing.brand}}</span></p>
+              <p class="overflow_within"><span class="badge badge-info">Brand: </span><span class="p-1 shadow"> {{listing.brand}}</span></p>
             </div>
             <div class="col-sm-12">
               <p class="overflow_within"><span class="badge badge-dark">Category: </span><span class="p-1 shadow"> {{listing.category}}</span></p>
             </div>
             <div class="col-sm-12">
-              <p class="overflow_within"><span class="badge badge-dark">Plateform: </span><span class="p-1 shadow"> {% for listing_platform in listing.platforms %}<span class="badge badge-secondary">{{listing_platform.platform.name}}</span> {% endfor %}</span></p>
-            </div>  
+              <p class="overflow_within"><span class="badge badge-info">Plateform: </span><span class="p-1 shadow"> {% for listing_platform in listing.platforms %}<span class="badge badge-secondary">{{listing_platform.platform.name}}</span> {% endfor %}</span></p>
+            </div>
+            <div class="col-sm-12">
+              <span class="badge badge-dark">Locations: </span>
+              <p class="overflow_within" style="max-height:180px !important;overflow: auto;">
+                {% for catalogue_location in listing.catalogue.locations %}
+                <div class="border border-secondary shadow p-1">
+                  <h6 title="this is the location {{catalogue_location.warehouse_location.name}} and it's bins under it" class="badge shadow" style="display:block;">{{catalogue_location.warehouse_location.name}}</h6>
+                  <div class="d-flex flex-row flex-wrap justify-content-between align-items-center p-2">
+                    {% for catalogue_locations_bin in catalogue_location.bins %}
+                      <span style="word-wrap: break-word;" title="This is Bin In Location {{catalogue_location.warehouse_location.name}}" class="badge badge-secondary">{{catalogue_locations_bin.bin.name}}</span>
+                    {% endfor %}
+                  </div>
+                </div>
+                {% endfor %}
+              </p>              
+            </div>
             <div class="col-sm-12">
               <div class="overflow_within"><span class="badge badge-info">Created At: </span>
                 <p class="p-1 shadow"> {{listing.created_date}}</p>
@@ -103,8 +118,8 @@
                 </select>
                 <button type="button" id="cancel_search" class="btn btn-sm col-sm-1 btn-danger" style="display:none;"><i class="fa fa-close"></i></button>
                 <select class="form-control col-sm-3" id="search_type">
-                  <option value="current">Current Page</option>
                   <option value="all">all Pages</option>
+                  <option value="current">Current Page</option>                  
                 </select>
                 <button type="submit" class="btn btn-success col-sm-2">Search</button>
               </form>
@@ -165,11 +180,16 @@
                     <option class="search_column2" value="quantity">Quantity</option>
                     <option class="search_column2" value="first_name">First Name</option>
                     <option class="search_column2" value="last_name">Last Name</option>
+                    <option class="search_column2" value="tax">Tax</option>
+                    <option class="search_column2" value="shipping">Shipping</option>
+                    <option class="search_column2" value="shipping_tax">Shipping Tax</option>
+                    <option class="search_column2" value="commission">Commission</option>
+                    <option class="search_column2" value="total_cost">Total Cost</option>
                   </select>
                   <button type="button" id="cancel_search2" class="btn btn-sm col-sm-1 btn-danger" style="display:none;"><i class="fa fa-close"></i></button>
-                  <select class="form-control col-sm-3" id="search_type2">
-                    <option value="current">Current Page</option>
+                  <select class="form-control col-sm-3" id="search_type2">                    
                     <option value="all">all Pages</option>
+                    <option value="current">Current Page</option>
                   </select>
                   <button type="submit" class="btn btn-success col-sm-2">Search</button>
                 </form>
@@ -180,9 +200,9 @@
                 <table class="table table-bordered" id="table_display2">
                   <thead>
                     <tr>
-                      <th>Id</th>
                       <th>Quantity</th>
                       <th>Full Name</th>
+                      <th>Total Cost</th>
                       <th>Action</th>
                     </tr>
                   </thead>
@@ -191,11 +211,10 @@
                     {% for order in listing.orders %}
                     <tr class="searching_card2"
                     data-search-id="{{order.id}}" data-search-quantity="{{order.quantity}}" data-search-first_name="{{order.customer_firstname}}"
-                    data-search-last_name="{{order.customer_lastname}}">
-
-                      <td title="{{order.date}}" class="cursor-pointer">{{order.id}}</td>
+                    data-search-last_name="{{order.customer_lastname}}" data-search-tax="{{order.tax}}" data-search-shipping="{{order.shipping}}" data-search-shipping_tax="{{order.shipping_tax}}" data-search-commission="{{order.commission}}" data-search-total_cost="{{order.total_cost}}" title="{{order.date}}">
                       <td>{{order.quantity}}</td>                      
                       <td>{{order.customer_firstname}} {{order.customer_lastname}}</td>
+                      <td>{{order.total_cost}}</td>
                       <td>
                         <div class="d-flex justify-content-around align-items-center">
                           <a href="{{url_for('routes.view_order', listing_id=listing.id, order_id=order.id)}}" class="btn btn-primary btn-sm"><i class="fa fa-eye"></i></a>
@@ -253,11 +272,12 @@ function rowOrderBuildCB(order){
       rowHTML = `
                   <tr class="searching_card2 search_all_card2"
                     data-search-id="${order.id}" data-search-quantity="${order.quantity}" data-search-first_name="${order.customer_firstname}"
-                    data-search-last_name="${order.customer_lastname}" style="background: gainsboro!important;" title="This Row not belong to this page it returned from search all">
-
-                      <td title="${order.date}" class="cursor-pointer">${order.id}</td>
+                    data-search-last_name="${order.customer_lastname}" 
+                    data-search-tax="${order.tax}" data-search-shipping="${order.shipping}" data-search-shipping_tax="${order.shipping_tax}" data-search-commission="${order.commission}" 
+                    data-search-total_cost="${order.total_cost}" style="background: gainsboro!important;" title="This Row not belong to this page it returned from search all">
                       <td>${order.quantity}</td>                      
                       <td>${order.customer_firstname} ${order.customer_lastname}</td>
+                      <td>${order.total_cost}</td>
                       <td>
                         <div class="d-flex justify-content-around align-items-center">
                           <a href="${order.view_order}" class="btn btn-primary btn-sm"><i class="fa fa-eye"></i></a>

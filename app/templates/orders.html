@@ -45,11 +45,16 @@
             <option class="search_column" value="listing_id">Listing ID</option>
             <option class="search_column" value="customer_firstname">Customer first name</option>
             <option class="search_column" value="customer_lastname">Customer last name</option>
+            <option class="search_column" value="tax">Tax</option>
+            <option class="search_column" value="shipping">Shipping</option>
+            <option class="search_column" value="shipping_tax">Shipping Tax</option>
+            <option class="search_column" value="commission">Commission</option>
+            <option class="search_column" value="total_cost">Total Cost</option>
           </select>
           <button type="button" id="cancel_search" class="btn btn-sm col-sm-1 btn-danger" style="display:none;"><i class="fa fa-close"></i></button>
           <select class="form-control col-sm-3" id="search_type">
-            <option value="current">Current Page</option>
             <option value="all">all Pages</option>
+            <option value="current">Current Page</option>
           </select>
           <button type="submit" class="btn btn-success col-sm-2">Search</button>
         </form>
@@ -66,14 +71,11 @@
       {% for order in orders %}
       <div class="searching_card col-4 p-3 d-flex justify-content-center align-items-center cursor-pointer text-decoration-none text-dark media_small_width_100"
       data-search-id="{{order.id}}" data-search-quantity="{{order.quantity}}" data-search-date="{{order.date}}"
-      data-search-listing_id="{{order.listing_id}}"  data-search-customer_firstname="{{order.customer_firstname}}" data-search-customer_lastname="{{order.customer_lastname}}">
+      data-search-listing_id="{{order.listing_id}}"  data-search-customer_firstname="{{order.customer_firstname}}" data-search-customer_lastname="{{order.customer_lastname}}" data-search-tax="{{order.tax}}" data-search-shipping="{{order.shipping}}" data-search-shipping_tax="{{order.shipping_tax}}" data-search-commission="{{order.commission}}" data-search-total_cost="{{order.total_cost}}" >
 
         <div class="hover_shadow row container border rounded shadow p-3" id="products_container">
           <div class="col-sm-12 mb-3 text-center">
             <img src="{{url_for('static', filename='assets/images/default_order.png')}}" alt="catalogue icon" width="150"class="mxwidth-150" />
-          </div>
-          <div class="col-sm-12">
-            <p class="overflow_within">Id: <span>{{order.id}}</span></p>
           </div>
           <div class="col-sm-12">
             <p class="overflow_within">Quantity: <span>{{order.quantity}}</span></p>
@@ -82,13 +84,25 @@
             <p class="overflow_within">Date: <span>{{order.date}}</span></p>
           </div>
           <div class="col-sm-12">
-            <p class="overflow_within">Listing ID: <span>{{order.listing_id}}</span></p>
-          </div>
-          <div class="col-sm-12">
             <p class="overflow_within">Customer First Name: <span>{{order.customer_firstname}}</span></p>
           </div>
           <div class="col-sm-12">
             <p class="overflow_within">Customer Last Name: <span>{{order.customer_lastname}}</span></p>
+          </div>
+          <div class="col-sm-12">
+            <p class="overflow_within">Tax: <span>{{order.tax}}</span></p>
+          </div>
+          <div class="col-sm-12">
+            <p class="overflow_within">Shipping: <span>{{order.shipping}}</span></p>
+          </div>
+          <div class="col-sm-12">
+            <p class="overflow_within">Shipping Tax: <span>{{order.shipping_tax}}</span></p>
+          </div>
+          <div class="col-sm-12">
+            <p class="overflow_within">Commission: <span>{{order.commission}}</span></p>
+          </div>
+          <div class="col-sm-12">
+            <p class="overflow_within">Total Cost: <span>{{order.total_cost}}</span></p>
           </div>
           <div class="col-sm-12 row">
             <div class="col-sm-6">
@@ -119,23 +133,23 @@
         <table class="table table-hover">
           <thead>
             <tr>
-              <th>#</th>
               <th>Icon</th>
               <th>Quantity</th>
               <th>Date</th>
-              <th>Listing ID</th>
               <th>Firstname</th>   
               <th>Lastname</th>
+              <th>tax</th>
+              <th>Shipping</th>
+              <th>shipping tax</th>
+              <th>commission</th>
+              <th>total cost</th>
               <th>Action</th>
             </tr>
           </thead>
           <tbody>
             {% for order in orders %}
             <tr class="searching_card" data-search-id="{{order.id}}" data-search-quantity="{{order.quantity}}" data-search-date="{{order.date}}"
-              data-search-listing_id="{{order.listing_id}}"  data-search-customer_firstname="{{order.customer_firstname}}" data-search-customer_lastname="{{order.customer_lastname}}">
-              <td>
-                <p class="overflow_within">{{order.id}}</p>
-              </td>
+              data-search-listing_id="{{order.listing_id}}"  data-search-customer_firstname="{{order.customer_firstname}}" data-search-customer_lastname="{{order.customer_lastname}}" data-search-tax="{{order.tax}}" data-search-shipping="{{order.shipping}}" data-search-shipping_tax="{{order.shipping_tax}}" data-search-commission="{{order.commission}}" data-search-total_cost="{{order.total_cost}}">
               <td>
                 <p class="overflow_within"><img src="{{url_for('static', filename='assets/images/default_order.png')}}" alt="listing icon" width="50" class="mxwidth-50" /></p>
               </td>                
@@ -146,27 +160,39 @@
                 <p class="overflow_within">{{order.date}}</p>
               </td>
               <td>
-                <p class="overflow_within">{{order.listing_id}}</p>
-              </td>
-              <td>
                 <p class="overflow_within">{{order.customer_firstname}}</p>
               </td>
               <td>
                 <p class="overflow_within">{{order.customer_lastname}}</p>
-              </td>                                          
+              </td>
+              <td>
+                <p class="overflow_within">{{order.tax}}</p>
+              </td>
+              <td>
+                <p class="overflow_within">{{order.shipping}}</p>
+              </td>
+              <td>
+                <p class="overflow_within">{{order.shipping_tax}}</p>
+              </td>
+              <td>
+                <p class="overflow_within">{{order.commission}}</p>
+              </td>
+              <td>
+                <p class="overflow_within">{{order.total_cost}}</p>
+              </td>                                
               <td>
                 <div class="col-sm-12 row">
                   <div class="col-sm-12 d-flex justify-content-around align-items-center">
                     <div>
-                      <a href="{{url_for('routes.view_order', listing_id=order.listing_id, order_id=order.id)}}" class="btn btn-primary btn-block">View</a>
+                      <a href="{{url_for('routes.view_order', listing_id=order.listing_id, order_id=order.id)}}" class="btn btn-primary btn-sm"><i class="fa fa-eye"></i></a>
                     </div>
                     <div>
-                      <a href="{{url_for('routes.edit_order', listing_id=order.listing_id, order_id=order.id, redirect_url=action_redirect)}}" class="btn btn-secondary btn-block">Edit</a>
+                      <a href="{{url_for('routes.edit_order', listing_id=order.listing_id, order_id=order.id, redirect_url=action_redirect)}}" class="btn btn-secondary btn-sm"><i class="fa fa-edit"></i></a>
                     </div>
                     <div>
                         <button data-url="{{url_for('routes.delete_order', listing_id=order.listing_id, order_id=order.id)}}" data-toggle="modal" 
                           data-target="#removeOrderModal" data-order-id="{{order.id}}" onclick="toggleLoadingCircle(true, 'block')" 
-                          class="wtform_modal_deletebtn btn btn-danger">Delete
+                          class="wtform_modal_deletebtn btn btn-danger btn-sm"><i class="fa fa-trash"></i>
                         </button>                        
                     </div>
                   </div>              
@@ -219,10 +245,8 @@ function rowBuildCB(order){
       const delete_click_event = (typeof(publicOnDeleteBtnClick) == 'function' ? 'publicOnDeleteBtnClick(event);' : '');
       rowHTML = `
       <tr class="searching_card search_all_card" data-search-id="${order.id}" data-search-quantity="${order.quantity}" data-search-date="${order.date}"
-              data-search-listing_id="${order.listing_id}"  data-search-customer_firstname="${order.customer_firstname}" data-search-customer_lastname="${order.customer_lastname}" style="background: gainsboro!important;" title="This Row not belong to this page it returned from search all">
-              <td>
-                <p class="overflow_within">${order.id}</p>
-              </td>
+              data-search-listing_id="${order.listing_id}"  data-search-customer_firstname="${order.customer_firstname}" data-search-customer_lastname="${order.customer_lastname}" style="background: gainsboro!important;" title="This Row not belong to this page it returned from search all"
+              data-search-tax="${order.tax}" data-search-shipping="${order.shipping}" data-search-shipping_tax="${order.shipping_tax}" data-search-commission="${order.commission}" data-search-total_cost="${order.total_cost}">
               <td>
                 <p class="overflow_within"><img src="${order.order_image_url}" alt="listing icon" width="50" class="mxwidth-50" /></p>
               </td>                
@@ -233,27 +257,39 @@ function rowBuildCB(order){
                 <p class="overflow_within">${order.date}</p>
               </td>
               <td>
-                <p class="overflow_within">${order.listing_id}</p>
-              </td>
-              <td>
                 <p class="overflow_within">${order.customer_firstname}</p>
               </td>
               <td>
                 <p class="overflow_within">${order.customer_lastname}</p>
-              </td>                                          
+              </td> 
+              <td>
+                <p class="overflow_within">${order.tax}</p>
+              </td>
+              <td>
+                <p class="overflow_within">${order.shipping}</p>
+              </td>
+              <td>
+                <p class="overflow_within">${order.shipping_tax}</p>
+              </td>
+              <td>
+                <p class="overflow_within">${order.commission}</p>
+              </td>
+              <td>
+                <p class="overflow_within">${order.total_cost}</p>
+              </td>                     
               <td>
                 <div class="col-sm-12 row">
                   <div class="col-sm-12 d-flex justify-content-around align-items-center">
                     <div>
-                      <a href="${order.view_order}" class="btn btn-primary btn-block">View</a>
+                      <a href="${order.view_order}" class="btn btn-primary btn-sm"><i class="fa fa-eye"></i></a>
                     </div>
                     <div>
-                      <a href="${order.edit_order}" class="btn btn-secondary btn-block">Edit</a>
+                      <a href="${order.edit_order}" class="btn btn-secondary btn-sm"><i class="fa fa-edit"></i></a>
                     </div>
                     <div>
                         <button data-url="${order.delete_order}" data-toggle="modal" 
                           data-target="#removeOrderModal" data-order-id="${order.id}" onclick="toggleLoadingCircle(true, 'block');${delete_click_event}" 
-                          class="wtform_modal_deletebtn btn btn-danger">Delete
+                          class="wtform_modal_deletebtn btn btn-danger btn-sm"><i class="fa fa-trash"></i>
                         </button>                        
                     </div>
                   </div>              

@@ -321,7 +321,7 @@ def search():
                 ).outerjoin(
                     Platform, ListingPlatform.platform_id==Platform.id
                 ).outerjoin(
-                    CatalogueLocations, Catalogue.id == CatalogueLocations.id
+                    CatalogueLocations, Catalogue.id == CatalogueLocations.catalogue_id
                 ).outerjoin(
                     WarehouseLocations, CatalogueLocations.location_id == WarehouseLocations.id
                 ).outerjoin(
@@ -332,6 +332,7 @@ def search():
                     and_(Catalogue.user_id==current_user.id),
                     and_(sqlalchemy_expression)
                 ).all()]
+
                 for i in range(len(data)):
                     data[i]['view_listing'] = url_for('routes.view_listing', listing_id=data[i]['id'])
                     data[i]['edit_listing'] = url_for('routes.edit_listing', listing_id=data[i]['id'])
@@ -346,7 +347,12 @@ def search():
                 'date': Order.date,
                 'listing_id': Order.listing_id,
                 'customer_firstname': Order.customer_firstname,
-                'customer_lastname': Order.customer_lastname
+                'customer_lastname': Order.customer_lastname,
+                'tax': Order.tax,
+                'shipping': Order.shipping,
+                'shipping_tax': Order.shipping_tax,
+                'commission': Order.commission,
+                'total_cost': Order.total_cost
             }
 
             if column in direct_search_columns:                
@@ -374,7 +380,12 @@ def search():
                 'id': Order.id,
                 'quantity': Order.quantity,
                 'first_name': Order.customer_firstname,
-                'last_name': Order.customer_lastname
+                'last_name': Order.customer_lastname,
+                'tax': Order.tax,
+                'shipping': Order.shipping,
+                'shipping_tax': Order.shipping_tax,
+                'commission': Order.commission,
+                'total_cost': Order.total_cost
             }
             if column in direct_search_columns:
                 search_val = '%{}%'.format(value)

@@ -1,5 +1,6 @@
 import datetime
 import sys
+import decimal
 #from sqlalchemy.types import TypeDecorator
 from sqlalchemy import desc, asc
 from sqlalchemy.orm import relationship, backref
@@ -422,6 +423,18 @@ class Listing(db.Model):
 
     def format(self):
         listing_platforms = [listing_platform.platform.name for listing_platform in self.platforms]
+        # for all locations string of this listing
+        listing_location_strings = []
+        # for looping in js over location data objects
+        listing_locations = []
+        listing_bins_arr = []
+        for catalogue_loc in self.catalogue.locations:
+            loc_name = catalogue_loc.warehouse_location.name
+            loc_obj = {'location': loc_name, 'bins': [catalogue_loc_bin.bin.name for catalogue_loc_bin in catalogue_loc.bins]}
+            listing_location_strings.append(loc_name)
+            listing_locations.append(loc_obj)
+            listing_bins_arr = [*listing_bins_arr, *loc_obj['bins']]
+
         return {
         'id': self.id,
         'dashboard_id': self.dashboard_id,
@@ -436,7 +449,10 @@ class Listing(db.Model):
         'quantity': self.quantity,
         'image': self.image,
         'platform': ",".join(listing_platforms),
-        'platforms': listing_platforms
+        'platforms': listing_platforms,
+        'location': ",".join(listing_location_strings),
+        'locations': listing_locations,
+        'bin': ",".join(listing_bins_arr)
         }
 
 class Purchase(db.Model):
@@ -488,16 +504,26 @@ class Order(db.Model):
     listing_id = db.Column(db.Integer, db.ForeignKey('listing.id', ondelete="CASCADE", onupdate="CASCADE"), nullable=False)
     customer_firstname = db.Column(db.String(50), nullable=True, default='')
     customer_lastname = db.Column(db.String(50), nullable=True, default='')
+    tax = db.Column(db.DECIMAL(precision=10, scale=2, asdecimal=True), nullable=True, default=0.00)
+    shipping = db.Column(db.DECIMAL(precision=10, scale=2, asdecimal=True), nullable=True, default=0.00)
+    shipping_tax = db.Column(db.DECIMAL(precision=10, scale=2, asdecimal=True), nullable=True, default=0.00)
+    commission = db.Column(db.DECIMAL(precision=10, scale=2, asdecimal=True), nullable=True, default=0.00)
+    total_cost = db.Column(db.DECIMAL(precision=10, scale=2, asdecimal=True), nullable=True, default=0.00)
     created_date = db.Column(DateTime, nullable=False, default=datetime.datetime.utcnow)
     updated_date = db.Column(DateTime, nullable=True, default=None, onupdate=datetime.datetime.utcnow)
 
 
-    def __init__(self, listing_id, quantity=0, date=None, customer_firstname='', customer_lastname=''):
+    def __init__(self, listing_id, quantity=0, date=None, customer_firstname='', customer_lastname='', tax=0.0, shipping=0.0, shipping_tax=0.0, commission=0.0, total_cost=0.0):
         self.listing_id = listing_id
         self.quantity = quantity
         self.date = date
         self.customer_firstname = customer_firstname
         self.customer_lastname = customer_lastname
+        self.tax = tax
+        self.shipping = shipping
+        self.shipping_tax = shipping_tax
+        self.commission = commission
+        self.total_cost = total_cost
 
     def insert(self):
         db.session.add(self)
@@ -518,6 +544,11 @@ class Order(db.Model):
         'date': str(self.date),
         'customer_firstname': self.customer_firstname,
         'customer_lastname': self.customer_lastname,
+        'tax': str(self.tax),
+        'shipping': str(self.shipping),
+        'shipping_tax': str(self.shipping_tax),
+        'commission': str(self.commission),
+        'total_cost': str(self.total_cost),
         'created_date': self.created_date,
         'updated_date': self.updated_date
         }
@@ -731,11 +762,30 @@ class CatalogueLocationsBins(db.Model):
 
 ################################ ---------- Tables for Inventory (End) ---------------- #########################
 # some functions for automation
-"""
-@db.event.listens_for(Dashboard, "after_insert")
-def insert_order_to_printer(mapper, connection, target):
-    print("hi")
-"""
+# before insert will let me able to set the columns values (done before commit) and after init (all working around init function and what passed)
+@db.event.listens_for(Order, "before_insert")
+def insert_order_hock(mapper, connection, target):
+    try:
+        scoped_session = db.create_scoped_session()
+        target_listing = scoped_session.query(Listing).filter_by(id=target.listing_id).one_or_none()
+        if target_listing is not None:
+            listing_price = decimal.Decimal(target_listing.price)
+            # handle for now static, tax is final number of tax for that item, shipping is price for shipping to the country, shipping_tax is fixed number added to result, commission fixed
+            tax = decimal.Decimal(target.tax)
+            shipping = decimal.Decimal(target.shipping)
+            shipping_tax = decimal.Decimal(target.shipping_tax)
+            commission = decimal.Decimal(target.commission)
+            total_cost = decimal.Decimal(target.total_cost)
+            # if total cost any number except 0 that's mean user decided to add it manual so not calcuate (in insert)
+            if total_cost == 0:
+                total_cost = (listing_price + tax + shipping + shipping_tax + commission)
+                target.total_cost = total_cost
+    except Exception as e:
+        scoped_session.rollback()
+        raise e
+    finally:
+        scoped_session.close()
+
 
 # automatic after update Catalogue update it's listings data if any change on shared cells (1 side cascade)
 @db.event.listens_for(Catalogue, "after_update")
@@ -757,8 +807,8 @@ def update_listing_on_catalogue_update(mapper, connection, target):
         scoped_session.commit()
     except Exception as e:
         scoped_session.rollback()
-        raise e
         print('Error in Updating catalogue event db function (update_listing_on_catalogue_update): {}'.format(e, sys.exc_info()))
+        raise e        
     finally:
         scoped_session.close()
 """

@@ -186,6 +186,31 @@ class OrderForm(FlaskForm):
     date = DateTimeLocalField('Date', validators=[InputRequired()], format="%Y-%m-%dT%H:%M")
     customer_firstname = StringField('Customer Name Name', validators=[Length(max=50)])
     customer_lastname = StringField('Customer Last Name', validators=[Length(max=50)])
+    tax = DecimalField(
+        'tax',
+        validators=[],
+        default=0.00
+    )
+    shipping = DecimalField(
+        'shipping',
+        validators=[],
+        default=0.00
+    )
+    shipping_tax = DecimalField(
+        'shipping_tax',
+        validators=[],
+        default=0.00
+    )
+    commission = DecimalField(
+        'commission',
+        validators=[],
+        default=0.00
+    )
+    total_cost = DecimalField(
+        'total_cost',
+        validators=[],
+        default=0.00
+    )
 
 class addOrderForm(OrderForm):
     action_redirect = HiddenField()

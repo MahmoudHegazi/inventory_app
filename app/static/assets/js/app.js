@@ -611,7 +611,7 @@ function fillEditBin(){
 
 
 /* integerted with search throw 1 event cancel search, and visible elements (searchComponent use display none for process search result) */
-function multipleSelectComponent(checkboxSelector='', dataLabel='', actionModals=[], selectAllSelector=''){
+function multipleSelectComponent(checkboxSelector='', dataLabel='', actionModals=[], selectAllSelector='', openModalCB=null, closeModalCB=null){
   let checkedCheckBoxes = [];
   let selectedValues = [];
   let selectedLabels = [];
@@ -624,9 +624,8 @@ function multipleSelectComponent(checkboxSelector='', dataLabel='', actionModals
   for (let a=0; a<actionModals.length; a++){
    let actionModal = actionModals[a];
    if (!(
-     actionModal.modalId && actionModal.actionLabesSelctor && actionModal.formInputSelector &&
-     actionModal.startActionBtn && $(actionModal.modalId).length && 
-     $(actionModal.actionLabesSelctor).length && $(actionModal.formInputSelector).length && $(actionModal.startActionBtn).length
+     actionModal.modalId && actionModal.startActionBtn && 
+     $(actionModal.modalId).length && $(actionModal.startActionBtn).length
      )){        
      allActionsReady = false;
      break;
@@ -699,34 +698,50 @@ function multipleSelectComponent(checkboxSelector='', dataLabel='', actionModals
    actionModals.forEach( (actionModal)=>{
        $(actionModal.modalId).on('shown.bs.modal', function(e) {
          
-       
-       /* set action form input value */
-       $(actionModal.formInputSelector).val(selectedValues.join(","));
- 
-       $(actionModal.actionLabesSelctor).html("");
+       if ((actionModal.setFormIdsInputVal === true || typeof(actionModal.setFormIdsInputVal) === 'undefined') && actionModal.formInputSelector && $(actionModal.formInputSelector).length){
+         /* set action form input value (this way it will never need do action for input value when modal closes even if modal opened with empty selected) */
+         $(actionModal.formInputSelector).val(selectedValues.join(","));
+       }
  
        // display total element text if provided
        if (actionModal.totalElement && $(actionModal.totalElement).length){
          $(actionModal.totalElement).text(selectedValues.length);
        }
-     
-       // display labels
-       let actionLabesHtml = '';
-       selectedLabels.forEach( (labelText)=>{
-         actionLabesHtml += `<span class="badge badge-secondary mr-1 mt-1">${labelText}</span>`;
-       });
-       $(actionModal.actionLabesSelctor).html(actionLabesHtml);
+
+       if ((actionModal.displayLabels === true || typeof(actionModal.displayLabels) === 'undefined') && actionModal.actionLabesSelctor && $(actionModal.actionLabesSelctor).length){
+          $(actionModal.actionLabesSelctor).html("");
+
+          // display labels if displayLabels set in current modal data setup obj
+          let actionLabesHtml = '';
+          selectedLabels.forEach( (labelText)=>{
+            actionLabesHtml += `<span class="badge badge-secondary mr-1 mt-1">${labelText}</span>`;
+          });
+          $(actionModal.actionLabesSelctor).html(actionLabesHtml);
+       }
+
+       // call openModalCB if exist (SelectComponent working around 2 main lists selectedValues, selectedLabels) any cb must use this 2 arugments
+       if (typeof(actionModal.openModalCB) === 'function'){
+          actionModal.openModalCB(selectedValues, selectedLabels);
+       }
      });
-   
+     
      actionModals.forEach( (actionModal)=>{
        $(actionModal.modalId).on('hide.bs.modal', function(e) {
-         // empty labels
-         $(actionModal.actionLabesSelctor).html("");
+
+         if ((actionModal.displayLabels === true || typeof(actionModal.displayLabels) === 'undefined') && actionModal.actionLabesSelctor && $(actionModal.actionLabesSelctor).length){
+           // empty labels
+           $(actionModal.actionLabesSelctor).html("");
+         }
          // empty total elements text if exist
          if (actionModal.totalElement && $(actionModal.totalElement).length){
            $(actionModal.totalElement).text("0");
          }
-         // if selectAll exist reset it          
+         // if selectAll exist reset it
+         
+         // if there are callback for close modal call it
+         if (typeof(actionModal.closeModalCB) === 'function'){
+            actionModal.closeModalCB();
+         }
        });
      });
 

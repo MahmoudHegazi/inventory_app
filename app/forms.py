@@ -1,11 +1,12 @@
+import phonenumbers
 from flask_wtf import FlaskForm
 from wtforms import (StringField, TextAreaField, IntegerField, BooleanField,HiddenField, DecimalField, SelectField,
                      RadioField, SubmitField, PasswordField, validators, SelectMultipleField)
-from wtforms.validators import InputRequired, Length, Email, NumberRange, ValidationError
-from wtforms.fields import DateTimeLocalField
+from wtforms.validators import InputRequired, Length, Email, NumberRange, ValidationError, optional
+from wtforms.fields import DateTimeLocalField, FieldList 
 from wtforms.widgets import NumberInput
 from flask_wtf.file import FileField, FileAllowed, FileRequired
-import phonenumbers
+
 
 def FileSizeLimit(max_size_in_mb):
     
@@ -106,7 +107,7 @@ class editCatalogueForm(catalogueModal):
 
 
 class removeCatalogueForm(FlaskForm):
-    catalogue_id = HiddenField(validators=[InputRequired()])    
+    catalogue_id = HiddenField(validators=[InputRequired()])
     delete = SubmitField('Delete')
 
 
@@ -117,6 +118,16 @@ class removeCataloguesForm(FlaskForm):
 # Using wtforms in all app + prevent any unknown delet request that can delete catalogues of system By depend on wtforms
 class removeAllCataloguesForm(FlaskForm):
     delete_all = SubmitField('Delete All Catalgoues')
+
+class AddMultipleListingForm(FlaskForm):
+    # select platform choice here do 2 things one for ux second as fieldList.data return None instead of empty list if not selected value in select, by adding 0 force it add list with 0, !!! if not added it will broke the two lists order and access with indexs of two lists 
+    platforms_selects = FieldList(SelectMultipleField(u'Select Platform', coerce=int,
+                                    validate_choice=True,
+                                    validators=[optional()],
+                                    choices=[(0, 'Select Platform')],
+                                    render_kw={'style': 'display:none;', 'title': 'Select Platforms'}))
+    catalogue_ids = FieldList(IntegerField(validators=[optional(), NumberRange(min=1)], render_kw={'style': 'display:none;'}))
+    add = SubmitField('Add')
 
 # signup = SubmitField('Signup', default='checked')
 

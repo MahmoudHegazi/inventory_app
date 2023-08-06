@@ -149,7 +149,7 @@
 
 {% endmacro %}
 
-{% macro catalogues_forms(catalogues_excel, delete_catalogues, delete_all_catalogues) %}
+{% macro catalogues_forms(catalogues_excel, delete_catalogues, delete_all_catalogues, add_multiple_listings) %}
 <div class="modal fade" id="importExcelCatalogues">
   <div class="modal-dialog">
     <div class="modal-content">
@@ -246,6 +246,55 @@
     </div>
   </div>
 </div>
+
+
+<div class="modal fade" id="addMultipleListingModal">
+  <div class="modal-dialog modal-xl">
+    <div class="modal-content">
+    
+      <!-- Modal Header -->
+      <div class="modal-header">
+        <h4 class="modal-title">Add Multiple Listings</h4>
+        <button type="button" class="close" data-dismiss="modal">&times;</button>
+      </div>      
+      <!-- Modal body -->
+      <div class="modal-body">
+        {% if add_multiple_listings and add_multiple_listings.add and add_multiple_listings.platforms_selects is defined and add_multiple_listings.catalogue_ids is defined %}        
+        <p><span>You Have selected</span><strong><span class="badge badge-primary mx-1" id="selected_catalogues_total">0</span></strong><span>Catalogues</span></p>
+        <form id="add_multiple_listing" action="{{url_for('routes.multiple_listing_add')}}" method="post">
+            {{add_multiple_listings.hidden_tag()}}
+            <h5 class="text-center mt-2">Please select platforms for each listing</h5>
+            {% for platform_select in add_multiple_listings.platforms_selects %}
+            <div class="new_listing_containers mb-1 shadow-sm" id="container_{{loop.index}}" style="display:none;">
+              {% if add_multiple_listings.catalogue_ids|length > loop.index0 %}
+                <div class="row p-2">
+                  <label class="listing_label col-sm-7"></label>
+                  {{add_multiple_listings.platforms_selects[loop.index0](class='form-control multiple_platform_selects col-sm-5', style='display:none;')}}
+                </div>   
+                {{add_multiple_listings.catalogue_ids[loop.index0](class='multiple_platform_ids', style='display:none;')}}
+              {% else %}
+                {# if else must not occured only occured if 2 lists not equal for any reason #}
+                <div class="alert alert-danger">Unable to display platforms data error please report this issue</div>
+              {% endif %}
+            </div>
+            {% endfor %}
+
+            {{add_multiple_listings.add(class='btn btn-success btn-sm mt-3 btn-block')}}
+        </form>
+        {% else %}
+        <div class="alert-danger">Unable to Display Add Multiple Listings form right now.</div>
+        {% endif %}
+      </div>
+      
+      <!-- Modal footer -->
+      <div class="modal-footer">
+        <button type="button" class="btn btn-danger" data-dismiss="modal">Close</button>
+      </div>
+      
+    </div>
+  </div>
+</div>
+
 
 {% endmacro %}
 

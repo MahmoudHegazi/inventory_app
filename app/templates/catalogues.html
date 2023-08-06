@@ -67,6 +67,7 @@
     <div class="p-2">
       <button id="selectAll" class="btn btn-secondary btn-sm">Select All</button>
       <button id="deleteCataloguesOpen" data-toggle="modal" data-target="#removeCatalogues" class="btn btn-danger btn-sm" type="button" style="display:none;">Delete Catagloues</button>
+      <button id="multiple_listing_open" data-toggle="modal" data-target="#addMultipleListingModal" class="btn btn-primary btn-sm" type="button" style="display:none;">Add listings</button>
     </div>
     <!-- multiple select end -->
 
@@ -206,7 +207,7 @@
 </div>
 {{url_for('routes.view_catalogue', catalogue_id=1)}}
 {% import 'forms.html' as forms %}
-{{ forms.catalogues_forms(catalogues_excel=catalogues_excel,delete_catalogues=delete_catalogues, delete_all_catalogues=delete_all_catalogues) }}
+{{ forms.catalogues_forms(catalogues_excel=catalogues_excel,delete_catalogues=delete_catalogues, delete_all_catalogues=delete_all_catalogues, add_multiple_listings=add_multiple_listings) }}
 {% endblock %}
 
 
@@ -230,8 +231,24 @@ const actionModalsArray = [
     formInputSelector: '#catalogues_ids',
     startActionBtn: '#deleteCataloguesOpen',
     totalElement: '#catalogues_ids_total'
+  },
+  {
+    modalId: '#addMultipleListingModal',
+    formId: '#add_multiple_listing',
+    startActionBtn: '#multiple_listing_open',
+    totalElement: '#selected_catalogues_total',
+    displayLabels: false,
+    setFormIdsInputVal: false,
+    openModalCB: multipleListingOpenCB,
+    closeModalCB: multipleListingCloseCB
   }
 ];
+
+
+
+
+
+
 // incase component started he will allow return some public functions can accessed and used in other components called after incase component not started it will return undefined; not value
 const selectComponent = multipleSelectComponent(checkboxSelector=".deleted_catalogues",  dataLabel="data-check-catalogue", actionModals=actionModalsArray, selectAllSelector="#selectAll");
 
@@ -311,6 +328,81 @@ function rowBuildCB(catalogue){
 }
 
 searchComponent('fast', 'swing', cp=function(){return true;}, addon='', condition='*=', rowBuildCB=rowBuildCB, table='catalogue');
+
+
+/* multiple Listings Callbacks */
+function multipleListingOpenCB(selectedValues, selectedLabels){
+  console.log("cb called", selectedValues, selectedLabels);
+  const newListingContainers = $(".new_listing_containers");
+  // start if all data is ready and all lengths same (newListingContainers equal to all catalogues of the page dynamic incase size of catalogues increased) so selected values must be less or equal this elements
+  if (selectedValues.length == selectedLabels.length && newListingContainers.length >= selectedValues.length){
+    for (let i=0; i< selectedValues.length; i++){
+      const currentCatalogueId = selectedValues[i];
+      const currentCatalogueName = selectedLabels[i];
+      const currentNewListingCont = newListingContainers.eq(i);
+      const currentSelectPlatform = currentNewListingCont.find('select.multiple_platform_selects');
+      const currentCatalogueIdInput = currentNewListingCont.find('input.multiple_platform_ids');
+      const currentCatalogueLabel = currentNewListingCont.find('label.listing_label');
+      
+      if (currentSelectPlatform.length && currentCatalogueIdInput.length && currentCatalogueLabel.length){
+        currentCatalogueIdInput.eq(0).val(currentCatalogueId);
+        currentCatalogueLabel.eq(0).text(currentCatalogueName);
+        currentSelectPlatform.eq(0).show();
+        currentNewListingCont.show();
+        // add class to selected inputs to disable other not used input
+        currentCatalogueIdInput.eq(0).addClass("used");
+        currentSelectPlatform.eq(0).addClass("used");
+        //multipleSelectV2();
+
+      } else {
+        console.log(`multipleListingOpenCB Error: container with index ${i} missing select platform or catalogue id input or label.`);
+      }
+    }
+
+    // disable all other inputs not used
+    $("select.multiple_platform_selects:not(.used)").attr("disabled", true);
+    $("input.multiple_platform_ids:not(.used)").attr("disabled", true);
+
+  } else {
+    console.log("Invalid data multipleListingOpenCB not processed", newListingContainers.length);
+  }
+}
+
+function multipleListingCloseCB(){
+  $("select.multiple_platform_selects").val("");
+  $("select.multiple_platform_selects").hide();
+  $("input.multiple_platform_ids").val("");
+  $("input.multiple_platform_ids").hide();
+  $("label.listing_label").text("");
+  $(".new_listing_containers").hide();
+
+  // remove used class
+  $("select.multiple_platform_selects.used").removeClass("used");
+  $("input.multiple_platform_ids.used").removeClass("used");
+  // remove disabled from inputs
+  $("select.multiple_platform_selects").removeAttr("disabled");
+  $("input.multiple_platform_ids").removeAttr("disabled");
+}
+
+/* default on modal, here, wtforms fildList will remove entry(select Element) if user in html not selected value (user can unselect default value so before submit back it if no value selected) */
+if ($("#add_multiple_listing").length){
+  $("#add_multiple_listing").on("submit", (event)=>{
+    $("select.multiple_platform_selects.used").each( (_i, userSelectPlatform)=>{
+      if ($(userSelectPlatform).val().length === 0){
+        $(userSelectPlatform).val([0]);
+      } else {
+        // if user selected empty option with other options deslect it (note server will handle 0 value, but this send only needed data)
+        const selectedValues = $(userSelectPlatform).val();
+        if (selectedValues.length > 1 && selectedValues.includes("0")){
+          const zeroOption = $(userSelectPlatform).find("option[value='0']");
+          if (zeroOption.length > 0){
+            zeroOption.eq(0).prop("selected", false);
+          }
+        }
+      }
+    });
+  });
+}
 
 </script>
 {% endblock page_scripts %}

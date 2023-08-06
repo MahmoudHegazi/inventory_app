@@ -12,7 +12,7 @@ from .forms import addListingForm, editListingForm, addCatalogueForm, editCatalo
 removeCatalogueForm, removeListingForm, addSupplierForm, editSupplierForm, removeSupplierForm, \
 addPurchaseForm, editPurchaseForm, removePurchaseForm, addOrderForm, editOrderForm, removeOrderForm, CatalogueExcelForm, \
 removeCataloguesForm, removeListingsForm, removeAllCataloguesForm, addPlatformForm, editPlatformForm, removePlatformForm, \
-addLocationForm, editLocationForm, removeLocationForm, addBinForm, editBinForm, removeBinForm
+addLocationForm, editLocationForm, removeLocationForm, addBinForm, editBinForm, removeBinForm, AddMultipleListingForm
 from . import vendor_permission, db
 from .functions import get_safe_redirect, updateDashboardListings, updateDashboardOrders, updateDashboardPurchasesSum, secureRedirect, get_charts
 from sqlalchemy.exc import IntegrityError
@@ -82,6 +82,35 @@ def index():
         abort(500)
         return 'system error', 500
 
+def populate_add_multiple_form(form, platform, dashboard_id, min_entries=None, max_entries=None):
+    try:
+        # this function called twice on in get route to inital the form and set min, max entires and process, and fill choices, other call will be only for fill choices as already form inital and should have the entries filled with user inputs
+        need_process = False
+
+        user_platforms = platform.query.filter_by(dashboard_id=dashboard_id).all()
+        platform_choices = [(platform_obj.id, platform_obj.name) for platform_obj in user_platforms]
+
+        # process will update min and max entries, which will used to create the needed number of inputs for fieldList, then you can access the entries and set it's choices 
+        if min_entries is not None:
+            form.catalogue_ids.min_entries = min_entries
+            form.platforms_selects.min_entries = min_entries
+            need_process = True
+        
+        if max_entries is not None:
+            form.catalogue_ids.max_entries = max_entries
+            form.platforms_selects.max_entries = max_entries
+            need_process = True
+
+        if need_process == True:
+            form.process()
+
+        for select_field in form.platforms_selects.entries:
+            select_field.choices.extend(platform_choices)
+        
+    except Exception as e:
+        print("error in populate_add_multiple_form")
+        raise e
+
 ################ -------------------------- Catalogue -------------------- ################
 @routes.route('/catalogues', methods=['GET'])
 @login_required
@@ -96,12 +125,16 @@ def catalogues():
         catalogues_excel = CatalogueExcelForm()
         delete_catalogues = removeCataloguesForm()
         delete_all_catalogues = removeAllCataloguesForm()
+        add_multiple_listings = AddMultipleListingForm()
         #return str(delete_catalogues.hidden_tag())+str(delete_catalogues.catalogues_ids)
         user_catalogues = pagination['data']
-        return render_template('catalogues.html', catalogues=user_catalogues,  catalogues_excel=catalogues_excel, pagination_btns=pagination['pagination_btns'], delete_catalogues=delete_catalogues, delete_all_catalogues=delete_all_catalogues)
+        populate_add_multiple_form(add_multiple_listings, Platform, current_user.dashboard.id, min_entries=len(user_catalogues), max_entries=len(user_catalogues))
+
+        return render_template('catalogues.html', catalogues=user_catalogues,  catalogues_excel=catalogues_excel, pagination_btns=pagination['pagination_btns'], delete_catalogues=delete_catalogues, delete_all_catalogues=delete_all_catalogues, add_multiple_listings=add_multiple_listings)
     except Exception as e:
         print('System Error: {}'.format(sys.exc_info()))
         flash('unable to display catalogues page', 'danger')
+        raise e
         return redirect(url_for('routes.index'))
 
 
@@ -506,7 +539,7 @@ def listings():
             User.id == current_user.id,
             Dashboard.id == current_user.dashboard.id
         )
-    # total_pages + 1 (becuase range not take last number while i need it to display the last page)
+        # total_pages + 1 (becuase range not take last number while i need it to display the last page)
         pagination = makePagination(
                 request.args.get('page', 1),
                 user_dashboard_listings_q,
@@ -875,6 +908,62 @@ def delete_listings():
 
     finally:
         return redirect(url_for('routes.listings'))
+
+# ! this route called from catalogues page
+@routes.route('/listings/multiple_add', methods=['POST'])
+@login_required
+@vendor_permission.require(http_exception=403)
+def multiple_listing_add():
+    try:
+        total_created_listings = 0
+        form = AddMultipleListingForm()
+        # fill choices only
+        populate_add_multiple_form(form, Platform, current_user.dashboard.id)
+        if form.validate_on_submit():
+            catalogue_ids_data = form.catalogue_ids.data
+            platforms_selects_data = form.platforms_selects.data
+
+            if len(catalogue_ids_data) == len(platforms_selects_data):
+                for i in range(len(catalogue_ids_data)):
+                    catalogue_id = catalogue_ids_data[i]
+                    platform_ids_list = platforms_selects_data[i]
+                    if catalogue_id is not None:
+                        current_catalogue = Catalogue.query.filter_by(id=catalogue_id, user_id=current_user.id).one_or_none()
+                        if current_catalogue is not None:
+                            # current_user.dashboard.id may small heavy repted query but make sure get value on time when insert
+                            new_listing = Listing(dashboard_id=current_user.dashboard.id, catalogue_id=current_catalogue.id)
+                            # create platforms using append
+                            for platform_id in platform_ids_list:
+                                # sometimes platform id will be 0 if no platform selected (coerce used always int)
+                                if platform_id != 0:
+                                    valid_platform = Platform.query.filter_by(dashboard_id=current_user.dashboard.id, id=platform_id).one_or_none()
+                                    if valid_platform is not None:
+                                        new_platform = ListingPlatform(listing_id=None, platform_id=valid_platform.id)
+                                        new_listing.platforms.append(new_platform)
+                            
+                            new_listing.insert()
+                            total_created_listings += 1
+                    else:
+                        # this error if something happend in Javascript and not filled the catalogue_id input so it must notice by user to report (this developing error)
+                        flash("one of catalogues is invalid, unable to create listing for it", "danger")
+                
+                # set the number of total listings after adding action
+                updateDashboardListings(current_user.dashboard)
+                flash("Successfully created {} listings".format(total_created_listings))
+            else:
+                # (protect mylogic from fieldList when it delete one of select feilds if user not select value)
+                print("Error in multiple_listing_add catalogues_ids data not equal to platforms_data, one of inputs missing")
+                flash("System Error while processing your request, Please report this issue.", 'danger')
+
+        else:
+            print('error from multiple_listing_add {}'.format(form.errors))
+            flash("Error while processing your request, can not add multiple listing right now.", "danger")
+    except Exception as e:
+        print('System Error: {}'.format(sys.exc_info()))
+        flash('Unknown error unable to add multiple listing', 'danger')
+    
+    finally:
+        return redirect(url_for('routes.catalogues'))
 
 
 ################ -------------------------- Listing Purchases (this purchases based on selected listing from any supplier) -------------------- ################

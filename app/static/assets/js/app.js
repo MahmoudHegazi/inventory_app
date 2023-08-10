@@ -771,6 +771,174 @@ function multipleSelectComponent(checkboxSelector='', dataLabel='', actionModals
    console.log('multipleSelectComponent not started');
   }
 }
+
+
+
+// this component asynced with flask so it not require any code in flask endpoints so it final result tretet as normal request to page with query limit paramter
+function limitPerPageComponent(){
+  if ($("#limit_select").length && $("#custom_limit_cont").length && $("#custom_limit_option").length && $("#custom_limit_input").length && $("#set_custom_btn").length && $("#limit_select").attr('data-save-limit')){
+    
+    const maxLimit = 1000;
+    let previousLimit = null;
+
+    // function prevent editing form html and broke functionality always return valid number bigger than 0 and less than max for server request length variables also private protected no access outside
+    const limitOr10 = (l)=>{      
+      let limit = String(l).trim();
+      // parseInt will handle float
+      return ((limit && !(isNaN(limit)) && limit <= maxLimit && limit > 0) === true) ? parseInt(limit) : 10;
+    }
+
+    async function setLimitAJAX(limit){
+      let success = true;
+      try {
+        const res = await fetch($("#limit_select").attr('data-save-limit'), {
+          method: 'POST',
+          credentials: "same-origin",
+          headers:{
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({limit}),
+        });
+        const data = await res.json();
+        console.log(data);
+        if (!data || data.code != 200){
+          success = false;
+        }
+      } catch (error){
+        console.warn('error while sending ajax request, no intenert connection maybe', error);
+        success = false;
+      }
+      return success;
+    }
+
+    async function onLimitChange(e){     
+
+      if ($(e.currentTarget).length){
+        
+        if ($(e.currentTarget).val()){
+          // direct change page limit (casted only if selected value not custom)
+
+          // ! if you need switch from custom to the inital value also cast reload remove this (safe) only removed if limitOptionExit removed, if limitOptionExit removed not need remove this, if removed this remove previousLimit
+          // for better UX if user selected value before and switch to custom to test and back to the previous selected value not reload page (ux only not effect values or types) use only if to set previous as page reload after new value valid assigned
+          if (previousLimit && previousLimit == $(e.currentTarget).val()){
+            $("#custom_limit_cont").css('display', 'none');
+            return false;
+          }
+
+          // hide custom
+          $("#custom_limit_cont").css('display', 'none');
+          $("#limit_select").prop('disabled', true);
+          $("#limit_select").removeAttr('title');
+
+          // set number of limit using ajax to session (note incase any invalid number gotten return default 10) !! for secuirty reason if user tried edit html I will not inform him there are error and set the value to 10 as default
+          const selectedLimit = limitOr10($(e.currentTarget).val());
+          const setLimitData = await setLimitAJAX(selectedLimit);
+          reloadOrDisplayError(setLimitData);
+        } else {
+          // custom set page limit (display)
+          $("#custom_limit_cont").css('display', 'block');
+        }
+
+      } else {
+        displayAjaxError('Unable to update limit per page right now, due to system issue please report this problem.', 'danger');
+        console.log('invalid target can not run onLimitChange');
+      }
+    }
+
+    async function handleCustom(){
+
+      const selectedLimit = parseInt(String($("#custom_limit_input").val()).trim());
+      // make sure user enter valid limit number (component controlled by maxLimit private variable (private means can not accessed or edited from console))
+      if (isNaN(selectedLimit) || selectedLimit <= 0 || selectedLimit > maxLimit){
+        displayAjaxError(`Invalid custom limit, please enter number bigger than 0 and less than or equal to ${maxLimit}.`, 'warning');
+        return false;
+      }
+
+
+      // (can remove me safe to repeat action if same custom selected) small performance feature and ux, Avoids not needed ajax call, and page reload, incase user selected same custom limit number, use prop to change the custom option to the exist custom option, and trigger change event so onLimitChange will called and automatic detect this is previous selected as it do dynamiclly and hide the container (this makes sure logic work dynamic when option changed even if it custom created the app handle it, and logic work in circle)
+      const limitOptionExit = $(`#limit_select option[value='${selectedLimit}']`);
+      if (limitOptionExit.length){
+        limitOptionExit.prop('selected', true).trigger('change');
+        return false;
+      }
+
+      $("#limit_select").prop('disabled', true);
+      $("#custom_limit_cont").css('display', 'none');
+      const setLimitData = await setLimitAJAX(selectedLimit);
+      reloadOrDisplayError(setLimitData, onFailureCB=()=>{$("#custom_limit_cont").css('display', 'block');});
+    }
+
+    // This final function is called after ajax for both hard and custom limit, reloading the page or displaying an error message if it fails
+    function reloadOrDisplayError(ajaxSuccess, onFailureCB=null){
+
+      if (ajaxSuccess){
+          // successfull saved limit and update the number, here page will reloaded
+          location.reload();
+      } else {
+          // unable to save limit
+          displayAjaxError('Unable to update limit per page right now, please check your internet connection and try again', 'danger');
+          console.warn('error while saving limit with ajax');
+          $("#limit_select").prop('disabled', false);
+
+          // additonal actions when ajax fails, only used in custom for UX best ux, 
+          if (typeof(onFailureCB) === 'function'){
+            onFailureCB();
+          }
+      }
+
+    }
+
+    function setLimitOptionOnLoad(){
+      // set limit when load
+      const sessionLimit = parseInt(String($("#limit_select").attr('data-limit')).trim());
+      // dynamic set max of input based on variable value (only when user uses up and down button)
+      $("#custom_limit_input").prop('max', maxLimit);
+      $("#custom_limit_input").attr('title', `Max Value is ${maxLimit}`);
+      
+      // invalid limit provided or session limit not setted yet stop load handle
+      if (isNaN(sessionLimit) || sessionLimit <= 0 || sessionLimit > maxLimit){
+        return false;
+      }
+      
+      const limitOption = $(`#limit_select option[value='${sessionLimit}']`);
+      console.log(limitOption.length, sessionLimit);
+      if (limitOption.length > 0){
+        // this handle both, if option is static html, or custom option with same value of static option, eg: user selected custom and enter 100
+        limitOption.eq(0).prop('selected', true);
+      } else {
+        //custom limit setted before as function very strict any other number is custom as it follow rules of limit > 0 and < 1000 max (unkown html option)
+        console.log(`iam the remaning not cast if value is exist already in static options like 100, ${sessionLimit}`);
+        $("#custom_limit_option").before(`<option value="${sessionLimit}">${sessionLimit}</option>`);
+        const newOpt = $(`#limit_select option[value='${sessionLimit}']`);
+        if (newOpt.length){
+          newOpt.prop('selected', true);
+        } else {
+          // this must not happend but incase elm not added detect that and not set the previousLimit as value not selected
+          console.warn('Error, can not create new jquery elm');
+          return false;
+        }
+      }
+
+      // save previous value when page loaded
+      previousLimit = sessionLimit;
+
+      $("#limit_select").attr('title', `selected is ${previousLimit} items per page`);
+    }
+
+    // dynamic set value of saved selected limit using js
+    setLimitOptionOnLoad();
+
+    $("#limit_select").on('change', onLimitChange);
+    $("#set_custom_btn").on('click', handleCustom);
+
+
+    return true;
+  } else {
+    console.warn('unable to start limitPerPageComponent mising required element');
+    return false;
+  }
+}
+
 $(document).ready(async function(){
     applyHoverEffect();
 });

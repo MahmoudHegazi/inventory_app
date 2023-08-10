@@ -23,10 +23,12 @@ from flask import request as flask_request
 routes = Blueprint('routes', __name__, template_folder='templates', static_folder='static')
 
 
-def makePagination(page=1, query_obj=None, callback=()):
+def makePagination(page=1, query_obj=None, callback=(), limit_parm=10):
     import math
     try:
-        limit = 10
+        # save integer limit , so can passed direct from query paramter and auto handle incase invalid query paramter set (no code in endpoint)
+        str_limit = str(limit_parm).strip()
+        limit = int(str_limit) if str_limit and str_limit.isnumeric() else 10
         offset = 0
         # limit == 0 means no need data
         if limit < 1:
@@ -120,7 +122,8 @@ def catalogues():
         pagination = makePagination(
             request.args.get('page', 1),
             Catalogue.query.filter_by(user_id=current_user.id),
-            lambda total_pages: [url_for('routes.catalogues', page=page_index) for page_index in range(1, total_pages+1)]
+            lambda total_pages: [url_for('routes.catalogues', page=page_index) for page_index in range(1, total_pages+1)],
+            limit_parm=session.get('limit', 10)
         )
         catalogues_excel = CatalogueExcelForm()
         delete_catalogues = removeCataloguesForm()
@@ -543,7 +546,8 @@ def listings():
         pagination = makePagination(
                 request.args.get('page', 1),
                 user_dashboard_listings_q,
-                lambda total_pages: [url_for('routes.listings', page=page_index) for page_index in range(1, total_pages+1)]
+                lambda total_pages: [url_for('routes.listings', page=page_index) for page_index in range(1, total_pages+1)],
+                limit_parm=session.get('limit', 10)
         )
         user_dashboard_listings = pagination['data']
 

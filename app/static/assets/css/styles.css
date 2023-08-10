@@ -91,6 +91,17 @@ color_lightpink {
     margin-right: auto !important;
     max-width: 90% !important;
 }
+.w_max_content {
+    width:max-content !important;
+}
+.minw_max_content {
+    min-width: max-content !important;
+}
+.w_100px {
+    min-width:100px !important;
+    max-width:100px !important;
+    width:100px !important;
+}
 
 .header_bg {
     background-attachment: fixed;

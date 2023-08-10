@@ -7,27 +7,49 @@
   <img src="{{url_for('static', filename='assets/images/loading_circle.gif')}}" class="loading_circle" style="display:none;" />    
   <div class="container-fluid content_container">
     {% if listings is defined %} 
-    <!-- settings menu-->
-    <div id="settings_toast_cont">
-      <button type="button" class="btn btn-outline-primary mb-1" id="open_settings">Settings</button>
-      <div id="settings_toast" class="toast shadow" data-autohide="false" style="display:none">
-         <div class="toast-header bg-dark text-white">
-            <span><i class="fa fa-gear"></i> Settings</span>
-         </div>
-         <div class="toast-body">
-            <div class="row">
-               <div class="col-sm-12 d-flex justify-content-start align-items-center">
-                  <label>Display: </label>
-                  <select class="form-control ml-2" id="switch_display">
-                     <option value="table" selected="selected">Table</option>
-                     <option value="card">Card</option>                     
-                  </select>
-               </div>
+    <div class="d-flex justify-content-between align-items-center mb-2">
+        <!-- per page limit -->        
+        {% set limit = session["limit"] %}
+        <div class="d-flex justify-content-center align-items-center w_max_content">
+          <label class="mr-1 minw_max_content">Limit: </label>
+          <!-- component full dynamic u can set diffrent options html -->
+          <select id="limit_select" name="limit" class="form-control" data-save-limit="{{url_for('main.savelimit')}}" data-limit="{{limit}}">
+            <option value="10">10</option>
+            <option value="25">25</option>
+            <option value="50">50</option>
+            <option value="100">100</option>
+            <option id="custom_limit_option" value="">custom</option>
+          </select>
+          <div style="display:none;" id="custom_limit_cont">
+            <div class="d-flex justify-content-center align-items-center">
+              <input class="form-control mx-1 w_100px" type="number" id="custom_limit_input" value="" placeholder="custom" min="1">
+              <button class="btn btn-sm btn-primary ml minw_max_content" id="set_custom_btn">Set Custom</button>
             </div>
-         </div>
-      </div>
+          </div>
+        </div>
+        <!-- per page limit end -->
+        <!-- settings menu-->
+        <div id="settings_toast_cont">
+          <button type="button" class="btn btn-outline-primary mb-1" id="open_settings">Settings</button>
+          <div id="settings_toast" class="toast shadow" data-autohide="false" style="display:none">
+             <div class="toast-header bg-dark text-white">
+                <span><i class="fa fa-gear"></i> Settings</span>
+             </div>
+             <div class="toast-body">
+                <div class="row">
+                   <div class="col-sm-12 d-flex justify-content-start align-items-center">
+                      <label>Display: </label>
+                      <select class="form-control ml-2" id="switch_display">
+                         <option value="table" selected="selected">Table</option>
+                         <option value="card">Card</option>                     
+                      </select>
+                   </div>
+                </div>
+             </div>
+          </div>
+        </div>
+        <!-- settings end -->
     </div>
-    <!-- settings end -->
     <div class="d-flex justify-content-end align-items-center flex-wrap">
       <a href="{{url_for('routes.add_listing')}}" class="ml-2 btn btn-primary">
         Add Listing
@@ -260,9 +282,11 @@ const paginationBtns = {% if pagination_btns %}{{pagination_btns|tojson|safe}}{%
 const paginationPage = {{ request.args.get('page', 1) }};
 displayPaginationComponent(paginationBtns, paginationPage, ['listings_pag1', 'listings_pag2']);
 
-
-
 toggleSettingsToast();
+
+
+// limit per page component
+limitPerPageComponent();
 
 /* delete multiple listings */
 const actionModalsArray = [

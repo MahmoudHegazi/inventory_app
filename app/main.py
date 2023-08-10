@@ -440,3 +440,22 @@ def search():
             return jsonify({'code': 404, 'succeess': False, 'message': 'invalid search, unknown table'})
     else:
         return jsonify({'code': 400, 'succeess': False, 'message': 'invalid search request'})
+
+
+# store limit in session with ajax
+# this search function works with js search component dynamic for all app searchs
+@main.route('/save_limit', methods=['POST', 'GET'])
+@login_required
+@vendor_permission.require()
+def savelimit():
+    try:
+        # confirm both side client and server number will set in session is valid integer
+        limit = request.json.get('limit', 10)
+        limit = limit if isinstance(limit, int) else 10
+        session['limit'] = limit
+        code = 200
+    except Exception as e:
+        print('System error in savelimit, info: {}'.format(sys.exc_info()))
+        code = 500
+    finally:
+        return jsonify({'code': code})

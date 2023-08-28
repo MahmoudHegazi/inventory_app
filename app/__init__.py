@@ -23,6 +23,7 @@ db = SQLAlchemy(app)
 bcrypt = Bcrypt(app)
 principals = Principal(app)
 #admin = Admin(app, name='Inventory Admin')
+# openssl 22.0.0, cryptography 41.0.3
 
 login_manager = LoginManager()
 login_manager.login_view = 'auth.login'

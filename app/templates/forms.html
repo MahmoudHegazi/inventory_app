@@ -114,7 +114,7 @@
 {% endmacro %}
 
 
-{% macro listings_forms(delete_listings) %}
+{% macro listings_forms(delete_listings, import_offers) %}
 <div class="modal fade" id="removeListings">
   <div class="modal-dialog">
     <div class="modal-content">
@@ -143,6 +143,37 @@
         <button type="button" class="btn btn-danger" data-dismiss="modal">Close</button>
       </div>
       
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="importOffersModal">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <!-- Modal Header -->
+      <div class="modal-header">
+        <h4 class="modal-title">Import Offers</h4>
+        <button type="button" class="close" data-dismiss="modal">&times;</button>
+      </div>
+      <!-- Modal body -->
+      <div class="modal-body">
+        {% if import_offers %}
+        <form id="import_offers_form" method="post" action="{{url_for('main.api_offers_import')}}">
+          {{import_offers.hidden_tag()}}
+          <div class="form-group">
+            {{import_offers.api_key.label}}
+            {{import_offers.api_key(class='form-control')}}
+          </div>
+          {{import_offers.import_data(class='btn btn-success')}}
+        </form>
+        {% else %}
+        <div class="alert-danger">Unable to Display Import Offers form right now.</div>
+        {% endif %}
+      </div>
+      <!-- Modal footer -->
+      <div class="modal-footer">
+        <button type="button" class="btn btn-danger" data-dismiss="modal">Close</button>
+      </div>
     </div>
   </div>
 </div>
@@ -642,7 +673,7 @@
 </div>
 {% endmacro %}
 
-{% macro setup_forms(add_platform, edit_platform, delete_platform, add_location, edit_location, delete_location, add_bin, edit_bin, delete_bin) %}
+{% macro setup_forms(add_platform, edit_platform, delete_platform, add_location, edit_location, delete_location, add_bin, edit_bin, delete_bin, add_category, edit_category, delete_category, import_categories) %}
 <div class="modal fade" id="addPlatformModal">
   <div class="modal-dialog">
     <div class="modal-content">
@@ -915,6 +946,153 @@
         </form>
         {% else %}
         <div class="alert-danger">Unable to Display Remove Bin form right now.</div>
+        {% endif %}
+      </div>
+      <!-- Modal footer -->
+      <div class="modal-footer">
+        <button type="button" class="btn btn-danger" data-dismiss="modal">Close</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+
+<div class="modal fade" id="addCategoryModal">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <!-- Modal Header -->
+      <div class="modal-header">
+        <h4 class="modal-title">Add Category</h4>
+        <button type="button" class="close" data-dismiss="modal">&times;</button>
+      </div>
+      <!-- Modal body -->
+      <div class="modal-body">
+        {% if add_category %}
+        <form id="add_category_form" method="post" action="{{url_for('routes.add_category')}}">
+            {{add_category.hidden_tag()}}                
+            <div class="form-group">
+              {{add_category.code.label}}
+              {{add_category.code(class='form-control', placeholder='Enter Category Code', maxlength='45')}}
+            </div>
+            <div class="form-group">
+              {{add_category.label.label}}
+              {{add_category.label(class='form-control', placeholder='Enter Label', maxlength='255')}}
+            </div>
+            <div class="form-group">
+              {{add_category.level.label}}
+              {{add_category.level(class='form-control', placeholder='Enter Level', title='optional')}}
+            </div>
+            <div class="form-group">
+              {{add_category.parent_code.label}}
+              {{add_category.parent_code(class='form-control', placeholder='Enter Parent Code', maxlength='45', title='optional')}}
+            </div>
+            {{add_category.add(class='btn btn-success btn-block')}}
+        </form>
+        {% else %}
+        <div class="alert-danger">Unable to Display Add Category form right now.</div>
+        {% endif %}
+      </div>
+      <!-- Modal footer -->
+      <div class="modal-footer">
+        <button type="button" class="btn btn-danger" data-dismiss="modal">Close</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="editCategoryModal">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <!-- Modal Header -->
+      <div class="modal-header">
+        <h4 class="modal-title">Edit Category</h4>
+        <button type="button" class="close" data-dismiss="modal">&times;</button>
+      </div>      
+      <!-- Modal body -->
+      <div class="modal-body">
+        {% if edit_category %}
+        <form id="edit_category_form" method="post" action="">
+            {{edit_category.hidden_tag()}}                
+            <div class="form-group">
+              {{edit_category.code_edit.label}}
+              {{edit_category.code_edit(class='form-control', placeholder='Enter Category Code', maxlength='45')}}
+            </div>
+            <div class="form-group">
+              {{edit_category.label_edit.label}}
+              {{edit_category.label_edit(class='form-control', placeholder='Enter Label', maxlength='255')}}
+            </div>
+            <div class="form-group">
+              {{edit_category.level_edit.label}}
+              {{edit_category.level_edit(class='form-control', placeholder='Enter Level', title='optional')}}
+            </div>
+            <div class="form-group">
+              {{edit_category.parent_code_edit.label}}
+              {{edit_category.parent_code_edit(class='form-control', placeholder='Enter Parent Code', maxlength='45', title='optional')}}
+            </div>
+            {{edit_category.edit(class='btn btn-success btn-block')}}
+        </form>
+        {% else %}
+        <div class="alert-danger">Unable to Display Edit Category form right now.</div>
+        {% endif %}
+      </div>
+      <!-- Modal footer -->
+      <div class="modal-footer">
+        <button type="button" class="btn btn-danger" data-dismiss="modal">Close</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="deleteCategoryModal">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <!-- Modal Header -->
+      <div class="modal-header">
+        <h4 class="modal-title">Remove Category</h4>
+        <button type="button" class="close" data-dismiss="modal">&times;</button>
+      </div>
+
+      <!-- Modal body -->
+      <div class="modal-body">
+        {% if delete_category %}
+        <form id="remove_category_form" method="post" action="">
+         <p>Are you Sure you want remove Category</p>
+         {{delete_category.hidden_tag()}}
+         {{delete_category.delete(class='btn btn-danger')}}
+        </form>
+        {% else %}
+        <div class="alert-danger">Unable to Display Remove Category form right now.</div>
+        {% endif %}
+      </div>
+      <!-- Modal footer -->
+      <div class="modal-footer">
+        <button type="button" class="btn btn-danger" data-dismiss="modal">Close</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="importCategoriesModal">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <!-- Modal Header -->
+      <div class="modal-header">
+        <h4 class="modal-title">Import Categories</h4>
+        <button type="button" class="close" data-dismiss="modal">&times;</button>
+      </div>
+      <!-- Modal body -->
+      <div class="modal-body">
+        {% if import_categories %}
+        <form id="import_categories_form" method="post" action="{{url_for('main.api_import_categories')}}">
+          {{import_categories.hidden_tag()}}
+          <div class="form-group">
+            {{import_categories.api_key.label}}
+            {{import_categories.api_key(class='form-control')}}
+          </div>
+          {{import_categories.import_data(class='btn btn-success')}}
+        </form>
+        {% else %}
+        <div class="alert-danger">Unable to Display Import Categories form right now.</div>
         {% endif %}
       </div>
       <!-- Modal footer -->

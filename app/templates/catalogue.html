@@ -81,6 +81,18 @@
                 <p class="overflow_within"><span class="badge badge-dark">Condition: </span><span class="p-1 shadow"> {{catalogue.condition}}</span></p>
             </div>
             <div class="col-sm-12">
+              <p class="overflow_within"><span class="badge badge-info">Category Code: </span><span class="p-1 shadow">{% if catalogue.category %}{{catalogue.category.code}}{% endif %}</span></p>
+            </div>
+            <div class="col-sm-12">
+              <p class="overflow_within"><span class="badge badge-dark">Category Label: </span><span class="p-1 shadow">{% if catalogue.category %}{{catalogue.category.label}}{% endif %}</span></p>
+            </div>
+            <div class="col-sm-12">
+              <p class="overflow_within"><span class="badge badge-info">Category Level: </span><span class="p-1 shadow">{% if catalogue.category %}{{catalogue.category.level}}{% endif %}</span></p>
+            </div>
+            <div class="col-sm-12">
+              <p class="overflow_within"><span class="badge badge-dark">Category Parent Code: </span><span class="p-1 shadow">{% if catalogue.category %}{{catalogue.category.parent_code}}{% endif %}</span></p>
+            </div>
+            <div class="col-sm-12">
               <p class="overflow_within" style="max-height:180px !important;overflow: auto;">
                 <span class="badge badge-info">Locations: </span>
                 {% for catalogue_location in catalogue.locations %}

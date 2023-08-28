@@ -89,11 +89,41 @@
             </div>
         </div>
         <!-- Locations end -->
+        <!-- Categories start -->
+        <div class="container mb-2">
+          {% if dashboard is defined and dashboard.categories is defined %}
+          <div class="div border shadow rounded p-2">
+            <h5 class="mt-2 mb-3"><span>Categories: </span>
+            <div style="float:right;max-width:fit-content;" class="d-flex justify-content-around align-items-center">
+              <button type="button" data-toggle="modal" data-target="#importCategoriesModal" class="btn btn-info btn-sm mr-1">Import from API</button>
+              <button type="button" data-toggle="modal" data-target="#addCategoryModal" class="btn btn-success btn-sm"><i class="fa fa-plus"></i></button>
+            </div>
+            </h5>
+            <div class="mt-4" style="max-height:300px;overflow: auto;">
+              <!-- categories -->
+              {% for category in dashboard.categories %}
+              <div class="col-sm-12 row shadow mb-2">
+                <div class="col-sm-6">
+                  <p style="word-break: break-word;">{{category.code}} : {{category.label}}</p>
+                </div>                
+                <div class="col-sm-6 text-right">
+                  <button data-toggle="modal" data-url="{{url_for('routes.edit_category', category_id=category.id)}}" data-category-id="{{category.id}}" data-category-code="{{category.code}}" data-category-label="{{category.label}}" data-category-level="{{category.level}}" data-category-parent_code="{{category.parent_code}}" data-target="#editCategoryModal" class="btn btn-sm btn-warning edit_category" type="button"><i class="fa fa-edit"></i></button>
+                  <button data-toggle="modal" data-url="{{url_for('routes.delete_category', category_id=category.id)}}" data-category-id="{{category.id}}" data-target="#deleteCategoryModal" class="btn btn-sm btn-danger wtform_modal_deletebtn" type="button"><i class="fa fa-remove"></i></button>
+                </div>
+              </div>
+              {% endfor %}
+            </div>
+          </div>
+          {% else %}
+          <div class="alert alert-danger">Unable to Display Categories right now.</div>
+          {% endif %}
+        </div>
+        <!-- Categories end -->
     </div>
   </div>
 </div>
 {% from 'forms.html' import setup_forms %}
-{{ setup_forms(add_platform=add_platform, edit_platform=edit_platform, delete_platform=delete_platform, add_location=add_location, edit_location=edit_location, delete_location=delete_location, add_bin=add_bin, edit_bin=edit_bin, delete_bin=delete_bin) }}
+{{ setup_forms(add_platform=add_platform, edit_platform=edit_platform, delete_platform=delete_platform, add_location=add_location, edit_location=edit_location, delete_location=delete_location, add_bin=add_bin, edit_bin=edit_bin, delete_bin=delete_bin, add_category=add_category, edit_category=edit_category, delete_category=delete_category, import_categories=import_categories) }}
 {% endblock %}
 
 {% block page_scripts %}
@@ -101,6 +131,9 @@
 deleteWtformsModalProccess(dataAttId='data-platform-id', formId='remove_platform_form', idInputId='platform_id_remove', modalId='deletePlatformModal');
 
 deleteWtformsModalProccess(dataAttId='data-location-id', formId='remove_location_form', idInputId='location_id_remove', modalId='deleteLocationModal');
+
+deleteWtformsModalProccess(dataAttId='data-category-id', formId='remove_category_form', idInputId='category_id', modalId='deleteCategoryModal');
+
 
 // use this dynamic function to handle also add bin child of location
 deleteWtformsModalProccess(dataAttId='data-location-id', formId='add_bin_form', idInputId='location_id', modalId='addBinModal');
@@ -111,6 +144,7 @@ deleteWtformsModalProccess(dataAttId='data-bin-id', formId='remove_bin_form', id
 fillEditPlatForm();
 fillEditLocation();
 fillEditBin();
+fillEditCategory();
 </script>
 {% endblock page_scripts %}
 

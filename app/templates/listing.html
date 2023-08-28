@@ -49,15 +49,54 @@
               <div class="overflow_within"><span class="badge badge-dark">Product Description: </span>
                 <p class="p-1 shadow break_word overflow-350"> {{listing.product_description}}</p>
               </div>
-            </div>
+            </div>            
             <div class="col-sm-12">
               <p class="overflow_within"><span class="badge badge-info">Brand: </span><span class="p-1 shadow"> {{listing.brand}}</span></p>
             </div>
             <div class="col-sm-12">
-              <p class="overflow_within"><span class="badge badge-dark">Category: </span><span class="p-1 shadow"> {{listing.category}}</span></p>
+              <p class="overflow_within"><span class="badge badge-dark">Category Code: </span><span class="p-1 shadow"> {{listing.category_code}}</span></p>
             </div>
             <div class="col-sm-12">
-              <p class="overflow_within"><span class="badge badge-info">Plateform: </span><span class="p-1 shadow"> {% for listing_platform in listing.platforms %}<span class="badge badge-secondary">{{listing_platform.platform.name}}</span> {% endfor %}</span></p>
+              <p class="overflow_within"><span class="badge badge-info">Category Label: </span><span class="p-1 shadow"> {{listing.category_label}}</span></p>
+            </div>
+            <div class="col-sm-12">
+              <p class="overflow_within"><span class="badge badge-dark">Category Level: </span><span class="p-1 shadow">{% if listing.catalogue and listing.catalogue.category %}{{listing.catalogue.level}}{% endif %}</span></p>
+            </div>
+            <div class="col-sm-12">
+              <p class="overflow_within"><span class="badge badge-info">Category Parent Code: </span><span class="p-1 shadow">{% if listing.catalogue and listing.catalogue.category %}{{listing.catalogue.category.parent_code}}{% endif %}</span></p>
+            </div>
+            <div class="col-sm-12">
+              <p class="overflow_within"><span class="badge badge-dark">Plateform: </span><span class="p-1 shadow"> {% for listing_platform in listing.platforms %}<span class="badge badge-secondary">{{listing_platform.platform.name}}</span> {% endfor %}</span></p>
+            </div>
+            <div class="col-sm-12">
+              <p class="overflow_within"><span class="badge badge-info">Active: </span><span class="p-1 shadow"> {{listing.active}}</span></p>
+            </div>
+            <div class="col-sm-12">
+              <p class="overflow_within"><span class="badge badge-dark">Discount Start Date: </span><span class="p-1 shadow"> {{listing.discount_start_date}}</span></p>
+            </div>
+            <div class="col-sm-12">
+              <p class="overflow_within"><span class="badge badge-info">Discount End Date: </span><span class="p-1 shadow"> {{listing.discount_end_date}}</span></p>
+            </div>
+            <div class="col-sm-12">
+              <p class="overflow_within"><span class="badge badge-dark">Unit Discount Price: </span><span class="p-1 shadow"> {{listing.unit_discount_price}}</span></p>
+            </div>
+            <div class="col-sm-12">
+              <p class="overflow_within"><span class="badge badge-info">Quantity Threshold: </span><span class="p-1 shadow"> {{listing.quantity_threshold}}</span></p>
+            </div>
+            <div class="col-sm-12">
+              <p class="overflow_within"><span class="badge badge-dark">Currency ISO Code: </span><span class="p-1 shadow"> {{listing.currency_iso_code}}</span></p>
+            </div>
+            <div class="col-sm-12">
+              <p class="overflow_within"><span class="badge badge-info">Shop SKU: </span><span class="p-1 shadow"> {{listing.shop_sku}}</span></p>
+            </div>
+            <div class="col-sm-12">
+              <p class="overflow_within"><span class="badge badge-dark">Offer ID: </span><span class="p-1 shadow"> {{listing.offer_id}}</span></p>
+            </div>
+            <div class="col-sm-12">
+              <p class="overflow_within"><span class="badge badge-info">Reference: </span><span class="p-1 shadow"> {{listing.reference}}</span></p>
+            </div>
+            <div class="col-sm-12">
+              <p class="overflow_within"><span class="badge badge-dark">Reference Type: </span><span class="p-1 shadow"> {{listing.reference_type}}</span></p>
             </div>
             <div class="col-sm-12">
               <span class="badge badge-dark">Locations: </span>

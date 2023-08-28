@@ -1,5 +1,9 @@
 ./data
 app.py
+server.crt
+server.csr
+server.key
+server.key.org
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]

@@ -45,6 +45,139 @@
                 </ul>
                 {% endif %}
               </div>
+              <div class="form-group">
+                <div class="custom-control custom-checkbox">                  
+                  {{form.active(class='custom-control-input', placeholder='Active')}}
+                  {{form.active.label(class='custom-control-label', for='active')}}
+                </div>
+                {% if form.active.errors %}
+                <ul class="errors bg-danger text-white">
+                    {% for error in form.active.errors %}
+                        <li class="p-1 mb-1">{{ error }}</li>
+                    {% endfor %}
+                </ul>
+                {% endif %}
+              </div>
+              <div class="form-group">
+                {{form.discount_start_date.label}}
+                {{form.discount_start_date(class='form-control', placeholder='Discount Start Date')}}
+
+                {% if form.discount_start_date.errors %}
+                <ul class="errors bg-danger text-white">
+                    {% for error in form.discount_start_date.errors %}
+                        <li class="p-1 mb-1">{{ error }}</li>
+                    {% endfor %}
+                </ul>
+                {% endif %}
+              </div>              
+              <div class="form-group">
+                {{form.discount_end_date.label}}
+                {{form.discount_end_date(class='form-control', placeholder='Discount End Date')}}
+
+                {% if form.discount_end_date.errors %}
+                <ul class="errors bg-danger text-white">
+                    {% for error in form.discount_end_date.errors %}
+                        <li class="p-1 mb-1">{{ error }}</li>
+                    {% endfor %}
+                </ul>
+                {% endif %}
+              </div>
+              <div class="form-group">
+                {{form.unit_discount_price.label}}
+                {{form.unit_discount_price(class='form-control', placeholder='Unit Discount Price')}}
+
+                {% if form.unit_discount_price.errors %}
+                <ul class="errors bg-danger text-white">
+                    {% for error in form.unit_discount_price.errors %}
+                        <li class="p-1 mb-1">{{ error }}</li>
+                    {% endfor %}
+                </ul>
+                {% endif %}
+              </div>
+              <div class="form-group">
+                {{form.unit_origin_price.label}}
+                {{form.unit_origin_price(class='form-control', placeholder='Unit Origin Price')}}
+
+                {% if form.unit_origin_price.errors %}
+                <ul class="errors bg-danger text-white">
+                    {% for error in form.unit_origin_price.errors %}
+                        <li class="p-1 mb-1">{{ error }}</li>
+                    {% endfor %}
+                </ul>
+                {% endif %}
+              </div>              
+              <div class="form-group">
+                {{form.quantity_threshold.label}}
+                {{form.quantity_threshold(class='form-control', placeholder='Quantity Threshold')}}
+
+                {% if form.quantity_threshold.errors %}
+                <ul class="errors bg-danger text-white">
+                    {% for error in form.quantity_threshold.errors %}
+                        <li class="p-1 mb-1">{{ error }}</li>
+                    {% endfor %}
+                </ul>
+                {% endif %}
+              </div>
+              <div class="form-group">
+                {{form.currency_iso_code.label}}
+                {{form.currency_iso_code(class='form-control', placeholder='Currency ISO Code')}}
+
+                {% if form.currency_iso_code.errors %}
+                <ul class="errors bg-danger text-white">
+                    {% for error in form.currency_iso_code.errors %}
+                        <li class="p-1 mb-1">{{ error }}</li>
+                    {% endfor %}
+                </ul>
+                {% endif %}
+              </div>
+              <div class="form-group">
+                {{form.shop_sku.label}}
+                {{form.shop_sku(class='form-control', placeholder='Shop SKU')}}
+
+                {% if form.shop_sku.errors %}
+                <ul class="errors bg-danger text-white">
+                    {% for error in form.shop_sku.errors %}
+                        <li class="p-1 mb-1">{{ error }}</li>
+                    {% endfor %}
+                </ul>
+                {% endif %}
+              </div>
+              <div class="form-group">
+                {{form.offer_id.label}}
+                {{form.offer_id(class='form-control', placeholder='Offer Id')}}
+
+                {% if form.offer_id.errors %}
+                <ul class="errors bg-danger text-white">
+                    {% for error in form.offer_id.errors %}
+                        <li class="p-1 mb-1">{{ error }}</li>
+                    {% endfor %}
+                </ul>
+                {% endif %}
+              </div>
+              <div class="form-group">
+                {{form.reference.label}}
+                {{form.reference(class='form-control', placeholder='Reference')}}
+
+                {% if form.reference.errors %}
+                <ul class="errors bg-danger text-white">
+                    {% for error in form.reference.errors %}
+                        <li class="p-1 mb-1">{{ error }}</li>
+                    {% endfor %}
+                </ul>
+                {% endif %}
+              </div>
+              <div class="form-group">
+                {{form.reference_type.label}}
+                {{form.reference_type(class='form-control', placeholder='Reference Type')}}
+
+                {% if form.reference_type.errors %}
+                <ul class="errors bg-danger text-white">
+                    {% for error in form.reference_type.errors %}
+                        <li class="p-1 mb-1">{{ error }}</li>
+                    {% endfor %}
+                </ul>
+                {% endif %}
+              </div>
               <div class="d-flex justify-content-center align-items-center w-50 mx-auto">
                 {{form.add(class='btn btn-success w-50')}}
                 <a href="{{url_for('routes.listings')}}" class="btn btn-primary w-50">Cancel</a>

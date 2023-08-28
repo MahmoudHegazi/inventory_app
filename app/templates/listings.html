@@ -51,9 +51,10 @@
         <!-- settings end -->
     </div>
     <div class="d-flex justify-content-end align-items-center flex-wrap">
-      <a href="{{url_for('routes.add_listing')}}" class="ml-2 btn btn-primary">
+      <a href="{{url_for('routes.add_listing')}}" class="ml-2 mr-1 btn btn-primary">
         Add Listing
       </a>
+      <button class="btn btn-info" data-toggle="modal" data-target="#importOffersModal">Import Offers</button>
     </div>
     <!-- search component -->
     <div class="row mt-2 mb-2">
@@ -269,7 +270,7 @@
 
 </div>
 {% import 'forms.html' as forms %}
-{{ forms.listings_forms(delete_listings=delete_listings) }}
+{{ forms.listings_forms(delete_listings=delete_listings, import_offers=import_offers) }}
 {% endblock %}
 
 

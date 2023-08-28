@@ -540,7 +540,7 @@ function setFormRedirectByUrl(customRedirect=null){
 /* fill edit platform form with data */
 function fillEditPlatForm(){
   $(".edit_platform").on('click', (event)=>{
-    if ($(event.currentTarget).length && $(event.currentTarget).attr('data-platform-id') && $("#name_edit").length && $("#platform_id_edit").length && $(`#edit_platform_form`) && $(event.currentTarget).attr('data-url') && $(event.currentTarget).attr('data-platform-name')) {
+    if ($(event.currentTarget).length && $(event.currentTarget).attr('data-platform-id') && $("#name_edit").length && $("#platform_id_edit").length && $(`#edit_platform_form`).length && $(event.currentTarget).attr('data-url') && $(event.currentTarget).attr('data-platform-name')) {
         const action_url = String($(event.currentTarget).attr('data-url')).trim();
         const platform_id = String($(event.currentTarget).attr('data-platform-id')).trim();
         const platform_name = String($(event.currentTarget).attr('data-platform-name')).trim();      
@@ -550,21 +550,23 @@ function fillEditPlatForm(){
     }
   });
 
-  $(`#edit_platform_form`).on('hidden.bs.modal', () => {
+  $('#editPlatformModal').on('hidden.bs.modal', () => {
     if ($("#platform_id_edit").length){
       $("#platform_id_edit").val("");
     }
     if ($("#name_edit").length){
       $("#name_edit").val("");
     }
-    $(`#edit_platform_form`).attr('action', '');
+    if ($('#edit_platform_form').length){
+      $('#edit_platform_form').attr('action', '');
+    }
   });
 }
 
 
 function fillEditLocation(){
   $(".edit_location").on('click', (event)=>{
-    if ($(event.currentTarget).length && $(event.currentTarget).attr('data-location-id') && $("#location_name_edit").length && $("#location_id_edit").length && $(`#edit_location_form`) && $(event.currentTarget).attr('data-url') && $(event.currentTarget).attr('data-location-name')) {
+    if ($(event.currentTarget).length && $(event.currentTarget).attr('data-location-id') && $("#location_name_edit").length && $("#location_id_edit").length && $(`#edit_location_form`).length && $(event.currentTarget).attr('data-url') && $(event.currentTarget).attr('data-location-name')) {
         const action_url = String($(event.currentTarget).attr('data-url')).trim();
         const location_id = String($(event.currentTarget).attr('data-location-id')).trim();
         const location_name = String($(event.currentTarget).attr('data-location-name')).trim();      
@@ -574,21 +576,25 @@ function fillEditLocation(){
     }
   });
 
-  $(`#edit_location_form`).on('hidden.bs.modal', () => {
+  $(`#editLocationModal`).on('hidden.bs.modal', () => {
     if ($("#location_id_edit").length){
       $("#location_id_edit").val("");
     }
     if ($("#location_name_edit").length){
       $("#location_name_edit").val("");
     }
-    $(`#edit_location_form`).attr('action', '');
+
+    if ($('#edit_location_form').length){
+      $('#edit_location_form').attr('action', '');
+    }
+    
   });
 }
 
 
 function fillEditBin(){
   $(".edit_bin").on('click', (event)=>{
-    if ($(event.currentTarget).length && $(event.currentTarget).attr('data-bin-id') && $("#bin_name_edit").length && $("#bin_id_edit").length && $(`#edit_bin_form`) && $(event.currentTarget).attr('data-url') && $(event.currentTarget).attr('data-bin-name')) {
+    if ($(event.currentTarget).length && $(event.currentTarget).attr('data-bin-id') && $("#bin_name_edit").length && $("#bin_id_edit").length && $(`#edit_bin_form`).length && $(event.currentTarget).attr('data-url') && $(event.currentTarget).attr('data-bin-name')) {
         const action_url = String($(event.currentTarget).attr('data-url')).trim();
         const bin_id = String($(event.currentTarget).attr('data-bin-id')).trim();
         const bin_name = String($(event.currentTarget).attr('data-bin-name')).trim();      
@@ -598,14 +604,58 @@ function fillEditBin(){
     }
   });
 
-  $(`#edit_bin_form`).on('hidden.bs.modal', () => {
+  $(`#editBinModal`).on('hidden.bs.modal', () => {
     if ($("#bin_id_edit").length){
       $("#bin_id_edit").val("");
     }
     if ($("#bin_name_edit").length){
       $("#bin_name_edit").val("");
     }
-    $(`#edit_bin_form`).attr('action', '');
+
+    if ($('#edit_bin_form').length){
+      $('#edit_bin_form').attr('action', '');
+    }
+  });
+}
+
+function fillEditCategory(){
+  $(".edit_category").on('click', (event)=>{
+    if ($(event.currentTarget).length && $(event.currentTarget).attr('data-category-id') && $("#category_id_edit").length && $("#code_edit").length && $("#label_edit").length && $("#level_edit").length && $("#parent_code_edit").length && $('#edit_category_form').length && $(event.currentTarget).attr('data-url') && typeof($(event.currentTarget).attr('data-category-code')) !== 'undefined' && typeof($(event.currentTarget).attr('data-category-label')) !== 'undefined' && typeof($(event.currentTarget).attr('data-category-level')) !== 'undefined' && typeof($(event.currentTarget).attr('data-category-parent_code')) !== 'undefined') {
+        const action_url = String($(event.currentTarget).attr('data-url')).trim();
+        const category_id = String($(event.currentTarget).attr('data-category-id')).trim();
+        const category_code = String($(event.currentTarget).attr('data-category-code')).trim();
+        const category_label = String($(event.currentTarget).attr('data-category-label')).trim();
+        const category_level = String($(event.currentTarget).attr('data-category-level')).trim();
+        const category_parent_code = String($(event.currentTarget).attr('data-category-parent_code')).trim();
+        $("#category_id_edit").val(category_id);
+        $("#code_edit").val(category_code);
+        $("#label_edit").val(category_label);
+        $("#level_edit").val(category_level);
+        $("#parent_code_edit").val(category_parent_code);
+        $(`#edit_category_form`).attr('action', action_url);
+    }
+  });
+
+  $('#editCategoryModal').on('hidden.bs.modal', () => {
+    if ($("#category_id_edit").length){
+      $("#category_id_edit").val("");
+    }
+    if ($("#code_edit").length){
+      $("#code_edit").val("");
+    }
+    if ($("#label_edit").length){
+      $("#label_edit").val("");
+    }
+    if ($("#level_edit").length){
+      $("#level_edit").val("");
+    }
+    if ($("#parent_code_edit").length){
+      $("#parent_code_edit").val("");
+    }
+
+    if ($('#edit_category_form').length){
+      $('#edit_category_form').attr('action', '');
+    }
   });
 }
 

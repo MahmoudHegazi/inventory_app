@@ -1,11 +1,13 @@
 import json
 import sys
 import os
-from flask import Flask, Blueprint, session, redirect, url_for, flash, Response, request, render_template, jsonify, Request
+import requests
+from flask import Flask, Blueprint, session, redirect, url_for, flash, Response, request, render_template, jsonify, Request, Response
 from .models import *
-from .forms import CatalogueExcelForm, ExportDataForm
+from .forms import CatalogueExcelForm, ExportDataForm, importCategoriesAPIForm, importOffersAPIForm
 from . import vendor_permission, admin_permission, db, excel
-from .functions import get_mapped_catalogues_dicts, getTableColumns, getFilterBooleanClauseList, ExportSqlalchemyFilter, get_export_data, get_charts, get_excel_rows, get_sheet_row_locations
+from .functions import get_mapped_catalogues_dicts, getTableColumns, getFilterBooleanClauseList, ExportSqlalchemyFilter,\
+get_export_data, get_charts, get_excel_rows, get_sheet_row_locations, apikey_or_none, chunks, upload_catalogues
 from flask_login import login_required, current_user
 import flask_excel
 import pyexcel
@@ -444,7 +446,7 @@ def search():
 
 # store limit in session with ajax
 # this search function works with js search component dynamic for all app searchs
-@main.route('/save_limit', methods=['POST', 'GET'])
+@main.route('/save_limit', methods=['POST'])
 @login_required
 @vendor_permission.require()
 def savelimit():
@@ -459,3 +461,159 @@ def savelimit():
         code = 500
     finally:
         return jsonify({'code': code})
+
+
+# import categories using API (user securly provide API key)
+@main.route('/import_categories_api', methods=['POST', 'GET'])
+@login_required
+@vendor_permission.require()
+def api_import_categories():
+    total_imported = 0
+    total_updated = 0
+    total_notchanged = 0
+    try:
+        #a750a16c-054e-407c-9825-3da7d4b2a9c1
+        form = importCategoriesAPIForm()
+        if form.validate_on_submit():
+            # secure apikey
+            apikey = apikey_or_none(form.api_key.data)
+            req_url = 'https://marketplace.bestbuy.ca/api/hierarchies'
+            if apikey is not None:
+                headers = {'Authorization': apikey}
+                r = requests.get(req_url, headers=headers)
+                if r.status_code == 200:
+                    data = json.loads(r.content)
+                    if 'hierarchies' in data:
+                        # start of valid import
+                        hierarchies = data['hierarchies']
+                        total_data = len(hierarchies)
+                        # limit of add_all is 50000 incase of data returned more than 50k split them
+                        for hierarchy in hierarchies:
+                            if 'code' in hierarchy and 'label' in hierarchy and 'level' in hierarchy and 'parent_code' in hierarchy:
+                                # import unique code and labels categories only, add_all was faster but no check
+                                category_exist = db.session.query(Category).filter(Category.dashboard_id==current_user.dashboard.id, Category.code==hierarchy['code']).first()
+                                if category_exist:
+                                    require_update = False
+                                    if category_exist.label != hierarchy['label']:
+                                        category_exist.label = hierarchy['label']
+                                        require_update = True
+
+                                    if category_exist.level != hierarchy['level']:
+                                        category_exist.level = hierarchy['level']
+                                        require_update = True
+
+                                    if category_exist.parent_code != hierarchy['parent_code']:
+                                        category_exist.parent_code = hierarchy['parent_code']
+                                        require_update = True
+
+                                    if require_update:
+                                        category_exist.update()
+                                        total_updated += 1
+                                    else:
+                                        total_notchanged += 1
+                                else:
+                                    new_code = Category(dashboard_id=current_user.dashboard.id, code=hierarchy['code'], label=hierarchy['label'], level=hierarchy['level'], parent_code=hierarchy['parent_code'])
+                                    new_code.insert()
+                                    total_imported += 1
+                        flash('Succsefully imported {total_imported} of categories from total: {total_data} categories, Updated {total_updated} of categories from total: {total_data} categories, and not changed Categories: {not_changed}'.format(total_imported=total_imported,total_data=total_data,total_updated=total_updated,not_changed=total_notchanged), 'success')
+                    else:
+                        flash('API Changed, Could not process your request right now', 'danger')
+                elif r.status_code == 401:
+                    flash('Invalid API key, the API refused to authorize your request.', 'danger')
+                else:
+                    flash('The API cannot process your request now, please try again later, if the problem is not resolved, please report to us.', 'danger')
+            else:
+                flash('Invalid API Key.', 'danger')
+        else:
+            for field, errors in form.errors.items():
+                if field == 'csrf_token':
+                    flash("Error can not import categories Please restart page and try again", "danger")
+                    continue
+                flash('Error in {} : {}'.format(field, ','.join(errors)), 'danger')   
+    except Exception as e:
+        flash('System Error, Could not process your request right now', 'danger')
+        print('System error in api_import_categories, info: {}'.format(sys.exc_info()))
+        raise e
+
+    finally:
+        return redirect(url_for('routes.setup'))
+
+def calc_chunks_result(results):
+    try:
+        final_result = {'total': 0, 'uploaded': 0, 'updated': 0, 'not_changed': 0, 'luploaded': 0, 'lupdated': 0, 'lnot_changed': 0, 'new_categories': 0}
+        for result in results:
+            final_result['total'] += result['total']
+            final_result['uploaded'] += result['uploaded']
+            final_result['updated'] += result['updated']
+            final_result['not_changed'] += result['not_changed']
+            final_result['luploaded'] += result['luploaded']
+            final_result['lnot_changed'] += result['lnot_changed']
+            final_result['new_categories'] += result['new_categories']
+        return final_result
+    except Exception as e:
+        raise e
+
+
+# remaning listing info report
+# import categories using API (user securly provide API key)
+@main.route('/import_offers_api', methods=['POST', 'GET'])
+@login_required
+@vendor_permission.require()
+def api_offers_import():
+    total_imported = 0
+    try:
+        #a750a16c-054e-407c-9825-3da7d4b2a9c1
+        form = importOffersAPIForm()
+        if form.validate_on_submit():
+            # secure apikey
+            apikey = apikey_or_none(form.api_key.data)
+            req_url = 'https://marketplace.bestbuy.ca/api/offers'
+            if apikey is not None:
+                headers = {'Authorization': apikey}
+                chunks_errors = []
+                successful = 0
+                # better send small test request, to confirm API key, and API comunication
+                r = requests.get(req_url, headers=headers)
+                # this is like status test request (API endpoint health check before start multiple requests, with time.sleep(10) per each, incase invalid api key user will wait alot if not tested)
+                if r.status_code == 200:
+                    for i in range(0,1):
+                        try:
+                            # chunks remaning
+                            r = requests.get(req_url, headers=headers)
+                            next_url = r.links.get('next').get('url') if r.links and r.links.get('next', None) and r.links.get('next').get('url', None) else None
+                            successful += 1
+                            return jsonify(upload_catalogues(json.loads(r.content)['offers'], current_user))
+                        except Exception as e:
+                            print("Error in one of chunks at api_offers_import: {}".format(sys.exc_info()))
+                            chunks_errors.append("Some Of data Could not be imported, Error occured in request number 2: start from 200 to 300")
+                
+                    if len(chunks_errors) == 0:
+                        flash('Succsefully Imported All Data, here is report of data changes', 'success')
+                    elif len(successful) > 0 and successful > 0:
+                        # one or more request blocked, but not all, inform user which requests have issue (API later automatic will handle when import data, but notify user with his stuiation)
+                        for chunk_error in chunks_errors:
+                            flash(chunk_error, 'danger')
+                    else:
+                        flash('Unable to connect to the API right now to get Data, please try again later.', 'danger')
+                elif r.status_code == 401:
+                    flash('Invalid API key, the API refused to authorize your request.', 'danger')
+                else:
+                    flash('The API cannot process your request now, please try again later, if the problem is not resolved, please report to us.', 'danger')
+            else:
+                flash('Invalid API Key.', 'danger')
+        else:
+            for field, errors in form.errors.items():
+                if field == 'csrf_token':
+                    flash("Error can not import offers Please restart page and try again", "danger")
+                    continue
+                flash('Error in {} : {}'.format(field, ','.join(errors)), 'danger')
+
+    except Exception as e:
+        flash('System Error, Could not process your request right now', 'danger')
+        print('System error in api_offers_import, info: {}'.format(sys.exc_info()))
+        raise e
+    """
+    finally:
+        return redirect(url_for('routes.setup'))
+    """
+

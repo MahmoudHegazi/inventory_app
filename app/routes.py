@@ -7,18 +7,19 @@ import flask_excel
 from flask import Flask, Blueprint, session, redirect, url_for, flash, Response, request, render_template, jsonify, abort
 from flask_wtf import Form
 from .models import User, Supplier, Dashboard, Listing, Catalogue, Purchase, Order, Platform, ListingPlatform, WarehouseLocations, LocationBins, \
-CatalogueLocations, CatalogueLocationsBins
+CatalogueLocations, CatalogueLocationsBins, Category
 from .forms import addListingForm, editListingForm, addCatalogueForm, editCatalogueForm, \
 removeCatalogueForm, removeListingForm, addSupplierForm, editSupplierForm, removeSupplierForm, \
 addPurchaseForm, editPurchaseForm, removePurchaseForm, addOrderForm, editOrderForm, removeOrderForm, CatalogueExcelForm, \
 removeCataloguesForm, removeListingsForm, removeAllCataloguesForm, addPlatformForm, editPlatformForm, removePlatformForm, \
-addLocationForm, editLocationForm, removeLocationForm, addBinForm, editBinForm, removeBinForm, AddMultipleListingForm
+addLocationForm, editLocationForm, removeLocationForm, addBinForm, editBinForm, removeBinForm, AddMultipleListingForm, \
+addCategoryForm, editCategoryForm, removeCategoryForm, importCategoriesAPIForm, importOffersAPIForm
 from . import vendor_permission, db
 from .functions import get_safe_redirect, updateDashboardListings, updateDashboardOrders, updateDashboardPurchasesSum, secureRedirect, get_charts
 from sqlalchemy.exc import IntegrityError
 from flask_login import login_required, current_user
 from flask import request as flask_request
-
+from sqlalchemy import or_, and_
 
 routes = Blueprint('routes', __name__, template_folder='templates', static_folder='static')
 
@@ -177,9 +178,11 @@ def add_catalogue():
 
             locations_bins_data.append(current_location_obj)
 
+        categories = [(cat.code, '{}:{}'.format(cat.code, cat.label)) for cat in Category.query.filter_by(dashboard_id=current_user.dashboard.id).all()]
         form = addCatalogueForm()
         form.warehouse_locations.choices = locations_choices
         form.locations_bins.choices = allowed_bins_ids
+        form.category_code.choices = categories
     except Exception as e:
         print('System Error: {}'.format(sys.exc_info()))
         flash('unable to process your request', 'danger')
@@ -189,22 +192,26 @@ def add_catalogue():
         success = None
         try:
             if form.validate_on_submit():
-                # using sqlalchemy.orm.collections.instrumentedlist append technique to insert all relations one time if catalogue inserted, and in child locations as well so if error happend before inser which last thing all actions will ignored (1 commit for all)
-                new_catalogue = Catalogue(user_id=current_user.id, sku=form.sku.data, product_name=form.product_name.data, product_description=form.product_description.data, brand=form.brand.data, category=form.category.data, price=form.price.data, sale_price=form.sale_price.data, quantity=form.quantity.data, product_model=form.product_model.data, condition=form.condition.data, upc=form.upc.data)
-                for warehouse_location_id in form.warehouse_locations.data:
-                    valid_location = WarehouseLocations.query.filter_by(dashboard_id=current_user.dashboard.id, id=warehouse_location_id).one_or_none()
-                    if valid_location is not None:
-                        new_catalogue_location = CatalogueLocations(location_id=valid_location.id)
-                        for bin_id in form.locations_bins.data:
-                            valid_bin = LocationBins.query.filter_by(id=bin_id).one_or_none()
-                            if valid_bin is not None:
-                                new_location_bin = CatalogueLocationsBins(bin_id=valid_bin.id)
-                                new_catalogue_location.bins.append(new_location_bin)
-                        new_catalogue.locations.append(new_catalogue_location)
-
-                new_catalogue.insert()
-                success = True
-                flash('Successfully Created New Catalogue', 'success')
+                selected_category = Category.query.filter_by(code=form.category_code.data, dashboard_id=current_user.dashboard.id).first()
+                if selected_category:
+                    # using sqlalchemy.orm.collections.instrumentedlist append technique to insert all relations one time if catalogue inserted, and in child locations as well so if error happend before inser which last thing all actions will ignored (1 commit for all)
+                    new_catalogue = Catalogue(user_id=current_user.id, sku=form.sku.data, product_name=form.product_name.data, product_description=form.product_description.data, brand=form.brand.data, category_code=selected_category.code, price=form.price.data, sale_price=form.sale_price.data, quantity=form.quantity.data, product_model=form.product_model.data, condition=form.condition.data, upc=form.upc.data)
+                    for warehouse_location_id in form.warehouse_locations.data:
+                        valid_location = WarehouseLocations.query.filter_by(dashboard_id=current_user.dashboard.id, id=warehouse_location_id).one_or_none()
+                        if valid_location is not None:
+                            new_catalogue_location = CatalogueLocations(location_id=valid_location.id)
+                            for bin_id in form.locations_bins.data:
+                                valid_bin = LocationBins.query.filter_by(id=bin_id).one_or_none()
+                                if valid_bin is not None:
+                                    new_location_bin = CatalogueLocationsBins(bin_id=valid_bin.id)
+                                    new_catalogue_location.bins.append(new_location_bin)
+                            new_catalogue.locations.append(new_catalogue_location)
+                    new_catalogue.insert()
+                    success = True
+                    flash('Successfully Created New Catalogue', 'success')
+                else:
+                    success = False
+                    flash('Invalid Category', 'danger')
             else:
                 success = False
         except Exception as e:
@@ -261,12 +268,14 @@ def edit_catalogue(catalogue_id):
                 for loc_bin in cat_loc.bins:
                     selected_bins_ids.append(loc_bin.bin_id)
             
+            categories = [(cat.code, '{}:{}'.format(cat.code, cat.label)) for cat in Category.query.filter_by(dashboard_id=current_user.dashboard.id).all()]
+
             form = editCatalogueForm(
                 sku = target_catalogue.sku,
                 product_name = target_catalogue.product_name,
                 product_description = target_catalogue.product_description,
                 brand = target_catalogue.brand,
-                category = target_catalogue.category,
+                category_code = target_catalogue.category_code,
                 quantity = target_catalogue.quantity,
                 product_model = target_catalogue.product_model,
                 condition = target_catalogue.condition,
@@ -278,6 +287,7 @@ def edit_catalogue(catalogue_id):
                 )
             form.warehouse_locations.choices = locations_choices
             form.locations_bins.choices = allowed_bins_ids
+            form.category_code.choices = categories
 
         else:
             flash('Unable to find the selected catalogue, it maybe deleted', 'danger')
@@ -305,8 +315,11 @@ def edit_catalogue(catalogue_id):
                 if target_catalogue.brand != form.brand.data:
                     target_catalogue.brand = form.brand.data
 
-                if target_catalogue.category != form.category.data:
-                    target_catalogue.category = form.category.data
+                if target_catalogue.category_code != form.category_code.data:
+                    # code should always be valid by wtforms, incase invalid it will ignored without notifcation
+                    target_category = Category.query.filter_by(code=form.category_code.data, dashboard_id=current_user.dashboard.id).first()
+                    if target_category:
+                        target_catalogue.category_code = target_category.code
 
                 if target_catalogue.price != form.price.data:
                     target_catalogue.price = form.price.data
@@ -552,7 +565,8 @@ def listings():
         user_dashboard_listings = pagination['data']
 
         delete_listings = removeListingsForm()
-        return render_template('listings.html', listings=user_dashboard_listings, pagination_btns=pagination['pagination_btns'], delete_listings=delete_listings)
+        import_offers = importOffersAPIForm()
+        return render_template('listings.html', listings=user_dashboard_listings, pagination_btns=pagination['pagination_btns'], delete_listings=delete_listings, import_offers=import_offers)
     except Exception as e:
         print('System Error: {}'.format(sys.exc_info()))
         flash('Unknown error Unable to view Listings', 'danger')
@@ -626,7 +640,7 @@ def add_listing():
 
                 if valid_platforms:
                     user_dashboard = current_user.dashboard
-                    new_listing = Listing(dashboard_id=user_dashboard.id, catalogue_id=form.catalogue_id.data)
+                    new_listing = Listing(dashboard_id=user_dashboard.id, catalogue_id=form.catalogue_id.data, active=form.active.data, discount_start_date=form.discount_start_date.data, discount_end_date=form.discount_end_date.data, unit_discount_price=form.unit_discount_price.data, unit_origin_price=form.unit_origin_price.data, quantity_threshold=form.quantity_threshold.data, currency_iso_code=form.currency_iso_code.data, shop_sku=form.shop_sku.data, offer_id=form.offer_id.data, reference=form.reference.data, reference_type=form.reference_type.data)
                     new_listing.insert()
                     # add the listing platforms
                     for platform_id in platforms_ids:
@@ -692,7 +706,18 @@ def edit_listing(listing_id):
             listing_platforms = [listing_platform.platform.id for listing_platform in target_listing.platforms]
             form = editListingForm(
                 catalogue_id=target_listing.catalogue_id,
-                platforms=listing_platforms
+                platforms=listing_platforms,
+                active=target_listing.active,
+                discount_start_date=target_listing.discount_start_date,
+                discount_end_date=target_listing.discount_end_date,
+                unit_discount_price=target_listing.unit_discount_price,
+                unit_origin_price=target_listing.unit_origin_price,
+                quantity_threshold=target_listing.quantity_threshold,
+                currency_iso_code=target_listing.currency_iso_code,
+                shop_sku=target_listing.shop_sku,
+                offer_id=target_listing.offer_id,
+                reference=target_listing.reference,
+                reference_type=target_listing.reference_type
             )
             user_catalogues = Catalogue.query.filter_by(user_id=current_user.id).all()
             form.catalogue_id.choices = [(catalogue.id, catalogue.product_name) for catalogue in user_catalogues]
@@ -762,9 +787,42 @@ def edit_listing(listing_id):
                                 new_listing_platform = ListingPlatform(listing_id=target_listing.id,platform_id=platform_id)
                                 new_listing_platform.insert()
 
+                        if target_listing.active != form.active.data:
+                            target_listing.active = form.active.data
+
+                        if target_listing.discount_start_date != form.discount_start_date.data:
+                            target_listing.discount_start_date = form.discount_start_date.data
+
+                        if target_listing.discount_end_date != form.discount_end_date.data:
+                            target_listing.discount_end_date = form.discount_end_date.data
+
+                        if target_listing.unit_discount_price != form.unit_discount_price.data:
+                            target_listing.unit_discount_price = form.unit_discount_price.data
+
+                        if target_listing.unit_origin_price != form.unit_origin_price.data:
+                            target_listing.unit_origin_price = form.unit_origin_price.data
+
+                        if target_listing.quantity_threshold != form.quantity_threshold.data:
+                            target_listing.quantity_threshold = form.quantity_threshold.data
+
+                        if target_listing.currency_iso_code != form.currency_iso_code.data:
+                            target_listing.currency_iso_code = form.currency_iso_code.data
+
+                        if target_listing.shop_sku != form.shop_sku.data:
+                            target_listing.shop_sku = form.shop_sku.data
+
+                        if target_listing.offer_id != form.offer_id.data:
+                            target_listing.offer_id = form.offer_id.data
+
+                        if target_listing.reference != form.reference.data:
+                            target_listing.reference = form.reference.data
+
+                        if target_listing.reference_type != form.reference_type.data:
+                            target_listing.reference_type = form.reference_type.data
+                        
                         target_listing.catalogue.update()
                         target_listing.update()
-                        # listing sync with new catalogue done on catalogue after update
+                        # listing sync with new catalogue done on catalogue after update (catalogue.update, and sync_listing do same event)
                         selected_catalogue.update()
                         target_listing.sync_listing()
                     else:
@@ -781,7 +839,40 @@ def edit_listing(listing_id):
                             new_listing_platform = ListingPlatform(listing_id=target_listing.id,platform_id=platform_id)
                             new_listing_platform.insert()
 
-                    #target_listing.update()
+                    if target_listing.active != form.active.data:
+                        target_listing.active = form.active.data
+
+                    if target_listing.discount_start_date != form.discount_start_date.data:
+                        target_listing.discount_start_date = form.discount_start_date.data
+
+                    if target_listing.discount_end_date != form.discount_end_date.data:
+                        target_listing.discount_end_date = form.discount_end_date.data
+
+                    if target_listing.unit_discount_price != form.unit_discount_price.data:
+                        target_listing.unit_discount_price = form.unit_discount_price.data
+
+                    if target_listing.unit_origin_price != form.unit_origin_price.data:
+                        target_listing.unit_origin_price = form.unit_origin_price.data
+
+                    if target_listing.quantity_threshold != form.quantity_threshold.data:
+                        target_listing.quantity_threshold = form.quantity_threshold.data
+
+                    if target_listing.currency_iso_code != form.currency_iso_code.data:
+                        target_listing.currency_iso_code = form.currency_iso_code.data
+
+                    if target_listing.shop_sku != form.shop_sku.data:
+                        target_listing.shop_sku = form.shop_sku.data
+
+                    if target_listing.offer_id != form.offer_id.data:
+                        target_listing.offer_id = form.offer_id.data
+
+                    if target_listing.reference != form.reference.data:
+                        target_listing.reference = form.reference.data
+
+                    if target_listing.reference_type != form.reference_type.data:
+                        target_listing.reference_type = form.reference_type.data
+
+                    target_listing.update()
             else:
                 success = False
         except Exception as e:
@@ -2240,7 +2331,14 @@ def setup():
         edit_bin = editBinForm()
         delete_bin = removeBinForm()
         
-        return render_template('setup.html', dashboard=current_user.dashboard, add_platform=add_platform, edit_platform=edit_platform, delete_platform=delete_platform, add_location=add_location, edit_location=edit_location, delete_location=delete_location, add_bin=add_bin, edit_bin=edit_bin, delete_bin=delete_bin)
+
+        add_category = addCategoryForm()
+        edit_category = editCategoryForm()
+        delete_category = removeCategoryForm()
+
+        import_categories = importCategoriesAPIForm()
+        
+        return render_template('setup.html', dashboard=current_user.dashboard, add_platform=add_platform, edit_platform=edit_platform, delete_platform=delete_platform, add_location=add_location, edit_location=edit_location, delete_location=delete_location, add_bin=add_bin, edit_bin=edit_bin, delete_bin=delete_bin, add_category=add_category, edit_category=edit_category, delete_category=delete_category, import_categories=import_categories)
     except Exception as e:
         print("Error in setup page Error: {}".format(sys.exc_info()))
         flash('Unknown error Unable to setup page', 'danger')
@@ -2538,6 +2636,133 @@ def delete_bin(location_id, bin_id):
         flash('Unknown error unable to delete bin', 'danger')
     finally:
         return redirect(url_for('routes.setup'))
+
+###########################  Categories  ##############################
+@routes.route('/categories/add', methods=['POST'])
+@login_required
+@vendor_permission.require(http_exception=403)
+def add_category():
+    try:
+        form = addCategoryForm()
+        if form.validate_on_submit():
+            # category code and label are uniques for the dashboard (eg you can not have to categories with same title in invetory sidebar and random some here and some here)
+            exist_category = db.session.query(Category).filter(and_(Category.dashboard_id==current_user.dashboard_id), or_(Category.code==form.code.data, Category.label==form.label.data)).first()
+            if not exist_category:
+                new_category = Category(dashboard_id=current_user.dashboard_id, code=form.code.data, label=form.label.data, level=form.level.data, parent_code=form.parent_code.data)
+                new_category.insert()
+                flash('Successfully Created New Category', 'success')
+            else:
+                flash('Can not add Category, Category with same code [{}] or label [{}] already exist'.format(form.code.data, form.label.data), 'danger')
+        else:
+            for field, errors in form.errors.items():
+                if field == 'csrf_token':
+                    flash("Error can not create category Please restart page and try again", "danger")
+                    continue
+                flash('Error in {} : {}'.format(field, ','.join(errors)), 'danger')
+
+    except Exception as e:
+        print('System Error: {}'.format(sys.exc_info()))
+        flash('Unknown Error unable to create new Category', 'danger')
+    finally:
+        return redirect(url_for('routes.setup'))
+
+@routes.route('/categories/<int:category_id>/edit', methods=['GET', 'POST'])
+@login_required
+@vendor_permission.require()
+def edit_category(category_id):
+    actions = 0
+    unique_success = True
+    unqiues_message = []
+    try:
+        form = editCategoryForm()
+        if form.validate_on_submit():
+            target_category = Category.query.filter_by(id=category_id, dashboard_id=current_user.dashboard.id).one_or_none()
+            if target_category is not None:
+                
+                # confirm new code not exist in system only when code updated
+                if target_category.code != form.code_edit.data:
+                    exist_category_code = Category.query.filter_by(code=form.code_edit.data, dashboard_id=current_user.dashboard.id).first()
+
+                    if not exist_category_code:
+                        target_category.code = form.code_edit.data
+                        actions += 1
+                    else:
+                        unique_success = False
+                        unqiues_message.append('Category with same code [{}] already exist'.format(form.code_edit.data))
+                
+                # confirm new label not exist in system only when label updated
+                if target_category.label != form.label_edit.data:
+                    exist_category_label = Category.query.filter_by(label=form.label_edit.data, dashboard_id=current_user.dashboard.id).first()
+
+                    if not exist_category_label:
+                        target_category.label = form.label_edit.data
+                        actions += 1
+                    else:
+                        unique_success = False
+                        unqiues_message.append('Category with same label [{}] already exist'.format(form.label_edit.data))
+
+                if target_category.level != form.level_edit.data:
+                        target_category.level = form.level_edit.data
+                        actions += 1
+
+                if target_category.parent_code != form.parent_code_edit.data:
+                        target_category.parent_code = form.parent_code_edit.data
+                        actions += 1
+
+                if unique_success == True:
+                    if actions > 0:
+                        target_category.update()
+                        flash('Successfully edit category ID:({})'.format(category_id), 'success')
+                    else:
+                        flash('No changes Detected.', 'success')
+                else:
+                    flash('Can not edit Category, {}'.format(','.join(unqiues_message)), 'danger')        
+            else:
+                flash('Category with ID: ({}) not found or deleted'.format(category_id), 'danger')
+        else:
+            for field, errors in form.errors.items():
+                if field == 'csrf_token':
+                    flash("Error can not edit category Please restart page and try again", "danger")
+                    continue
+
+                if field == 'code_edit':
+                    field = 'code'
+                if field == 'label_edit':
+                    field = 'label'
+                if field == 'level_edit':
+                    field = 'level'
+                if field == 'parent_code_edit':
+                    field = 'parent_code'
+
+                flash('Error in {} : {}'.format(field, ','.join(errors)), 'danger')
+
+    except Exception as e:
+        print('System Error: {}'.format(sys.exc_info()))
+        flash('Unknown error unable to edit category', 'danger')
+    finally:
+        return redirect(url_for('routes.setup'))
+
+@routes.route('/categories/<int:category_id>/delete', methods=['POST'])
+@login_required
+@vendor_permission.require(http_exception=403)
+def delete_category(category_id):
+    try:
+        form = removeCategoryForm()
+        target_category = Category.query.filter_by(id=category_id, dashboard_id=current_user.dashboard.id).one_or_none()
+        if target_category is not None:
+            if form.validate_on_submit():
+                target_category.delete()
+                flash('Successfully deleted Category ID: {}'.format(category_id), 'success')
+            else:
+                flash('Unable to delete Category, ID: {}'.format(category_id), 'danger')
+        else:
+            flash('Category not found it maybe deleted, ID: {}'.format(category_id), 'danger')
+    except Exception as e:
+        print('System Error: {}'.format(sys.exc_info()))
+        flash('Unknown error unable to delete category', 'danger')
+    finally:
+        return redirect(url_for('routes.setup'))
+
 
 """
 @routes.errorhandler(403)

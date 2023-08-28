@@ -28,6 +28,7 @@ class Dashboard(db.Model):
     listings = db.relationship("Listing", backref="dashboard", cascade="all, delete", passive_deletes=True)
     platforms = db.relationship("Platform", backref="dashboard", cascade="all, delete", passive_deletes=True)
     locations = db.relationship("WarehouseLocations", backref="dashboard", cascade="all, delete", passive_deletes=True)
+    categories = db.relationship("Category", backref="dashboard", cascade="all, delete", passive_deletes=True)
     user = db.relationship("User", backref="dashboard", cascade="all, delete", passive_deletes=True, uselist=False)
 
 
@@ -240,9 +241,52 @@ class Supplier(db.Model):
         }
 
 
-# sku, product_name, product_description, product_name, product_description, brand, category, price, sale_price, quantity, product_model,
-# condition, upc, location, product_image, 
+################################ ---------- Tables for Dashboard Catagories (Sart) ---------------- #########################
+class Category(db.Model):
+    __tablename__ = 'category'
+    id = db.Column(db.Integer, autoincrement=True, nullable=False, primary_key=True)
+    code = db.Column(db.String(45), nullable=False, unique=True)
+    label = db.Column(db.String(255), nullable=False)
+    level = db.Column(db.Integer, nullable=True, default=0)
+    parent_code = db.Column(db.String(45), nullable=True, default='')
+    dashboard_id = db.Column(db.Integer, db.ForeignKey('dashboard.id', ondelete="CASCADE", onupdate="CASCADE"), nullable=False)
+    created_date = db.Column(DateTime, nullable=False, default=datetime.datetime.utcnow)
+    updated_date = db.Column(DateTime, nullable=True, default=None, onupdate=datetime.datetime.utcnow)
+    catalogues = db.relationship("Catalogue", backref="category")
 
+    def __init__(self, dashboard_id, code, label, level=0, parent_code=''):
+        self.dashboard_id = dashboard_id
+        self.code = code
+        self.label = label
+        self.level = level
+        self.parent_code = parent_code
+
+    def insert(self):
+        db.session.add(self)
+        db.session.commit()
+
+    def update(self):
+        db.session.commit()
+
+    def delete(self):
+        db.session.delete(self)
+        db.session.commit()
+
+    def format(self):
+        return {
+        'id': self.id,
+        'code': self.code,
+        'label': self.label,
+        'level': self.level,
+        'parent_code': self.parent_code,
+        'created_date': self.created_date,
+        'updated_date': self.updated_date
+        }
+
+################################ ---------- Tables for Dashboard Catagories (End) ---------------- #########################
+
+# sku, product_name, product_description, product_name, product_description, brand, category_code, price, sale_price, quantity, product_model,
+# condition, upc, location, product_image, 
 # uselist=False make the one-to-one not return list of classes 
 class Catalogue(db.Model): # catelouge
     __tablename__ = 'catalogue'
@@ -251,7 +295,7 @@ class Catalogue(db.Model): # catelouge
     product_name = db.Column(db.String(500), nullable=True)
     product_description = db.Column(db.String(5000), nullable=True)
     brand = db.Column(db.String(255), nullable=True)
-    category = db.Column(db.String(255), nullable=True)
+    category_code = db.Column(db.String(45), db.ForeignKey('category.code', ondelete="SET NULL", onupdate="CASCADE"), nullable=True, default=None)
     price = db.Column(db.DECIMAL(precision=10, scale=2, asdecimal=True), nullable=True, default=0.00)
     sale_price = db.Column(db.DECIMAL(precision=10, scale=2, asdecimal=True), nullable=True, default=0.00)
     quantity = db.Column(db.Integer, nullable=True)
@@ -265,13 +309,13 @@ class Catalogue(db.Model): # catelouge
     listings = db.relationship("Listing", backref="catalogue", cascade="all, delete", passive_deletes=True)
     locations = db.relationship("CatalogueLocations", backref='catalogue', cascade="all, delete", passive_deletes=True)
 
-    def __init__(self, sku, user_id, product_name=None, product_description=None, brand=None, category=None, price=0.00, sale_price=0.00, quantity=None, product_model=None, condition=None, upc=None):
+    def __init__(self, sku, user_id, product_name=None, product_description=None, brand=None, category_code=None, price=0.00, sale_price=0.00, quantity=None, product_model=None, condition=None, upc=None):
         self.sku = sku
         self.product_name = product_name
         self.user_id = user_id
         self.product_description = product_description
         self.brand = brand
-        self.category = category
+        self.category_code = category_code
         self.price = price
         self.sale_price = sale_price
         self.quantity = quantity
@@ -287,36 +331,6 @@ class Catalogue(db.Model): # catelouge
         # update listings data when update done with event after_update (no use event)
         db.session.commit()
 
-    def sync_catalogue_listings(self):
-
-        for catalogue_listing in self.listings:
-            if self.sku != catalogue_listing.sku:
-                catalogue_listing.sku = self.sku
-
-            if self.product_name != catalogue_listing.product_name:
-                catalogue_listing.product_name = self.product_name
-
-            if self.product_description != catalogue_listing.product_description:
-                catalogue_listing.product_description = self.product_description
-
-            if self.brand != catalogue_listing.brand:
-                catalogue_listing.brand = self.brand
-
-            if self.category != catalogue_listing.category:
-                catalogue_listing.category = self.category
-
-            if self.price != catalogue_listing.price:
-                catalogue_listing.price = self.price
-
-            if self.sale_price != catalogue_listing.sale_price:
-                catalogue_listing.sale_price = self.sale_price
-
-            if self.quantity != catalogue_listing.quantity:
-                catalogue_listing.quantity = self.quantity
-
-            # catalogue class data changed update will also update the listing catalogue data to the new changed
-            catalogue_listing.update()
-
     def delete(self):
         db.session.delete(self)
         db.session.commit()
@@ -329,7 +343,7 @@ class Catalogue(db.Model): # catelouge
         'product_name': self.product_name,
         'product_description': self.product_description,
         'brand': self.brand,
-        'category': self.category,
+        'category_code': self.category_code,
         'price': str(self.price),
         'sale_price': str(self.sale_price),
         'quantity': self.quantity,
@@ -341,18 +355,34 @@ class Catalogue(db.Model): # catelouge
         'locations': [{'location_name': catalogue_loc.warehouse_location.name, 'bins': [catalogue_loc_bin.bin.name for catalogue_loc_bin in catalogue_loc.bins]} for catalogue_loc in self.locations]
         }
 
+
 class Listing(db.Model):
     __tablename__ = 'listing'
     id = db.Column(db.Integer, primary_key=True, nullable=False)
     sku = db.Column(db.String(45), nullable=False)
     product_name = db.Column(db.String(500), nullable=True)
     product_description = db.Column(db.String(5000), nullable=True)
-    brand = db.Column(db.String(255), nullable=True)
-    category = db.Column(db.String(255), nullable=True)
+    brand = db.Column(db.String(255), nullable=True)    
     price = db.Column(db.DECIMAL(precision=10, scale=2, asdecimal=True), nullable=True, default=0.00)
     sale_price = db.Column(db.DECIMAL(precision=10, scale=2, asdecimal=True), nullable=True, default=0.00)
     quantity = db.Column(db.Integer, nullable=True)
-    image = db.Column(db.String(45), nullable=True, default='default_listing.png') 
+    category_code = db.Column(db.String(255), nullable=True)
+    category_label = db.Column(db.String(255), nullable=True, default=None)
+    # new    
+    active = db.Column(db.Boolean, nullable=True, default=None)
+    discount_end_date = db.Column(DateTime, nullable=True, default=None)
+    discount_start_date = db.Column(DateTime, nullable=True, default=None)
+    unit_discount_price = db.Column(db.DECIMAL(precision=10, scale=2, asdecimal=True), nullable=True, default=0.00)
+    unit_origin_price = db.Column(db.DECIMAL(precision=10, scale=2, asdecimal=True), nullable=True, default=0.00)
+    quantity_threshold = db.Column(db.Integer, nullable=True, default=None)
+    currency_iso_code = db.Column(db.String(45), nullable=True, default=None)
+    shop_sku = db.Column(db.String(45), nullable=True, default=None)
+    offer_id = db.Column(db.Integer, nullable=True, default=None)
+    reference = db.Column(db.String(255), nullable=True, default=None)
+    reference_type = db.Column(db.String(255), nullable=True, default=None)
+    
+
+    image = db.Column(db.String(45), nullable=True, default='default_listing.png')
     created_date = db.Column(DateTime, nullable=False, default=datetime.datetime.utcnow)
     updated_date = db.Column(DateTime, nullable=True, default=None, onupdate=datetime.datetime.utcnow)
     dashboard_id = db.Column(db.Integer, db.ForeignKey('dashboard.id', ondelete="CASCADE", onupdate="CASCADE"), nullable=False)
@@ -361,9 +391,20 @@ class Listing(db.Model):
     orders = db.relationship("Order", backref="listing", cascade="all, delete", passive_deletes=True)
     platforms = db.relationship("ListingPlatform", backref="listing", cascade="all, delete", passive_deletes=True)
 
-    def __init__(self, dashboard_id, catalogue_id, image='default_listing.png'):
+    def __init__(self, dashboard_id, catalogue_id, active=None, discount_start_date=None, discount_end_date=None, unit_discount_price=None, unit_origin_price=None, quantity_threshold=None, currency_iso_code=None, shop_sku=None, offer_id=None, reference=None, reference_type=None, image='default_listing.png'):
         self.dashboard_id = dashboard_id
         self.catalogue_id = catalogue_id
+        self.active = active
+        self.discount_start_date = discount_start_date
+        self.discount_end_date = discount_end_date        
+        self.unit_discount_price = unit_discount_price
+        self.unit_origin_price = unit_origin_price
+        self.quantity_threshold = quantity_threshold
+        self.currency_iso_code = currency_iso_code
+        self.shop_sku = shop_sku
+        self.offer_id = offer_id
+        self.reference = reference
+        self.reference_type = reference_type
         self.image = image
 
         # automatic fill catalogue data in listing data, also incase catalogue not found stop initalize and throw error which captured by route try and except and print the flash message for user inform him error in creating which right
@@ -374,15 +415,17 @@ class Listing(db.Model):
                 self.product_name = target_catalogue.product_name
                 self.product_description = target_catalogue.product_description
                 self.brand = target_catalogue.brand
-                self.category = target_catalogue.category
+                self.category_code = target_catalogue.category_code
+                if target_catalogue.category:
+                    self.category_label = target_catalogue.category.label
                 self.price = target_catalogue.price
                 self.sale_price = target_catalogue.sale_price
                 self.quantity = target_catalogue.quantity
             else:
-                raise 'unable to find the target catalogue'
+                raise ValueError('unable to find the target catalogue')
         except Exception as e:
             print('error while setting default listing data {}'.format(e))
-            raise e            
+            raise e         
         
         
     def insert(self):        
@@ -397,7 +440,7 @@ class Listing(db.Model):
         #    self.catalogue.update()
 
     def sync_listing(self):
-
+        print("synced")
         if self.sku != self.catalogue.sku:
             self.sku = self.catalogue.sku
         if self.product_name != self.catalogue.product_name:
@@ -406,8 +449,10 @@ class Listing(db.Model):
             self.product_description = self.catalogue.product_description
         if self.brand != self.catalogue.brand:
             self.brand = self.catalogue.brand
-        if self.category != self.catalogue.category:
-            self.category = self.catalogue.category
+        if self.category_code != self.catalogue.category_code:
+            self.category_code = self.catalogue.category_code
+        if self.catalogue.category and self.catalogue.category.label != self.category_label:
+            self.category_label = self.catalogue.category.label
         if self.price != self.catalogue.price:
             self.price = self.catalogue.price
         if self.sale_price != self.catalogue.sale_price:
@@ -443,7 +488,7 @@ class Listing(db.Model):
         'product_name': self.product_name,
         'product_description': self.product_description,
         'brand': self.brand,
-        'category': self.category,
+        'category_code': self.category_code,
         'price': str(self.price),
         'sale_price': str(self.sale_price),
         'quantity': self.quantity,
@@ -624,7 +669,9 @@ class ListingPlatform(db.Model):
         'updated_date': self.updated_date
         }
 
+################################ ---------- Tables for Dashboard Plateforms (End) ---------------- #########################
 
+################################ ---------- Tables for Dashboard Warehouse Locations (Sart) ---------------- #########################
 class WarehouseLocations(db.Model):
     __tablename__ = 'warehouse_locations'
     id = db.Column(db.Integer, primary_key=True, nullable=False)
@@ -756,8 +803,7 @@ class CatalogueLocationsBins(db.Model):
         'updated_date': self.updated_date
         }
 
-
-################################ ---------- Tables for Dashboard Plateforms (End) ---------------- #########################
+################################ ---------- Tables for Dashboard Warehouse Locations (End) ---------------- #########################
 
 
 ################################ ---------- Tables for Inventory (End) ---------------- #########################
@@ -796,11 +842,14 @@ def update_listing_on_catalogue_update(mapper, connection, target):
         for alisting in target.listings:
             list_to_update = scoped_session.query(Listing).filter_by(id=alisting.id).one_or_none()
             if list_to_update:
+                print('print executed {}'.format(target.sku))
                 list_to_update.sku = target.sku
                 list_to_update.product_name = target.product_name
                 list_to_update.product_description = target.product_description
                 list_to_update.brand = target.brand
-                list_to_update.category = target.category
+                list_to_update.category_code = target.category_code
+                if target.category:
+                    list_to_update.category_label = target.category.label
                 list_to_update.price = target.price
                 list_to_update.sale_price = target.sale_price
                 list_to_update.quantity = target.quantity
@@ -808,7 +857,7 @@ def update_listing_on_catalogue_update(mapper, connection, target):
     except Exception as e:
         scoped_session.rollback()
         print('Error in Updating catalogue event db function (update_listing_on_catalogue_update): {}'.format(e, sys.exc_info()))
-        raise e        
+        raise e
     finally:
         scoped_session.close()
 """

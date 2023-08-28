@@ -53,12 +53,12 @@
                 {% endif %}
               </div>
               <div class="form-group">
-                {{form.category.label}}
-                {{form.category(class='form-control', placeholder='Category')}}
+                {{form.category_code.label}}
+                {{form.category_code(class='form-control', placeholder='Category')}}
                 
-                {% if form.category.errors %}
+                {% if form.category_code.errors %}
                 <ul class="errors bg-danger text-white">
-                    {% for error in form.category.errors %}
+                    {% for error in form.category_code.errors %}
                         <li class="p-1 mb-1">{{ error }}</li>
                     {% endfor %}
                 </ul>

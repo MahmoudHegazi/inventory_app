@@ -55,15 +55,25 @@ class LoginForm(FlaskForm):
 # Listings Forms
 class listingForm(FlaskForm):
     catalogue_id = SelectField('Catalogue',choices=[], validators=[InputRequired()], coerce=int, validate_choice=True)
+    platforms = SelectMultipleField('Platforms', choices=[], coerce=int, validate_choice=True)
+    active = BooleanField('Active', validators=[optional()])
+    discount_end_date = DateTimeLocalField('Discount End Date', validators=[optional()], format="%Y-%m-%dT%H:%M")
+    discount_start_date = DateTimeLocalField('Discount Start Date', validators=[optional()], format="%Y-%m-%dT%H:%M")
+    unit_discount_price = DecimalField('Unit Discount Price', validators=[optional()], default=0.00)
+    unit_origin_price = DecimalField('Unit Origin Price', validators=[optional()], default=0.00)
+    quantity_threshold = IntegerField('Quantity Threshold', validators=[optional()], default=0)
+    currency_iso_code = StringField('Currency ISO code', validators=[optional(), Length(max=45)])
+    shop_sku = StringField('Shop SKU', validators=[optional(), Length(max=45)])
+    offer_id = IntegerField('Offer ID', validators=[optional()])
+    reference = StringField('Reference', validators=[optional(), Length(max=255)])
+    reference_type = StringField('Reference Type', validators=[optional(), Length(max=255)])
 
 
 class addListingForm(listingForm):
-    platforms = SelectMultipleField('Platforms', choices=[], coerce=int, validate_choice=True)
     add = SubmitField('Add')
 
 
 class editListingForm(listingForm):
-    platforms = SelectMultipleField('Platforms', choices=[], coerce=int, validate_choice=True)
     edit = SubmitField('Edit')
 
 
@@ -75,13 +85,17 @@ class removeListingsForm(FlaskForm):
     listings_ids = HiddenField()
     delete_listings = SubmitField('Delete')
 
+class importOffersAPIForm(FlaskForm):
+    api_key = StringField('SHOP KEY', validators=[InputRequired(), Length(max=500)], render_kw={'title': 'You can get that key from your marketplace, in the API section'})
+    import_data = SubmitField('Import Data')
+
 # Product Forms
 class catalogueModal(FlaskForm):
     sku = StringField('SKU', validators=[InputRequired(), Length(max=45)])
     product_name = StringField('Product Name',validators=[Length(max=500)])
     product_description = TextAreaField('Product Description',validators=[Length(max=5000)])
     brand = StringField('Brand',validators=[Length(max=255)])
-    category = StringField('Category',validators=[Length(max=255)])
+    category_code = SelectField('Category Code',choices=[], validators=[InputRequired()], validate_choice=True)
     quantity = IntegerField('Quantity')
     product_model = StringField('Product Model',validators=[Length(max=255)])
     condition = StringField('Condition',validators=[Length(max=255)])
@@ -280,6 +294,30 @@ class removeBinForm(FlaskForm):
     bin_id_remove = HiddenField()
     delete = SubmitField('Delete Bin')
 
+
+# Category Forms
+class addCategoryForm(FlaskForm):
+    code = StringField('Category Code', validators=[InputRequired(), Length(max=45)])
+    label = StringField('Label', validators=[InputRequired(), Length(max=255)])
+    level = IntegerField('Level', validators=[optional()], default=0)
+    parent_code = StringField('Parent Code', validators=[optional(), Length(max=45)])
+    add = SubmitField('Add')
+
+class editCategoryForm(FlaskForm):
+    category_id_edit = HiddenField()
+    code_edit = StringField('Category Code', validators=[InputRequired(), Length(max=45)])
+    label_edit = StringField('Label', validators=[InputRequired(), Length(max=255)])
+    level_edit = IntegerField('Level', validators=[optional()])
+    parent_code_edit = StringField('Parent Code', validators=[optional(), Length(max=45)])
+    edit = SubmitField('Edit')
+
+class removeCategoryForm(FlaskForm):
+    category_id = HiddenField()
+    delete = SubmitField('Delete Category')
+
+class importCategoriesAPIForm(FlaskForm):
+    api_key = StringField('SHOP KEY', validators=[InputRequired(), Length(max=500)], render_kw={'title': 'You can get that key from your marketplace, in the API section'})
+    import_data = SubmitField('Import Data')
 
 ###############################  main Forms ###############################################
 class CatalogueExcelForm(FlaskForm):

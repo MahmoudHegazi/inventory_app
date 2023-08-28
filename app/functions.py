@@ -1,8 +1,11 @@
 import sys
+import re
+import datetime
+from dateutil import parser
 from urllib.parse import urlparse, urljoin
 from flask import request
 from sqlalchemy import func
-from .models import Supplier, Dashboard, Listing, Catalogue, Purchase, Order, Platform, ListingPlatform, CatalogueLocations, CatalogueLocationsBins, WarehouseLocations, LocationBins
+from .models import Supplier, Dashboard, Listing, Catalogue, Purchase, Order, Platform, ListingPlatform, CatalogueLocations, CatalogueLocationsBins, WarehouseLocations, LocationBins, Category
 from sqlalchemy.sql import extract
 from sqlalchemy import or_, and_, func , asc, desc
 
@@ -20,11 +23,12 @@ def get_safe_redirect(url=''):
     return ''
 
 
+
 #### main functions ####
 def valid_catalogues(excel_array):
     try:
         required_columns = [
-        "sku","product_name","product_description","brand","category","price","sale_price","quantity","product_model","condition","upc", "location"]
+        "sku","product_name","product_description","brand","category_code","price","sale_price","quantity","product_model","condition","upc", "location"]
         columns_missing = []
         if len(excel_array) == 0:
             return {'success': True, 'message': ''}
@@ -48,7 +52,7 @@ def valid_catalogues(excel_array):
         print('System Error valid_catalogues: {}'.format(sys.exc_info()))
         raise e
     
-#{ "sku",  "product_name",  "product_description",  "brand",  "category",  "price",  "sale_price",  "quantity",  "product_model",  "condition",  "upc",  "location", }
+#{ "sku",  "product_name",  "product_description",  "brand",  "category_code",  "price",  "sale_price",  "quantity",  "product_model",  "condition",  "upc",  "location", }
 def get_mapped_catalogues_dicts(excel_array):
     try:
        catalogues_valid = valid_catalogues(excel_array)
@@ -59,7 +63,7 @@ def get_mapped_catalogues_dicts(excel_array):
            "product_name": -1, 
            "product_description": -1, 
            "brand": -1, 
-           "category": -1, 
+           "category_code": -1, 
            "price": -1, 
            "sale_price": -1, 
            "quantity": -1, 
@@ -94,7 +98,7 @@ def get_mapped_catalogues_dicts(excel_array):
                    "product_name": current_row[catalogues_columns['product_name']], 
                    "product_description": current_row[catalogues_columns['product_description']], 
                    "brand": current_row[catalogues_columns['brand']], 
-                   "category": current_row[catalogues_columns['category']], 
+                   "category_code": current_row[catalogues_columns['category_code']], 
                    "price": price_n, 
                    "sale_price": sale_price_n, 
                    "quantity": current_row[catalogues_columns['quantity']], 
@@ -235,7 +239,7 @@ class ExportSqlalchemyFilter():
         self.purchase_columns = getTableColumns(Purchase)
         self.order_columns = getTableColumns(Order)
         self.supplier_columns = getTableColumns(Supplier, ['user_id'])
-        self.platform_columns = getTableColumns(Platform, ['dashboard_id'])
+        self.platform_columns = getTableColumns(Platform, ['dashboard_id'])        
         
         # locations tables (now it can used by vistors only not admin or developer or tester (tool can modifed for testing and anlaysis app))
         self.warehouse_locations_columns = getTableColumns(WarehouseLocations, ['id', 'dashboard_id', 'created_date', 'updated_date'])
@@ -244,8 +248,10 @@ class ExportSqlalchemyFilter():
         self.catalogue_locations_columns = getTableColumns(CatalogueLocations, ['id', 'created_date', 'updated_date', 'catalogue_id', 'location_id'])
         self.catalogue_locations_bins_columns = getTableColumns(CatalogueLocationsBins, ['id', 'created_date', 'updated_date', 'location_id', 'bin_id'])
 
+        self.categories_columns = getTableColumns(Category, ['dashboard_id', 'created_date', 'updated_date'])
+
         # rendered with same order in js (filters_args_list ...(args))  (can change order of display in frontend)
-        catalogue_table_filters = [*self.catalogue_columns, *self.warehouse_locations_columns, *self.location_bins_columns, *self.catalogue_locations_columns, *self.catalogue_locations_bins_columns]
+        catalogue_table_filters = [*self.catalogue_columns, *self.warehouse_locations_columns, *self.location_bins_columns, *self.catalogue_locations_columns, *self.catalogue_locations_bins_columns, *self.categories_columns]
         # call function here becuase i need custom ignored duplicated columns in Catalogue not the default (changed that for make test way for user without code, he can validate if catalogues data not changed) (actions done by event listeners)
         listing_table_filters = [
             *self.listing_columns,
@@ -254,9 +260,10 @@ class ExportSqlalchemyFilter():
             *self.warehouse_locations_columns,
             *self.location_bins_columns,
             *self.catalogue_locations_columns,
-            *self.catalogue_locations_bins_columns
+            *self.catalogue_locations_bins_columns,
+            *self.categories_columns
             ]
-        # *getTableColumns(Catalogue, ['user_id', 'sku', 'product_name', 'product_description', 'brand', 'category', 'price', 'sale_price', 'quantity'])
+        # *getTableColumns(Catalogue, ['user_id', 'sku', 'product_name', 'product_description', 'brand', 'category_code', 'price', 'sale_price', 'quantity'])
         purchase_table_filters = [*self.purchase_columns, *self.supplier_columns, *self.listing_columns, *self.catalogue_columns]
         order_table_filters = [*self.order_columns, *self.listing_columns, *self.catalogue_columns]
         supplier_table_filters = [*self.supplier_columns]
@@ -264,8 +271,8 @@ class ExportSqlalchemyFilter():
 
         # each export button have predefined group of allowed tables, can controled from here
         self.allowed_tables = {
-            'catalogue': [Catalogue, WarehouseLocations, LocationBins, CatalogueLocations, CatalogueLocationsBins],
-            'listing': [Listing, Catalogue, Platform, WarehouseLocations, LocationBins, CatalogueLocations, CatalogueLocationsBins],
+            'catalogue': [Catalogue, WarehouseLocations, LocationBins, CatalogueLocations, CatalogueLocationsBins, Category],
+            'listing': [Listing, Catalogue, Platform, WarehouseLocations, LocationBins, CatalogueLocations, CatalogueLocationsBins, Category],
             'purchase': [Purchase, Supplier, Listing, Catalogue],
             'order': [Order, Listing, Catalogue],
             'supplier': [Supplier]
@@ -437,6 +444,8 @@ def get_export_data(db, flask_excel, current_user_id, table_name, columns, opera
             CatalogueLocationsBins, CatalogueLocations.id == CatalogueLocationsBins.location_id
         ).outerjoin(
             LocationBins, CatalogueLocationsBins.bin_id == LocationBins.id
+        ).outerjoin(
+            Category, Category.code == Catalogue.category_code
         ).filter(and_(Catalogue.user_id==current_user_id), filterBooleanClauseList).all()
         if response['data']:
             export_data = []
@@ -451,7 +460,7 @@ def get_export_data(db, flask_excel, current_user_id, table_name, columns, opera
                 for cat_location in item.locations:
                     locations_arr.append(str(cat_location.warehouse_location.name))
                 locations = ','.join(locations_arr)
-                export_data.append([item.id, item.sku, item.product_name, item.product_description, item.brand, item.category, item.price, item.sale_price, item.quantity, item.product_model, item.condition, item.upc, locations])
+                export_data.append([item.id, item.sku, item.product_name, item.product_description, item.brand, item.category_code, item.price, item.sale_price, item.quantity, item.product_model, item.condition, item.upc, locations])
             # modfied array to return the addiontal relational data like locations or bins
             response['data'] = export_data
             
@@ -478,6 +487,8 @@ def get_export_data(db, flask_excel, current_user_id, table_name, columns, opera
             CatalogueLocationsBins, CatalogueLocations.id == CatalogueLocationsBins.location_id
         ).outerjoin(
             LocationBins, CatalogueLocationsBins.bin_id == LocationBins.id
+        ).outerjoin(
+            Category, Catalogue.category_code == Category.code
         ).filter(
             and_(Catalogue.user_id == current_user_id),
             filterBooleanClauseList
@@ -485,12 +496,12 @@ def get_export_data(db, flask_excel, current_user_id, table_name, columns, opera
         if response['data']:
             export_data = []
 
-            response['column_names'] = ['id', 'sku', 'product_name', 'product_description', 'brand', 'category', 'price', 'sale_price', 'quantity', 'created_date', 'updated_date', 'dashboard_id', 'catalogue_id', 'platform']
+            response['column_names'] = ['id', 'sku', 'product_name', 'product_description', 'brand', 'category_code', 'price', 'sale_price', 'quantity', 'created_date', 'updated_date', 'dashboard_id', 'catalogue_id', 'platform']
             export_data.append(response['column_names'])
             
             for item in response['data']:
                 platforms = ",".join(["{}".format(listing_platform.platform.name) for listing_platform in item.platforms])
-                export_data.append([item.id, item.sku, item.product_name, item.product_description, item.brand, item.category, item.price, item.sale_price, item.quantity, item.created_date, item.updated_date, item.dashboard_id, item.catalogue_id, platforms])
+                export_data.append([item.id, item.sku, item.product_name, item.product_description, item.brand, item.category_code, item.price, item.sale_price, item.quantity, item.created_date, item.updated_date, item.dashboard_id, item.catalogue_id, platforms])
             
             response['data'] = export_data
             if usejson == False:
@@ -868,3 +879,215 @@ def get_sheet_row_locations(mapped_catalogues_dict, row_index):
     except Exception as e:
         print("Error in get_sheet_locations row index: {}, error_info: {}".format(row_index, sys.exc_info()))
     return row_locations
+
+
+"""
+(About this regex used): this regex says, string must start with english character or number, and followed by any of english characters or numbers or - and must end by english characters or number only and not \n --- note $ diffrent than \Z, \Z means match exact what given and not ignore the \n so if string end with \n will considered not matched, $ will ignore the \n becuase it dynamic handle both re.MULTILINE and normal first match so $ will match anything the string end with before the new line, ---note: []+ here means continue to the end like we say some pattern until end of match + new pattern--in this example ^[a-z0-9]+ means take any character or number until you reach of end where no more characters or numbers, then move to next pattern part which look for any character or number or - until end, using + important incase search here first + can ignored as next pattern part will match any number or character, but if ignored this will match only first char and leave rest for next part (+)!! it near equal to , or and start with part and part etc---match unlike find and search, this not search for example test\Z in string hello test match require pattern to begning part of string you can not say re.match("test\Z",txt) this invalid as missing hello\s or the pattern equal to it \w+ , [a-z]+ .* , etc 
+"""
+# secure and validate apikey return valid secure apikey value to inserted in request headers or None if invalid key and sub could not fix it
+def apikey_or_none(apikey):
+    result = None
+    try:
+        # if sub omited will not allow if \n or spaces, better help user and protect system
+        apikey = re.sub('[\s\n\r]', "", apikey)
+        valid = re.match("^[a-z0-9]+[a-z0-9\-]+[a-z0-9]+\Z", apikey, re.IGNORECASE)
+        if valid:
+            result = valid.group()
+        return result
+    except:
+        print("System error in apikey_or_none: {}".format(sys.exc_info()))
+    finally:
+        return result
+    
+# divide lists into lists of length
+def chunks(data, step):
+    for i in range(0,len(data),step):
+        yield data[i: i+step]
+    
+def float_or_none(float_num):
+    try:
+        return float(float_num)
+    except:
+        return None
+    
+def int_or_none(int_num):
+    try:
+        return int(int_num)
+    except:
+        return None
+
+def datestr_or_none(datestr):
+    try:
+        return datestr.strftime("%Y-%m-%d %H:%M:%S")
+    except:
+        return None
+
+def mysql_strdate(timestr=''):
+    try:
+        if timestr:
+            datetime_obj = parser.parse(timestr)
+            return datetime_obj.strftime("%Y-%m-%d %H:%M:%S")
+        else:
+            return None
+    except:
+        print('Error in mysql_strdate {}'.format(sys.exc_info()))
+        return None
+    
+# this function insert only what needed to be inserted, and update only column that needed to updated, nothing more nothing less (+ uses performances to reduce db commit if required)
+def upload_catalogues(offers_data, current_user):
+    try:        
+        result = {'total': len(offers_data), 'uploaded': 0, 'updated': 0, 'not_changed': 0, 'luploaded': 0, 'lupdated': 0, 'lnot_changed': 0, 'new_categories': 0}
+        for offer in offers_data:
+            if 'product_sku' in offer and 'product_title' in offer:
+                product_sku = offer['product_sku']
+                product_title = offer['product_title']
+                product_description = offer['product_description'] if 'product_description' in offer else ''
+                product_brand = offer['product_brand'] if 'product_brand' in offer else ''
+                
+                quantity = offer['quantity'] if 'quantity' in offer else 0
+                active = offer['active'] if 'active' in offer else None
+                shop_sku = offer['shop_sku'] if 'shop_sku' in offer else None
+                category_code = offer['category_code'] if 'category_code' in offer else None
+                category_label = offer['category_label'] if 'category_label' in offer else None
+                currency_iso_code = offer['currency_iso_code'] if 'currency_iso_code' in offer else None
+                offer_id = offer['offer_id'] if 'offer_id' in offer else None
+                price = offer['price'] if 'price' in offer else 0.00
+
+                # it big but confirm 0 errors (risk managment rules)
+                reference = offer['product_references'][0]['reference'] if 'product_references' in offer and isinstance(offer['product_references'], list) and len(offer['product_references']) > 0 and isinstance(offer['product_references'][0], dict) and 'reference' in offer['product_references'][0] else None
+                reference_type = offer['product_references'][0]['reference_type'] if 'product_references' in offer and isinstance(offer['product_references'], list) and len(offer['product_references']) > 0 and isinstance(offer['product_references'][0], dict) and 'reference_type' in offer['product_references'][0] else None
+                
+                quantity_threshold = offer['all_prices'][0]['volume_prices'][0]['quantity_threshold'] if 'all_prices' in offer and isinstance(offer['all_prices'], list) and len(offer['all_prices']) > 0 and isinstance(offer['all_prices'][0], dict) and 'volume_prices' in offer['all_prices'][0] and isinstance(offer['all_prices'][0]['volume_prices'], list) and len(offer['all_prices'][0]['volume_prices']) > 0 and isinstance(offer['all_prices'][0]['volume_prices'][0], dict) and 'quantity_threshold' in offer['all_prices'][0]['volume_prices'][0] else None
+                unit_discount_price = offer['all_prices'][0]['volume_prices'][0]['unit_discount_price'] if 'all_prices' in offer and isinstance(offer['all_prices'], list) and len(offer['all_prices']) > 0 and isinstance(offer['all_prices'][0], dict) and 'volume_prices' in offer['all_prices'][0] and isinstance(offer['all_prices'][0]['volume_prices'], list) and len(offer['all_prices'][0]['volume_prices']) > 0 and isinstance(offer['all_prices'][0]['volume_prices'][0], dict) and 'unit_discount_price' in offer['all_prices'][0]['volume_prices'][0] else None
+                unit_origin_price = offer['all_prices'][0]['volume_prices'][0]['unit_origin_price'] if 'all_prices' in offer and isinstance(offer['all_prices'], list) and len(offer['all_prices']) > 0 and isinstance(offer['all_prices'][0], dict) and 'volume_prices' in offer['all_prices'][0] and isinstance(offer['all_prices'][0]['volume_prices'], list) and len(offer['all_prices'][0]['volume_prices']) > 0 and isinstance(offer['all_prices'][0]['volume_prices'][0], dict) and 'unit_origin_price' in offer['all_prices'][0]['volume_prices'][0] else None
+
+                discount_price = offer['discount']['discount_price'] if 'discount' in offer and isinstance(offer['discount'], dict) and 'discount_price' in offer['discount'] else None
+                discount_start_date = mysql_strdate(offer['discount']['start_date']) if 'discount' in offer and isinstance(offer['discount'], dict) and 'start_date' in offer['discount'] else None
+                discount_end_date = mysql_strdate(offer['discount']['end_date']) if 'discount' in offer and isinstance(offer['discount'], dict) and 'end_date' in offer['discount'] else None
+
+                selected_category = Category.query.filter_by(dashboard_id=current_user.dashboard.id, code=category_code).first()
+                if not selected_category:
+                    selected_category = Category(dashboard_id=current_user.dashboard.id, code=category_code, label=category_label, level=0, parent_code='')
+                    selected_category.insert()
+                    result['new_categories'] += 1
+
+                selected_catalogue = Catalogue.query.filter_by(sku=product_sku, user_id=current_user.id).first()
+                not_changed = False
+                if selected_catalogue:
+                    update_require = False
+                    # update catalogue data from api
+                    if selected_catalogue.product_name != product_title:
+                        selected_catalogue.product_name = product_title
+                        update_require = True
+
+                    if selected_catalogue.product_description != product_description:
+                        selected_catalogue.product_description = product_description
+                        update_require = True
+
+                    if selected_catalogue.brand != product_brand:
+                        selected_catalogue.brand = product_brand
+                        update_require = True
+
+                    if selected_catalogue.category_code != category_code:
+                        selected_catalogue.category_code = category_code
+                        update_require = True
+
+                    if float_or_none(selected_catalogue.price) != price:                        
+                        selected_catalogue.price = price
+                        update_require = True
+
+                    if float_or_none(selected_catalogue.sale_price) != discount_price:
+                        selected_catalogue.sale_price = discount_price
+                        update_require = True
+
+                    if int_or_none(selected_catalogue.quantity) != quantity:
+                        selected_catalogue.quantity = quantity
+                        update_require = True
+
+                    if selected_catalogue.upc != reference_type:
+                        selected_catalogue.upc = reference_type
+                        update_require = True
+
+                    if update_require:
+                        selected_catalogue.update()
+                        result['updated'] += 1
+                    else:
+                        result['not_changed'] += 1
+                        # this to help decide in next step, sync listing with changed catalogue data or not sync if catalogue not changed
+                        not_changed = True
+                else:
+                    selected_catalogue = Catalogue(product_sku, current_user.id, product_name=product_title, product_description=product_description, brand=product_brand, category_code=None, price=price, sale_price=discount_price, quantity=quantity, product_model=None, condition=None, upc=reference_type)
+                    selected_catalogue.insert()
+                    result['uploaded'] += 1
+
+                selected_listing = Listing.query.filter_by(dashboard_id=current_user.dashboard.id, catalogue_id=selected_catalogue.id, sku=selected_catalogue.sku).first()
+                if selected_listing:
+                    update_require2 = False
+
+                    if selected_listing.active != active:
+                        selected_listing.active = active
+                        update_require2 = True
+                       
+                       
+                    if datestr_or_none(selected_listing.discount_start_date) != discount_start_date:
+                        update_require2 = True
+                        selected_listing.discount_start_date = discount_start_date
+
+                    if datestr_or_none(selected_listing.discount_end_date) != discount_end_date:
+                        selected_listing.discount_end_date = discount_end_date
+                        update_require2 = True
+
+                    if float_or_none(selected_listing.unit_discount_price) != unit_discount_price:
+                        selected_listing.unit_discount_price = unit_discount_price
+                        update_require2 = True
+
+                    if float_or_none(selected_listing.unit_origin_price) != unit_origin_price:
+                        selected_listing.unit_origin_price = unit_origin_price
+                        update_require2 = True
+
+                    if int_or_none(selected_listing.quantity_threshold) != quantity_threshold:
+                        selected_listing.quantity_threshold = quantity_threshold
+                        update_require2 = True
+
+                    if selected_listing.currency_iso_code != currency_iso_code:
+                        selected_listing.currency_iso_code = currency_iso_code
+                        update_require2 = True
+
+                    if selected_listing.shop_sku != shop_sku:
+                        selected_listing.shop_sku = shop_sku
+                        update_require2 = True
+
+                    if int_or_none(selected_listing.offer_id) != offer_id:
+                        selected_listing.offer_id = offer_id
+                        update_require2 = True
+
+                    if selected_listing.reference != reference:
+                        selected_listing.reference = reference
+                        update_require2 = True
+
+                    if selected_listing.reference_type != reference_type:
+                        selected_listing.reference_type = reference_type
+                        update_require2 = True
+
+                    if update_require2:
+                        selected_listing.update()
+                    
+                    # is catalogue when updated changed or not, (default false) only if catalogue exist but it's data not updated not_changed will be True
+                    if not_changed == False:
+                        # this for sync listing with catalogue (also update listing data) (performance)
+                        selected_listing.sync_listing()
+
+                    # no updates happend, and catalogue not changed so the listing not asynced too
+                    if not update_require2 and not_changed == True:
+                        result['lnot_changed'] += 1
+
+                    if update_require2 or not_changed == False:
+                        result['lupdated'] += 1
+                else:
+                    new_listing = Listing(dashboard_id=current_user.dashboard.id, catalogue_id=selected_category.id, active=active, discount_start_date=discount_start_date, discount_end_date=discount_end_date, unit_discount_price=unit_discount_price, unit_origin_price=unit_origin_price, quantity_threshold=quantity_threshold, currency_iso_code=currency_iso_code, shop_sku=shop_sku, offer_id=offer_id, reference=reference, reference_type=reference_type)
+                    new_listing.insert()
+                    result['luploaded'] += 1
+
+        return result
+    except Exception as e:
+        raise e

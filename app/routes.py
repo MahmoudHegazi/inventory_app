@@ -68,7 +68,7 @@ def makePagination(page=1, query_obj=None, callback=(), limit_parm=10):
 @routes.route('/', methods=['GET'])
 @routes.route('/home', methods=['GET'])
 @login_required
-@vendor_permission.require()
+@vendor_permission.require(http_exception=403)
 def index():
     try:
         charts_data = get_charts(db, current_user,
@@ -238,7 +238,7 @@ def add_catalogue():
 
 @routes.route('/catalogue/<int:catalogue_id>/edit', methods=['GET', 'POST'])
 @login_required
-@vendor_permission.require()
+@vendor_permission.require(http_exception=403)
 def edit_catalogue(catalogue_id):
     form = None
     target_catalogue = None
@@ -682,7 +682,7 @@ def add_listing():
 
 @routes.route('/listings/<int:listing_id>/edit', methods=['GET', 'POST'])
 @login_required
-@vendor_permission.require()
+@vendor_permission.require(http_exception=403)
 def edit_listing(listing_id):
     
     # route setup
@@ -1064,7 +1064,7 @@ def multiple_listing_add():
 ################ -------------------------- Listing Purchases (this purchases based on selected listing from any supplier) -------------------- ################
 @routes.route('/listings/<int:listing_id>/purchases/<int:purchase_id>', methods=['GET', 'POST'])
 @login_required
-@vendor_permission.require()
+@vendor_permission.require(http_exception=403)
 def view_purchase_listing(listing_id, purchase_id):
     success = True
     target_purchase = None
@@ -1198,7 +1198,7 @@ def add_purchase_listing(listing_id):
 
 @routes.route('/listings/<int:listing_id>/purchases/<int:purchase_id>/edit', methods=['GET', 'POST'])
 @login_required
-@vendor_permission.require()
+@vendor_permission.require(http_exception=403)
 def edit_purchase_listing(listing_id, purchase_id):
     form = None
     target_purchase = None
@@ -1400,7 +1400,7 @@ def delete_purchase_listing(listing_id, purchase_id):
 ################ -------------------------- Listings Orders -------------------- ################
 @routes.route('/listings/<int:listing_id>/orders/<int:order_id>', methods=['GET'])
 @login_required
-@vendor_permission.require()
+@vendor_permission.require(http_exception=403)
 def view_order(listing_id, order_id):    
     success = True
     target_order = None
@@ -1552,7 +1552,7 @@ def add_order(listing_id):
 
 @routes.route('/listings/<int:listing_id>/orders/<int:order_id>/edit', methods=['GET', 'POST'])
 @login_required
-@vendor_permission.require()
+@vendor_permission.require(http_exception=403)
 def edit_order(listing_id, order_id):
     form = None
     target_order = None
@@ -1901,7 +1901,7 @@ def suppliers():
 
 @routes.route('/suppliers/<int:supplier_id>', methods=['GET'])
 @login_required
-@vendor_permission.require()
+@vendor_permission.require(http_exception=403)
 def view_supplier(supplier_id):
     success = True
     message = ''
@@ -1957,7 +1957,7 @@ def add_supplier():
 
 @routes.route('/suppliers/<int:supplier_id>/edit', methods=['GET', 'POST'])
 @login_required
-@vendor_permission.require()
+@vendor_permission.require(http_exception=403)
 def edit_supplier(supplier_id):
     success = True
     actions = 0
@@ -2024,7 +2024,7 @@ def delete_supplier(supplier_id):
 ################ -------------------------- Supplier Purchases (this purchases based on selected supplier) -------------------- ################
 @routes.route('/suppliers/<int:supplier_id>/purchases/<int:purchase_id>', methods=['GET'])
 @login_required
-@vendor_permission.require()
+@vendor_permission.require(http_exception=403)
 def view_purchase_supplier(supplier_id, purchase_id):
     success = True
     target_purchase = None
@@ -2137,7 +2137,7 @@ def add_purchase_supplier(supplier_id):
 
 @routes.route('/suppliers/<int:supplier_id>/purchases/<int:purchase_id>/edit', methods=['GET', 'POST'])
 @login_required
-@vendor_permission.require()
+@vendor_permission.require(http_exception=403)
 def edit_purchase_supplier(supplier_id, purchase_id):
     form = None
     target_supplier = None
@@ -2316,7 +2316,7 @@ def delete_purchase_supplier(supplier_id, purchase_id):
 #########################################################  Setup  ############################################################
 @routes.route('/setup', methods=['GET'])
 @login_required
-@vendor_permission.require()
+@vendor_permission.require(http_exception=403)
 def setup():
     try:
         add_platform =  addPlatformForm()
@@ -2376,7 +2376,7 @@ def add_platform():
 
 @routes.route('/platforms/<int:platform_id>/edit', methods=['GET', 'POST'])
 @login_required
-@vendor_permission.require()
+@vendor_permission.require(http_exception=403)
 def edit_platform(platform_id):
     success = True
     actions = 0
@@ -2468,7 +2468,7 @@ def add_location():
 
 @routes.route('/locations/<int:location_id>/edit', methods=['GET', 'POST'])
 @login_required
-@vendor_permission.require()
+@vendor_permission.require(http_exception=403)
 def edit_location(location_id):
     success = True
     actions = 0
@@ -2567,7 +2567,7 @@ def add_bin(location_id):
 
 @routes.route('/locations/<string:location_id>/bins/<string:bin_id>/edit', methods=['GET', 'POST'])
 @login_required
-@vendor_permission.require()
+@vendor_permission.require(http_exception=403)
 def edit_bin(location_id, bin_id):
     success = True
     actions = 0
@@ -2668,7 +2668,7 @@ def add_category():
 
 @routes.route('/categories/<int:category_id>/edit', methods=['GET', 'POST'])
 @login_required
-@vendor_permission.require()
+@vendor_permission.require(http_exception=403)
 def edit_category(category_id):
     actions = 0
     unique_success = True

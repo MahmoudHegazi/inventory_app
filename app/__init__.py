@@ -1,7 +1,7 @@
 import os
 from flask import Flask, render_template
 from flask_sqlalchemy import SQLAlchemy
-from flask_login import LoginManager
+from flask_login import LoginManager, current_user
 from flask_bcrypt import Bcrypt
 from flask_principal import Principal, Permission, RoleNeed
 from flask_admin import Admin, expose, BaseView
@@ -65,7 +65,7 @@ admin.add_link(backlink)
 # display errors page for all app based on all given errors
 @app.errorhandler(403)
 def handle_forbidden(e):
-    return render_template('errors/error_404.html') 
+    return render_template('errors/error_403.html') 
     # return render_template('errors/error_403.html')
 
 @app.errorhandler(404)

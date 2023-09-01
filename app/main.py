@@ -574,19 +574,22 @@ def api_offers_import():
                 successful = 0
                 # better send small test request, to confirm API key, and API comunication
                 r = requests.get(req_url, headers=headers)
+                #400/100 = 40, range(0,40)
                 # this is like status test request (API endpoint health check before start multiple requests, with time.sleep(10) per each, incase invalid api key user will wait alot if not tested)
                 if r.status_code == 200:
                     for i in range(0,1):
                         try:
                             # chunks remaning
-                            r = requests.get(req_url, headers=headers)
                             next_url = r.links.get('next').get('url') if r.links and r.links.get('next', None) and r.links.get('next').get('url', None) else None
-                            successful += 1
-                            return jsonify(upload_catalogues(json.loads(r.content)['offers'], current_user))
+                            return str(next_url)
+                            if next_url:
+                                r = requests.get(req_url, headers=headers)
+                                successful += 1
+                                return jsonify(upload_catalogues(json.loads(r.content)['offers'], current_user))                        
                         except Exception as e:
                             print("Error in one of chunks at api_offers_import: {}".format(sys.exc_info()))
                             chunks_errors.append("Some Of data Could not be imported, Error occured in request number 2: start from 200 to 300")
-                
+                            raise e
                     if len(chunks_errors) == 0:
                         flash('Succsefully Imported All Data, here is report of data changes', 'success')
                     elif len(successful) > 0 and successful > 0:

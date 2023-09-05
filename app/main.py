@@ -2,16 +2,20 @@ import json
 import sys
 import os
 import requests
-from flask import Flask, Blueprint, session, redirect, url_for, flash, Response, request, render_template, jsonify, Request, Response
+import time
+import math
+from flask import Flask, Blueprint, session, redirect, url_for, flash, Response, request, render_template, jsonify, Request, Response, current_app
 from .models import *
-from .forms import CatalogueExcelForm, ExportDataForm, importCategoriesAPIForm, importOffersAPIForm
+from .forms import CatalogueExcelForm, ExportDataForm, importCategoriesAPIForm, importOffersAPIForm, SetupBestbuyForm
 from . import vendor_permission, admin_permission, db, excel
 from .functions import get_mapped_catalogues_dicts, getTableColumns, getFilterBooleanClauseList, ExportSqlalchemyFilter,\
-get_export_data, get_charts, get_excel_rows, get_sheet_row_locations, apikey_or_none, chunks, upload_catalogues
+get_export_data, get_charts, get_excel_rows, get_sheet_row_locations, apikey_or_none, chunks, upload_catalogues, calc_chunks_result, \
+bestbuy_ready, get_remaining_requests, get_requests_before_1minute
 from flask_login import login_required, current_user
 import flask_excel
 import pyexcel
 from sqlalchemy import or_, and_, func , asc, desc, text
+from datetime import datetime, timedelta
 #from app import excel
 
 
@@ -300,8 +304,7 @@ def search():
             
         elif target_table == 'listing':
             direct_search_columns = {
-                'id': Listing.id,
-                'catalogue_id': Listing.catalogue_id,
+                'id': Listing.id,                
                 'sku': Listing.sku,
                 'product_name': Listing.product_name,
                 'price': Listing.price,
@@ -309,13 +312,17 @@ def search():
                 'quantity': Listing.quantity,
                 'platform': Platform.name,
                 'location': WarehouseLocations.name,
-                'bin': LocationBins.name
+                'bin': LocationBins.name,
+                'category': Category.label,
             }
             # eg: lower(listing.product_name) LIKE lower(:product_name_1)
             if column in direct_search_columns:
                 search_val = '%{}%'.format(value)
-                sqlalchemy_expression = direct_search_columns[column].ilike(search_val)
-
+                if value:
+                    sqlalchemy_expression = direct_search_columns[column].ilike(search_val)
+                else:
+                    sqlalchemy_expression = or_(direct_search_columns[column] == None, direct_search_columns[column] == '')               
+                
                 data = [data_obj.format() for data_obj in db.session.query(Listing).join(
                     Catalogue, Listing.catalogue_id == Catalogue.id
                 ).outerjoin(
@@ -330,6 +337,8 @@ def search():
                     CatalogueLocationsBins, CatalogueLocations.id == CatalogueLocationsBins.location_id
                 ).outerjoin(
                     LocationBins, CatalogueLocationsBins.bin_id == LocationBins.id
+                ).outerjoin(
+                    Category, Catalogue.category_code == Category.code
                 ).filter(
                     and_(Catalogue.user_id==current_user.id),
                     and_(sqlalchemy_expression)
@@ -463,6 +472,81 @@ def savelimit():
         return jsonify({'code': code})
 
 
+# setup bestbuy api connection, not save token only set metas for max and remaning user requests
+@main.route('/bestbuy_setup', methods=['POST', 'GET'])
+@login_required
+@vendor_permission.require()
+def setup_bestbuy():
+    redirects = {'setup': url_for('routes.setup'), 'listings': url_for('routes.listings')}
+    redirect_url = url_for('routes.setup')
+    message = ''
+    status = 'danger'
+    # global values of meta can set in db or config or here direct
+    remaining_requests = str(current_app.config.get('BESTBUY_RAMAINING'))
+    request_max = str(current_app.config.get('BESTBUY_MAX'))
+    try:
+        #a750a16c-054e-407c-9825-3da7d4b2a9c1
+        form = SetupBestbuyForm()        
+        if form.redirect.data in redirects:
+            redirect_url = redirects[form.redirect.data]
+        
+        if form.validate_on_submit():
+            change_detected = False
+            update_detected = False
+
+            # create only not exist bestbuy required metas
+            bestbuy_remaining_requests = UserMeta.query.filter_by(key='bestbuy_remaining_requests', user_id=current_user.id).first()
+            if bestbuy_remaining_requests:
+                # if global variable value changed update existing meta
+                if bestbuy_remaining_requests.value != remaining_requests:
+                    bestbuy_remaining_requests.value = remaining_requests
+                    bestbuy_remaining_requests.update()
+                    update_detected = True
+            else:
+                # if meta not exist with key bestbuy_remaining_requests create it with current global value for remaining_requests
+                new_meta = UserMeta(key='bestbuy_remaining_requests', user_id=current_user.id, value=remaining_requests)
+                current_user.meta.append(new_meta)
+                change_detected = True
+
+            bestbuy_request_max = UserMeta.query.filter_by(key='bestbuy_request_max', user_id=current_user.id).first()
+            if bestbuy_request_max:
+                # if global max changed update the metas
+                if bestbuy_request_max.value != request_max:
+                    bestbuy_request_max.value = request_max
+                    bestbuy_request_max.update()
+                    update_detected = True
+            else:
+                new_meta = UserMeta(key='bestbuy_request_max', user_id=current_user.id, value=request_max)
+                current_user.meta.append(new_meta)
+                change_detected = True
+
+            if change_detected:
+                current_user.update()
+                updated_msg = 'and updated ' if update_detected else ''
+                message = f'successfully setup bestbuy {updated_msg}API settings, you can now use bestbuy API to import data.'
+            elif update_detected:
+                message = 'successfully updated bestbuy API settings, you can now use bestbuy API to import data.'
+            else:
+                message = 'BestBuy API Already configured Before.'
+                
+            status = 'success'
+        else:
+            message = 'Unable to setup please try again'
+            return redirect(redirect_url)
+    except:
+        print('System error in setup_bestbuy, info: {}'.format(sys.exc_info()))
+        message = 'System error Unable to setup bestbuy API right now please try again later.'
+
+    finally:
+        flash(message, status)
+        return redirect(redirect_url)
+
+@main.route('/get_remaining_requests', methods=['POST', 'GET'])
+@login_required
+@vendor_permission.require()
+def get_remaining_requests_func():
+    return str(get_remaining_requests())
+
 # import categories using API (user securly provide API key)
 @main.route('/import_categories_api', methods=['POST', 'GET'])
 @login_required
@@ -472,58 +556,75 @@ def api_import_categories():
     total_updated = 0
     total_notchanged = 0
     try:
+        tomorrow_str = (datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0) + timedelta(hours=24)).strftime('%Y-%m-%d')
         #a750a16c-054e-407c-9825-3da7d4b2a9c1
         form = importCategoriesAPIForm()
         if form.validate_on_submit():
-            # secure apikey
-            apikey = apikey_or_none(form.api_key.data)
-            req_url = 'https://marketplace.bestbuy.ca/api/hierarchies'
-            if apikey is not None:
-                headers = {'Authorization': apikey}
-                r = requests.get(req_url, headers=headers)
-                if r.status_code == 200:
-                    data = json.loads(r.content)
-                    if 'hierarchies' in data:
-                        # start of valid import
-                        hierarchies = data['hierarchies']
-                        total_data = len(hierarchies)
-                        # limit of add_all is 50000 incase of data returned more than 50k split them
-                        for hierarchy in hierarchies:
-                            if 'code' in hierarchy and 'label' in hierarchy and 'level' in hierarchy and 'parent_code' in hierarchy:
-                                # import unique code and labels categories only, add_all was faster but no check
-                                category_exist = db.session.query(Category).filter(Category.dashboard_id==current_user.dashboard.id, Category.code==hierarchy['code']).first()
-                                if category_exist:
-                                    require_update = False
-                                    if category_exist.label != hierarchy['label']:
-                                        category_exist.label = hierarchy['label']
-                                        require_update = True
+            bestbuy_instaled = bestbuy_ready()
+            if bestbuy_instaled:
+                # for better performance in categories as it not include time.sleep like chunks requests in offer, uses get_requests_before_1minute to reject request if made 1 request or more 5 seconds or less ago
+                requests_within_1minute = get_requests_before_1minute()
+                if requests_within_1minute[0] == 0:
+                    user_remaining_requests = get_remaining_requests()
+                    # secure apikey (regex validate apikey before request)
+                    apikey = apikey_or_none(form.api_key.data)
+                    req_url = 'https://marketplace.bestbuy.ca/api/hierarchies'
+                    if apikey is not None:
+                        if user_remaining_requests > 0:
+                            headers = {'Authorization': apikey}
+                            r = requests.get(req_url, headers=headers)
+                            new_request_meta = UserMeta(key='bestbuy_request', user_id=current_user.id, value=r.status_code)
+                            new_request_meta.insert()
+                            if r.status_code == 200:
+                                data = json.loads(r.content)
+                                if 'hierarchies' in data:
+                                    # start of valid import
+                                    hierarchies = data['hierarchies']
+                                    total_data = len(hierarchies)
+                                    # limit of add_all is 50000 incase of data returned more than 50k split them
+                                    for hierarchy in hierarchies:
+                                        if 'code' in hierarchy and 'label' in hierarchy and 'level' in hierarchy and 'parent_code' in hierarchy:
+                                            # import unique code and labels categories only, add_all was faster but no check
+                                            category_exist = db.session.query(Category).filter(Category.dashboard_id==current_user.dashboard.id, Category.code==hierarchy['code']).first()
+                                            if category_exist:
+                                                require_update = False
+                                                if category_exist.label != hierarchy['label']:
+                                                    category_exist.label = hierarchy['label']
+                                                    require_update = True
 
-                                    if category_exist.level != hierarchy['level']:
-                                        category_exist.level = hierarchy['level']
-                                        require_update = True
+                                                if category_exist.level != hierarchy['level']:
+                                                    category_exist.level = hierarchy['level']
+                                                    require_update = True
 
-                                    if category_exist.parent_code != hierarchy['parent_code']:
-                                        category_exist.parent_code = hierarchy['parent_code']
-                                        require_update = True
+                                                if category_exist.parent_code != hierarchy['parent_code']:
+                                                    category_exist.parent_code = hierarchy['parent_code']
+                                                    require_update = True
 
-                                    if require_update:
-                                        category_exist.update()
-                                        total_updated += 1
-                                    else:
-                                        total_notchanged += 1
+                                                if require_update:
+                                                    category_exist.update()
+                                                    total_updated += 1
+                                                else:
+                                                    total_notchanged += 1
+                                            else:
+                                                new_code = Category(dashboard_id=current_user.dashboard.id, code=hierarchy['code'], label=hierarchy['label'], level=hierarchy['level'], parent_code=hierarchy['parent_code'])
+                                                new_code.insert()
+                                                total_imported += 1
+                                    flash('Succsefully imported {total_imported} of categories from total: {total_data} categories, Updated {total_updated} of categories from total: {total_data} categories, and not changed Categories: {not_changed}'.format(total_imported=total_imported,total_data=total_data,total_updated=total_updated,not_changed=total_notchanged), 'success')
                                 else:
-                                    new_code = Category(dashboard_id=current_user.dashboard.id, code=hierarchy['code'], label=hierarchy['label'], level=hierarchy['level'], parent_code=hierarchy['parent_code'])
-                                    new_code.insert()
-                                    total_imported += 1
-                        flash('Succsefully imported {total_imported} of categories from total: {total_data} categories, Updated {total_updated} of categories from total: {total_data} categories, and not changed Categories: {not_changed}'.format(total_imported=total_imported,total_data=total_data,total_updated=total_updated,not_changed=total_notchanged), 'success')
+                                    flash('API Changed, Could not process your request right now', 'danger')
+                            elif r.status_code == 401:
+                                flash('Invalid API key, the API refused to authorize your request.', 'danger')
+                            else:
+                                flash('The API cannot process your request now, please try again later, if the problem is not resolved, please report to us.', 'danger')
+                        else:
+                            flash(f'You Can not make more requests right now, please wait for {tomorrow_str} and try again', 'warning')
+
                     else:
-                        flash('API Changed, Could not process your request right now', 'danger')
-                elif r.status_code == 401:
-                    flash('Invalid API key, the API refused to authorize your request.', 'danger')
+                        flash('Invalid API Key.', 'danger')
                 else:
-                    flash('The API cannot process your request now, please try again later, if the problem is not resolved, please report to us.', 'danger')
+                    flash('Please wait {} seconds to import again'.format(requests_within_1minute[1]), 'danger')
             else:
-                flash('Invalid API Key.', 'danger')
+                flash('Please update or configure bestbuy API settings first, by clicking on same import button clicked.', 'warning')
         else:
             for field, errors in form.errors.items():
                 if field == 'csrf_token':
@@ -533,25 +634,8 @@ def api_import_categories():
     except Exception as e:
         flash('System Error, Could not process your request right now', 'danger')
         print('System error in api_import_categories, info: {}'.format(sys.exc_info()))
-        raise e
-
     finally:
         return redirect(url_for('routes.setup'))
-
-def calc_chunks_result(results):
-    try:
-        final_result = {'total': 0, 'uploaded': 0, 'updated': 0, 'not_changed': 0, 'luploaded': 0, 'lupdated': 0, 'lnot_changed': 0, 'new_categories': 0}
-        for result in results:
-            final_result['total'] += result['total']
-            final_result['uploaded'] += result['uploaded']
-            final_result['updated'] += result['updated']
-            final_result['not_changed'] += result['not_changed']
-            final_result['luploaded'] += result['luploaded']
-            final_result['lnot_changed'] += result['lnot_changed']
-            final_result['new_categories'] += result['new_categories']
-        return final_result
-    except Exception as e:
-        raise e
 
 
 # remaning listing info report
@@ -560,63 +644,107 @@ def calc_chunks_result(results):
 @login_required
 @vendor_permission.require()
 def api_offers_import():
-    total_imported = 0
+    results = []
     try:
+        tomorrow_str = (datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0) + timedelta(hours=24)).strftime('%Y-%m-%d')
         #a750a16c-054e-407c-9825-3da7d4b2a9c1
         form = importOffersAPIForm()
         if form.validate_on_submit():
-            # secure apikey
-            apikey = apikey_or_none(form.api_key.data)
-            req_url = 'https://marketplace.bestbuy.ca/api/offers'
-            if apikey is not None:
-                headers = {'Authorization': apikey}
-                chunks_errors = []
-                successful = 0
-                # better send small test request, to confirm API key, and API comunication
-                r = requests.get(req_url, headers=headers)
-                #400/100 = 40, range(0,40)
-                # this is like status test request (API endpoint health check before start multiple requests, with time.sleep(10) per each, incase invalid api key user will wait alot if not tested)
-                if r.status_code == 200:
-                    for i in range(0,1):
-                        try:
-                            # chunks remaning
-                            next_url = r.links.get('next').get('url') if r.links and r.links.get('next', None) and r.links.get('next').get('url', None) else None
-                            return str(next_url)
-                            if next_url:
-                                r = requests.get(req_url, headers=headers)
-                                successful += 1
-                                return jsonify(upload_catalogues(json.loads(r.content)['offers'], current_user))                        
-                        except Exception as e:
-                            print("Error in one of chunks at api_offers_import: {}".format(sys.exc_info()))
-                            chunks_errors.append("Some Of data Could not be imported, Error occured in request number 2: start from 200 to 300")
-                            raise e
-                    if len(chunks_errors) == 0:
-                        flash('Succsefully Imported All Data, here is report of data changes', 'success')
-                    elif len(successful) > 0 and successful > 0:
-                        # one or more request blocked, but not all, inform user which requests have issue (API later automatic will handle when import data, but notify user with his stuiation)
-                        for chunk_error in chunks_errors:
-                            flash(chunk_error, 'danger')
+            bestbuy_instaled = bestbuy_ready()
+            bestbuy_request_max = UserMeta.query.filter_by(key='bestbuy_request_max', user_id=current_user.id).first()
+            if bestbuy_instaled and bestbuy_request_max:
+                bestbuy_request_max = int(bestbuy_request_max.value)
+                user_remaining_requests = get_remaining_requests()
+                request_max = bestbuy_request_max if bestbuy_request_max <= 100 and bestbuy_request_max >= 0 else 100
+                # secure apikey
+                apikey = apikey_or_none(form.api_key.data)
+                req_url = f'https://marketplace.bestbuy.ca/api/offers?max={request_max}'
+                if apikey is not None:
+                    # confirm user have remaning requests from db in the current time
+                    if user_remaining_requests > 0:
+                        headers = {'Authorization': apikey}
+                        chunks_errors = []
+                        successful = 0
+                        # better send small test request, to confirm API key, and API comunication
+                        r = requests.get(req_url, headers=headers)
+                        
+                        #400/100 = 40, range(0,40)
+                        # this is like status test request (API endpoint health check before start multiple requests, with time.sleep(10) per each, incase invalid api key user will wait alot if not tested)
+                        if r.status_code == 200:
+
+                            response_content = json.loads(r.content) if r and r.content else None                    
+                            # get total count of requests
+                            total_count = None
+                            remaing_data = 0
+                            try:
+                                remaing_data = int(response_content['total_count']) - request_max if int(response_content['total_count']) >= request_max else 0
+                                total_count = math.ceil(int(response_content['total_count'])/request_max)                            
+                            except:
+                                print("API not sending total_count, or sending invalid int")
+                                pass
+
+                            # if total_count of required requests to imported less or equal to user_remaining_requests allow else make him send only requests with count of his reamning not block all
+                            total_requests = total_count if total_count and user_remaining_requests >= total_count else user_remaining_requests
+                            current_upload_result = upload_catalogues(json.loads(r.content)['offers'], current_user)
+                            results.append(current_upload_result)
+
+                            # static-dynamicly get user_remianing requests note nothing math or substrict done - to detect requests and that sure later incase in init file changed the remaning requests it still calcuate will and dynamic calcuate by dates of now requests vs the static number change by dev or admin bestbuy_remaining_requests (static-dynamic)
+                            user_remaining_requests = get_remaining_requests()
+                            if user_remaining_requests > 0:
+                                # start loop to add cooldown sleep between requests and get all data
+                                for i in range(0,total_requests):
+                                    # wait 5 seconds between each request
+                                    time.sleep(5)
+                                    try:
+                                        # chunks remaning
+                                        next_url = r.links.get('next').get('url') if r.links and r.links.get('next', None) and r.links.get('next').get('url', None) else None
+                                        if next_url:
+                                            r = requests.get(next_url, headers=headers)
+                                            if r.status_code == 200:
+                                                if remaing_data > 0:
+                                                    remaing_data = remaing_data - request_max if (remaing_data - request_max) > 0 else 0
+                                                current_upload_result = upload_catalogues(json.loads(r.content)['offers'], current_user)
+                                                results.append(current_upload_result)
+                                                successful += 1           
+                                    except Exception as e:
+                                        print("Error in one of chunks at api_offers_import: {}".format(sys.exc_info()))
+                                        chunks_errors.append("Some Of data Could not be imported, Error occured in request number 2: start from 200 to 300")
+                                        raise e
+                            else:
+                                chunks_errors.append("Could not import the Remaining {} data at the moment, you exceded the limit of requests, not all data imported".format(remaing_data))                    
+                        
+                            total_result = calc_chunks_result(results)
+                            str_part1 = 'Succsefully imported {total_imported} of Catalogues from total: {total} Catalogues, Updated {total_updated} of catalogues from total: {total} catalogues, and {not_changed} not changed Catalogues'.format(total_imported=total_result['uploaded'],total=total_result['total'],total_updated=total_result['updated'],not_changed=total_result['not_changed'])
+                            str_part2 = '--- AND imported {total_imported} of Listings from total: {total} Listings, Updated {total_updated} of listings from total: {total} listings,and created {new_categories} new Categories'.format(total_imported=total_result['luploaded'],total=total_result['total'],total_updated=total_result['lupdated'],not_changed=total_result['lnot_changed'], new_categories=total_result['new_categories'])
+                            if len(chunks_errors) == 0:
+                                flash('Succsefully Imported All Data, Import Report: {}{}'.format(str_part1, str_part2), 'success')
+                            elif len(chunks_errors) > 0:
+                                # one or more request blocked, but not all, inform user which requests have issue (API later automatic will handle when import data, but notify user with his stuiation)
+                                flash('Succsefully Imported some of Data, one or more requests failed, Import Report: {}{}'.format(str_part1, str_part2), 'success')
+
+                                for chunk_error in chunks_errors:
+                                    flash(chunk_error, 'danger')
+                            else:
+                                flash('Unable to connect to the API right now to get Data, please try again later.', 'danger')
+                        elif r.status_code == 401:
+                            flash('Invalid API key, the API refused to authorize your request.', 'danger')
+                        else:
+                            return jsonify(json.loads(r.content))
+                            flash('The API cannot process your request now, please try again later, if the problem is not resolved, please report to us.', 'danger')
                     else:
-                        flash('Unable to connect to the API right now to get Data, please try again later.', 'danger')
-                elif r.status_code == 401:
-                    flash('Invalid API key, the API refused to authorize your request.', 'danger')
+                        flash(f'You Can not make more requests right now, please wait for {tomorrow_str} and try again', 'warning')
                 else:
-                    flash('The API cannot process your request now, please try again later, if the problem is not resolved, please report to us.', 'danger')
+                    flash('Invalid API Key.', 'danger')
             else:
-                flash('Invalid API Key.', 'danger')
+                flash('Please update or configure bestbuy API settings first, by clicking on same import button clicked.', 'danger')
         else:
             for field, errors in form.errors.items():
                 if field == 'csrf_token':
                     flash("Error can not import offers Please restart page and try again", "danger")
                     continue
                 flash('Error in {} : {}'.format(field, ','.join(errors)), 'danger')
-
     except Exception as e:
         flash('System Error, Could not process your request right now', 'danger')
         print('System error in api_offers_import, info: {}'.format(sys.exc_info()))
-        raise e
-    """
     finally:
-        return redirect(url_for('routes.setup'))
-    """
-
+        return redirect(url_for('routes.listings'))

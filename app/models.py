@@ -77,6 +77,7 @@ class User(UserMixin, db.Model):
     dashboard_id = db.Column(db.Integer, db.ForeignKey('dashboard.id', ondelete="CASCADE", onupdate="CASCADE"), nullable=False, unique=True)
     suppliers = db.relationship("Supplier", backref="user", cascade="all, delete", passive_deletes=True)
     roles = db.relationship("UserRoles", backref="user", cascade="all, delete", passive_deletes=True)
+    meta = db.relationship("UserMeta", back_populates='user', cascade="all, delete", passive_deletes=True)
     catalogues = db.relationship('Catalogue', backref='user', cascade="all, delete", lazy='dynamic', passive_deletes=True)
 
     def __init__(self, dashboard_id, name, uname, email, upass, image='default_user.png', approved=True):
@@ -133,6 +134,41 @@ class User(UserMixin, db.Model):
         'updated_date': self.updated_date
         }
 
+class UserMeta(db.Model):
+    __tablename__ = 'usermeta'
+    id = db.Column(db.Integer, primary_key=True, nullable=False)
+    key = db.Column(db.String(45), nullable=False)
+    value = db.Column(db.String(255), nullable=True, default=None)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id', ondelete="CASCADE", onupdate="CASCADE"), nullable=False)
+    created_date = db.Column(DateTime, nullable=False, default=datetime.datetime.utcnow)
+    updated_date = db.Column(DateTime, nullable=True, default=None, onupdate=datetime.datetime.utcnow)
+    user = db.relationship('User', back_populates='meta')
+    def __init__(self, user_id, key, value=None):
+        self.user_id = user_id
+        self.key = key
+        self.value = value
+
+    def insert(self):
+        db.session.add(self)
+        db.session.commit()
+
+    def update(self):
+        db.session.commit()
+
+    def delete(self):
+        db.session.delete(self)
+        db.session.commit()
+
+    def format(self):
+        return {
+        'id': self.id,
+        'user_id': self.user_id,
+        'key': self.key,
+        'value': self.value,
+        'created_date': self.created_date,
+        'updated_date': self.updated_date
+        }
+    
 
 class Role(db.Model):
     __tablename__ = 'role'
@@ -497,7 +533,8 @@ class Listing(db.Model):
         'platforms': listing_platforms,
         'location': ",".join(listing_location_strings),
         'locations': listing_locations,
-        'bin': ",".join(listing_bins_arr)
+        'bin': ",".join(listing_bins_arr),
+        'category': self.catalogue.category.label if self.catalogue.category and self.catalogue.category.label else '',
         }
 
 class Purchase(db.Model):

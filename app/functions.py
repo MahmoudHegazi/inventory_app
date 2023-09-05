@@ -3,11 +3,13 @@ import re
 import datetime
 from dateutil import parser
 from urllib.parse import urlparse, urljoin
-from flask import request
+from flask import request, current_app
+from flask_login import current_user
 from sqlalchemy import func
-from .models import Supplier, Dashboard, Listing, Catalogue, Purchase, Order, Platform, ListingPlatform, CatalogueLocations, CatalogueLocationsBins, WarehouseLocations, LocationBins, Category
+from .models import Supplier, Dashboard, Listing, Catalogue, Purchase, Order, Platform, ListingPlatform, CatalogueLocations, CatalogueLocationsBins, WarehouseLocations, LocationBins, Category, UserMeta
 from sqlalchemy.sql import extract
 from sqlalchemy import or_, and_, func , asc, desc
+from datetime import datetime, timedelta
 
 def is_safe_redirect_url(target):
     host_url = urlparse(request.host_url)
@@ -1016,10 +1018,10 @@ def upload_catalogues(offers_data, current_user):
                         # this to help decide in next step, sync listing with changed catalogue data or not sync if catalogue not changed
                         not_changed = True
                 else:
-                    selected_catalogue = Catalogue(product_sku, current_user.id, product_name=product_title, product_description=product_description, brand=product_brand, category_code=None, price=price, sale_price=discount_price, quantity=quantity, product_model=None, condition=None, upc=reference_type)
+                    selected_catalogue = Catalogue(product_sku, current_user.id, product_name=product_title, product_description=product_description, brand=product_brand, category_code=selected_category.code, price=price, sale_price=discount_price, quantity=quantity, product_model=None, condition=None, upc=reference_type)
                     selected_catalogue.insert()
                     result['uploaded'] += 1
-
+                
                 selected_listing = Listing.query.filter_by(dashboard_id=current_user.dashboard.id, catalogue_id=selected_catalogue.id, sku=selected_catalogue.sku).first()
                 if selected_listing:
                     update_require2 = False
@@ -1084,10 +1086,103 @@ def upload_catalogues(offers_data, current_user):
                     if update_require2 or not_changed == False:
                         result['lupdated'] += 1
                 else:
-                    new_listing = Listing(dashboard_id=current_user.dashboard.id, catalogue_id=selected_category.id, active=active, discount_start_date=discount_start_date, discount_end_date=discount_end_date, unit_discount_price=unit_discount_price, unit_origin_price=unit_origin_price, quantity_threshold=quantity_threshold, currency_iso_code=currency_iso_code, shop_sku=shop_sku, offer_id=offer_id, reference=reference, reference_type=reference_type)
+                    
+                    new_listing = Listing(dashboard_id=current_user.dashboard.id, catalogue_id=selected_catalogue.id, active=active, discount_start_date=discount_start_date, discount_end_date=discount_end_date, unit_discount_price=unit_discount_price, unit_origin_price=unit_origin_price, quantity_threshold=quantity_threshold, currency_iso_code=currency_iso_code, shop_sku=shop_sku, offer_id=offer_id, reference=reference, reference_type=reference_type)
                     new_listing.insert()
                     result['luploaded'] += 1
 
         return result
     except Exception as e:
         raise e
+    
+def calc_chunks_result(results):
+    try:
+        final_result = {'total': 0, 'uploaded': 0, 'updated': 0, 'not_changed': 0, 'luploaded': 0, 'lupdated': 0, 'lnot_changed': 0, 'new_categories': 0}
+        for result in results:
+            final_result['total'] += result['total']
+            final_result['uploaded'] += result['uploaded']
+            final_result['updated'] += result['updated']
+            final_result['not_changed'] += result['not_changed']
+            final_result['luploaded'] += result['luploaded']
+            final_result['lnot_changed'] += result['lnot_changed']
+            final_result['new_categories'] += result['new_categories']
+        return final_result
+    except Exception as e:
+        raise e
+
+# bestbuy api
+def bestbuy_ready():
+    try:
+        # track both new setup first time , or updated global config value
+        return len(UserMeta.query.filter(
+            and_(UserMeta.user_id==current_user.id),
+            or_(
+                and_(UserMeta.key=='bestbuy_remaining_requests', UserMeta.value==current_app.config.get('BESTBUY_RAMAINING')),
+                and_(UserMeta.key=='bestbuy_request_max', UserMeta.value==current_app.config.get('BESTBUY_MAX'))
+                )
+        ).all()) >= 2
+    except Exception as e:
+        raise e
+
+def get_remaining_requests()->int:
+    remaining_requests = 0
+    try:
+        now_dt = datetime.utcnow()
+        
+        today = now_dt.replace(hour=0, minute=0, second=0, microsecond=0).strftime('%Y-%m-%d %H:%M:%S')
+        now = now_dt.strftime('%Y-%m-%d %H:%M:%S')
+        
+        now_requests = len(UserMeta.query.filter(
+            UserMeta.key=='bestbuy_request',
+            UserMeta.user_id==current_user.id,
+            and_(UserMeta.created_date>=today, UserMeta.created_date<=now)
+        ).all())
+    
+        user_remaining_requests = UserMeta.query.filter_by(key='bestbuy_remaining_requests', user_id=current_user.id).first()
+        if user_remaining_requests:
+            db_remaning_requests = int(user_remaining_requests.value) if int(user_remaining_requests.value) == int(current_app.config.get('BESTBUY_RAMAINING')) else int(current_app.config.get('BESTBUY_RAMAINING'))             
+            remaining_requests = db_remaning_requests - now_requests
+
+        # remove old requests meta for yestaerday and before to small db
+        before_today_requests = UserMeta.query.filter(
+            UserMeta.key=='bestbuy_request',
+            UserMeta.user_id==current_user.id,
+            and_(UserMeta.created_date<today)
+        ).all()
+        for old_request_meta in before_today_requests:
+            old_request_meta.delete()
+
+        return remaining_requests
+    except:
+        print('error in get_remaining_requests: {}'.format(sys.exc_info()))
+        return 0
+    
+def get_requests_before_1minute():
+    requests_before_1minute = 0
+    try:
+        now_dt = datetime.utcnow()
+        before_1minute = (now_dt - timedelta(minutes=1)).strftime('%Y-%m-%d %H:%M:%S')
+        now = now_dt.strftime('%Y-%m-%d %H:%M:%S')
+        
+        # remove old requests meta for yestaerday and before to small db
+        requests_before_1minute = len(UserMeta.query.filter(
+            UserMeta.key=='bestbuy_request',
+            UserMeta.user_id==current_user.id,
+            and_(UserMeta.created_date>before_1minute, UserMeta.created_date<=now)
+        ).all())
+
+        remanining_timeq = UserMeta.query.filter(
+            UserMeta.key=='bestbuy_request',
+            UserMeta.user_id==current_user.id,
+            and_(UserMeta.created_date>before_1minute)
+        ).order_by(desc(UserMeta.created_date)).first()
+
+        remanining_time = '60'
+        if remanining_timeq:
+            # remanining_timeq is last made request before 1 minute, eg made on 9/5/2023 9:00:00, after 1 minute 9:01:00, check now - last request date +1minute
+            last_after_1m = (remanining_timeq.created_date + timedelta(minutes=1))
+            remanining_time = str(int((last_after_1m - now_dt).total_seconds()))
+        return (requests_before_1minute, remanining_time)
+    except:
+        print('error in get_requests_before_1minute: {}'.format(sys.exc_info()))
+        return (requests_before_1minute, '60')

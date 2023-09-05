@@ -172,7 +172,7 @@ function searchComponent(speed='slow',easing='swing', cp=function(){return true;
         let result = [];
         $(`.searching_card${addon}[${dataAttrName}]`).each( (i, item)=>{
             const stringLower = $(item).attr(dataAttrName).toLowerCase();
-            if (stringLower.includes(searchTerm)){
+            if ((stringLower === searchTerm && stringLower.includes(searchTerm))){
                 result.push(item);
             }
         });
@@ -188,12 +188,15 @@ function searchComponent(speed='slow',easing='swing', cp=function(){return true;
         const searchValue = $(`#search_value${addon}`).val().trim();
         const searchColumn = $(`#search_by${addon}`).val().trim();
         const dataAttrName = dataSearchAttrs[searchColumn];
+        console.log(dataAttrName);  
         
-        if (dataAttrName && searchValue && selectType == 'current'){
+        //dataAttrName && searchValue && selectType == 'current'
+        if (dataAttrName && selectType == 'current'){
           /* html selector search condition set (stoping this way targetCards to make Insensitive search as no selector js for insesntive *= easy add i*= == 'your insestive search add new operator string sure there are insesntive core c++ std::regex pattern(".*a.*", std::regex_constants::icase);' */
           //const targetCards = $(`.searching_card${addon}[${dataAttrName}${condition}'${searchValue}']`);
           //const targetCardsArr = $(targetCards).toArray();
           const targetCardsArr = getQueryInsensitiveList(searchValue, dataAttrName);
+          console.log(targetCardsArr)
           $(`.searching_card${addon}`).each( (s, searchingCard)=>{
             if ( !targetCardsArr.includes($(searchingCard)[0])){
               /* this is how hide any bs4 (d-flex, row) with jquery effect css + callback*/
@@ -208,8 +211,8 @@ function searchComponent(speed='slow',easing='swing', cp=function(){return true;
           });
           $(`#cancel_search${addon}`).show();
           
-        } else if (searchColumn && searchValue && selectType == 'all' && typeof(rowBuildCB) === 'function') {
-
+        } else if (searchColumn && selectType == 'all' && typeof(rowBuildCB) === 'function') {
+          //searchColumn && searchValue && selectType == 'all' && typeof(rowBuildCB) === 'function'
           // hide current page or previous cards (targetCardsArr will be data from server in this scope)
           $(`.searching_card${addon}`).each( (s, searchingCard)=>{
               /* this is how hide any bs4 (d-flex, row) with jquery effect css + callback in clearn search before server start set speed to 1 as it addiotonal clean*/

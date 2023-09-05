@@ -54,7 +54,11 @@
       <a href="{{url_for('routes.add_listing')}}" class="ml-2 mr-1 btn btn-primary">
         Add Listing
       </a>
+      {% if bestbuy_installed %}
       <button class="btn btn-info" data-toggle="modal" data-target="#importOffersModal">Import Offers</button>
+      {% else %}
+      <button class="btn btn-info" data-toggle="modal" data-target="#SetupBestbuyFormModal">Import Offers</button>
+      {% endif %}      
     </div>
     <!-- search component -->
     <div class="row mt-2 mb-2">
@@ -64,7 +68,7 @@
           <select class="form-control col-sm-3" name="search_by" id="search_by">
             <option value="">Search BY</option>
             <option class="search_column" value="id">ID</option>
-            <option class="search_column" value="catalogue_id">Catalogue ID</option>
+            <option class="search_column" value="category">Category</option>
             <option class="search_column" value="sku">SKU</option>
             <option class="search_column" value="product_name">Product Name</option>
             <option class="search_column" value="price">Price</option>
@@ -101,6 +105,12 @@
     <div class="row" id="card_display" style="display:none;">
       {% for listing in listings %}
 
+      {% if listing.catalogue.category and listing.catalogue.category.label %}
+      {% set listing_category_label  =  listing.catalogue.category.label %}
+      {% else %}
+      {% set listing_category_label  =  '' %}
+      {% endif %}
+
       {# create platforms search string #}
       {% set ns = namespace(platforms_string='') %}
       {% for listing_platform in listing.platforms %}
@@ -111,7 +121,7 @@
       {% endfor %}
 
       <div class="searching_card col-4 p-3 d-flex justify-content-center align-items-stretch cursor-pointer text-decoration-none text-dark media_small_width_100"
-      data-search-id="{{listing.id}}" data-search-catalogueid="{{listing.catalogue_id}}" data-search-sku="{{listing.sku}}"
+      data-search-id="{{listing.id}}" data-search-category="{{listing_category_label}}" data-search-sku="{{listing.sku}}"
       data-search-product_name="{{listing.product_name}}" data-search-price="{{listing.price}}" 
       data-search-sale_price="{{listing.sale_price}}" data-search-quantity="{{listing.quantity}}" data-search-platform="{{ns.platforms_string}}">
 
@@ -122,7 +132,7 @@
           <div class="col-sm-12 p-3">
             <div class="overflow_within text-center"><strong>{{listing.product_name}}</strong></div>
             <div class="overflow_within"><input type="checkbox" data-check-listing="{{listing.product_name}}" class="select_listings form-control mx-auto" name="select_listings" value="{{listing.id}}" /></div>
-            <div class="overflow_within">Catalogue ID: <span>{{listing.catalogue_id}}</span></div>
+            <div class="overflow_within">Category: <span>{{listing_category_label}}</span></div>
             <div class="overflow_within">SKU: <span>{{listing.sku}}</span></div>
             <div class="overflow_within">Price: <span>{{listing.price}}</span></div>
             <div class="overflow_within">Sale Price: <span>{{listing.sale_price}}</span></div>
@@ -153,7 +163,7 @@
               <th>#</th>
               <th>Icon</th>
               <th>Product Name</th>
-              <th>Catalogue ID</th>
+              <th>Category</th>
               <th>SKU</th>              
               <th>Price</th>
               <th>Sale Price</th>
@@ -191,10 +201,16 @@
 
               {% endfor %}
 
-
               {% set location_string = locations_arr|join(',') %}
               {% set bin_string = bins_arr|join(',') %}
-            <tr class="searching_card" data-search-id="{{listing.id}}" data-search-catalogueid="{{listing.catalogue_id}}" data-search-sku="{{listing.sku}}"
+
+              {% if listing.catalogue.category and listing.catalogue.category.label %}
+              {% set listing_category_label  =  listing.catalogue.category.label %}
+              {% else %}
+              {% set listing_category_label  =  '' %}
+              {% endif %}
+              
+            <tr class="searching_card" data-search-id="{{listing.id}}" data-search-category="{{listing_category_label}}" data-search-sku="{{listing.sku}}"
             data-search-product_name="{{listing.product_name}}" data-search-price="{{listing.price}}" 
             data-search-sale_price="{{listing.sale_price}}" data-search-quantity="{{listing.quantity}}" data-search-platform="{{ns.platforms_string}}" data-search-location="{{location_string}}" data-search-bin="{{bin_string}}">
               <td>
@@ -207,7 +223,7 @@
                 <p class="overflow_within">{{listing.product_name}}</p>
               </td>
               <td>
-                <p class="overflow_within">{{listing.catalogue_id}}</p>
+                <p class="overflow_within">{{listing_category_label}}</p>
               </td>
               <td>
                 <p class="overflow_within">{{listing.sku}}</p>
@@ -270,7 +286,7 @@
 
 </div>
 {% import 'forms.html' as forms %}
-{{ forms.listings_forms(delete_listings=delete_listings, import_offers=import_offers) }}
+{{ forms.listings_forms(delete_listings=delete_listings, import_offers=import_offers, setup_bestbuy=setup_bestbuy) }}
 {% endblock %}
 
 
@@ -315,7 +331,7 @@ function rowBuildCB(listing){
 
   let rowHTML = '';
   if (listing && listing.id !== undefined && listing.sku !== undefined && listing.product_name !== undefined && listing.price !== undefined && listing.platform !== undefined && listing.listing_image_url !== undefined && listing.location !== undefined && listing.bin !== undefined && listing.view_listing !== undefined && listing.edit_listing !== undefined && Array.isArray(listing.platforms) && Array.isArray(listing.locations) ){
-    rowHTML += `<tr class="searching_card search_all_card" data-search-id="${listing.id}" data-search-catalogueid="${listing.catalogue_id}" data-search-sku="${listing.sku}"
+    rowHTML += `<tr class="searching_card search_all_card" data-search-id="${listing.id}" data-search-category="${listing.category}" data-search-sku="${listing.sku}"
               data-search-product_name="${listing.product_name}" data-search-price="${listing.price}" 
               data-search-sale_price="${listing.sale_price}" data-search-quantity="${listing.quantity}" data-search-platform="${listing.platform}"
               data-search-location="${listing.location}" data-search-bin="${listing.bin}" style="background: gainsboro!important;" title="This Row not belong to this page it returned from search all">
@@ -330,7 +346,7 @@ function rowBuildCB(listing){
                 <p class="overflow_within">${listing.product_name}</p>
               </td>
               <td>
-                <p class="overflow_within">${listing.catalogue_id}</p>
+                <p class="overflow_within">${listing.category}</p>
               </td>
               <td>
                 <p class="overflow_within">${listing.sku}</p>

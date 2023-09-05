@@ -328,4 +328,7 @@ class ExportDataForm(FlaskForm):
     table_name = HiddenField(validators=[InputRequired()])
     condition = SelectField('Condition:',choices=['and', 'or'], validators=[InputRequired()], validate_choice=True)
     export = SubmitField('Export')
-    
+
+class SetupBestbuyForm(FlaskForm):
+    redirect = StringField('', render_kw={'style': 'display:none;'})
+    setup = SubmitField('Setup API')

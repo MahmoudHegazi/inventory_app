@@ -17,6 +17,9 @@ app.config['SQLALCHEMY_DATABASE_URI'] = 'mysql://mr204h:Ilda2011@localhost/inven
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 app.config['MAX_CONTENT_LENGTH'] = 50 * 1024 * 1024
 app.config['AUTH_ALLOWED_FILES'] = {'png', 'jpg', 'jpeg', 'gif'}
+# here setup global variables for remaning requests per user and max request
+app.config['BESTBUY_RAMAINING'] = 50
+app.config['BESTBUY_MAX'] = 100
 #app.config['SALAT'] = os.environ.get('SALAT')
 db = SQLAlchemy(app)
 # if not used remove

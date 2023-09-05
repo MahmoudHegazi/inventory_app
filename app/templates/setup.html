@@ -95,7 +95,11 @@
           <div class="div border shadow rounded p-2">
             <h5 class="mt-2 mb-3"><span>Categories: </span>
             <div style="float:right;max-width:fit-content;" class="d-flex justify-content-around align-items-center">
+              {% if bestbuy_installed %}
               <button type="button" data-toggle="modal" data-target="#importCategoriesModal" class="btn btn-info btn-sm mr-1">Import from API</button>
+              {% else %}
+              <button type="button" data-toggle="modal" data-target="#SetupBestbuyFormModal" class="btn btn-info btn-sm mr-1">Import from API</button>
+              {% endif %}
               <button type="button" data-toggle="modal" data-target="#addCategoryModal" class="btn btn-success btn-sm"><i class="fa fa-plus"></i></button>
             </div>
             </h5>
@@ -123,7 +127,7 @@
   </div>
 </div>
 {% from 'forms.html' import setup_forms %}
-{{ setup_forms(add_platform=add_platform, edit_platform=edit_platform, delete_platform=delete_platform, add_location=add_location, edit_location=edit_location, delete_location=delete_location, add_bin=add_bin, edit_bin=edit_bin, delete_bin=delete_bin, add_category=add_category, edit_category=edit_category, delete_category=delete_category, import_categories=import_categories) }}
+{{ setup_forms(add_platform=add_platform, edit_platform=edit_platform, delete_platform=delete_platform, add_location=add_location, edit_location=edit_location, delete_location=delete_location, add_bin=add_bin, edit_bin=edit_bin, delete_bin=delete_bin, add_category=add_category, edit_category=edit_category, delete_category=delete_category, import_categories=import_categories, setup_bestbuy=setup_bestbuy) }}
 {% endblock %}
 
 {% block page_scripts %}

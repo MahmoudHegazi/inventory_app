@@ -4,18 +4,19 @@ import os
 import random
 import decimal
 import flask_excel
-from flask import Flask, Blueprint, session, redirect, url_for, flash, Response, request, render_template, jsonify, abort
+from flask import Flask, Blueprint, session, redirect, url_for, flash, Response, request, render_template, jsonify, abort, current_app
 from flask_wtf import Form
 from .models import User, Supplier, Dashboard, Listing, Catalogue, Purchase, Order, Platform, ListingPlatform, WarehouseLocations, LocationBins, \
-CatalogueLocations, CatalogueLocationsBins, Category
+CatalogueLocations, CatalogueLocationsBins, Category, UserMeta
 from .forms import addListingForm, editListingForm, addCatalogueForm, editCatalogueForm, \
 removeCatalogueForm, removeListingForm, addSupplierForm, editSupplierForm, removeSupplierForm, \
 addPurchaseForm, editPurchaseForm, removePurchaseForm, addOrderForm, editOrderForm, removeOrderForm, CatalogueExcelForm, \
 removeCataloguesForm, removeListingsForm, removeAllCataloguesForm, addPlatformForm, editPlatformForm, removePlatformForm, \
 addLocationForm, editLocationForm, removeLocationForm, addBinForm, editBinForm, removeBinForm, AddMultipleListingForm, \
-addCategoryForm, editCategoryForm, removeCategoryForm, importCategoriesAPIForm, importOffersAPIForm
+addCategoryForm, editCategoryForm, removeCategoryForm, importCategoriesAPIForm, importOffersAPIForm, SetupBestbuyForm
 from . import vendor_permission, db
-from .functions import get_safe_redirect, updateDashboardListings, updateDashboardOrders, updateDashboardPurchasesSum, secureRedirect, get_charts
+from .functions import get_safe_redirect, updateDashboardListings, updateDashboardOrders, updateDashboardPurchasesSum, secureRedirect, get_charts, \
+bestbuy_ready
 from sqlalchemy.exc import IntegrityError
 from flask_login import login_required, current_user
 from flask import request as flask_request
@@ -566,7 +567,9 @@ def listings():
 
         delete_listings = removeListingsForm()
         import_offers = importOffersAPIForm()
-        return render_template('listings.html', listings=user_dashboard_listings, pagination_btns=pagination['pagination_btns'], delete_listings=delete_listings, import_offers=import_offers)
+        setup_bestbuy = SetupBestbuyForm()
+        bestbuy_installed = bestbuy_ready()
+        return render_template('listings.html', listings=user_dashboard_listings, pagination_btns=pagination['pagination_btns'], delete_listings=delete_listings, import_offers=import_offers, setup_bestbuy=setup_bestbuy,bestbuy_installed=bestbuy_installed)
     except Exception as e:
         print('System Error: {}'.format(sys.exc_info()))
         flash('Unknown error Unable to view Listings', 'danger')
@@ -595,7 +598,8 @@ def view_listing(listing_id):
         ).one_or_none()
         if not target_listing:
             message = 'The listing specified with id: {} could not be found. It may be removed or deleted.'.format(listing_id)
-            success = False            
+            success = False
+
     except Exception as e:
         print('System Error: {}'.format(sys.exc_info()))
         message = 'Unknown error Unable to view Listing'
@@ -2337,8 +2341,12 @@ def setup():
         delete_category = removeCategoryForm()
 
         import_categories = importCategoriesAPIForm()
-        
-        return render_template('setup.html', dashboard=current_user.dashboard, add_platform=add_platform, edit_platform=edit_platform, delete_platform=delete_platform, add_location=add_location, edit_location=edit_location, delete_location=delete_location, add_bin=add_bin, edit_bin=edit_bin, delete_bin=delete_bin, add_category=add_category, edit_category=edit_category, delete_category=delete_category, import_categories=import_categories)
+
+        setup_bestbuy = SetupBestbuyForm()
+    
+        # check if user have bestbuy_metas created for remanaing and max per request for current user  (note if global app config numbers changed next time user will try import data will require to setup again the api and auto update the global config number only if required update)
+        bestbuy_installed = bestbuy_ready()
+        return render_template('setup.html', dashboard=current_user.dashboard, add_platform=add_platform, edit_platform=edit_platform, delete_platform=delete_platform, add_location=add_location, edit_location=edit_location, delete_location=delete_location, add_bin=add_bin, edit_bin=edit_bin, delete_bin=delete_bin, add_category=add_category, edit_category=edit_category, delete_category=delete_category, import_categories=import_categories, setup_bestbuy=setup_bestbuy, bestbuy_installed=bestbuy_installed)
     except Exception as e:
         print("Error in setup page Error: {}".format(sys.exc_info()))
         flash('Unknown error Unable to setup page', 'danger')

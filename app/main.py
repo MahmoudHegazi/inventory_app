@@ -59,6 +59,25 @@ def import_catalogues_excel():
                     db_row = mapped_catalogues['db_rows'][row_index]
                     # get locations name list of current row to insert db warehouse locations if not exist in edit and insert
                     row_locations = get_sheet_row_locations(mapped_catalogues, row_index)
+                    
+                    # as both provided category_code and category_label in excel file create the category if not exist
+                    categoryCode = db_row['category_code']
+                    categoryLabel = db_row['category']
+                    selected_category = Category.query.filter_by(code=categoryCode, dashboard_id=current_user.dashboard.id).first()
+                    # as in final line will insert using **db_row so must have valid column names
+                    del db_row['category_code']
+                    del db_row['category']
+                    if selected_category:
+                        db_row['category_id'] = selected_category.id
+                    else:
+                        # to not end with duplicated label only create category if label and code not exist else leave it None and user update his category manual (as label should not duplicated) (only create new category if label not exist)
+                        exist_label = Category.query.filter_by(dashboard_id=current_user.dashboard.id, label=categoryLabel).first()
+                        if not exist_label:
+                            selected_category = Category(dashboard_id=current_user.dashboard.id, code=categoryCode, label=categoryLabel, level=0, parent_code='')
+                            selected_category.insert()
+                            db_row['category_id'] = selected_category.id
+                    #################################################
+
 
                     row_info = "{}|{}".format(row_index+1, db_row['sku'])
                     if db_row['sku'] not in uploaded_skus:
@@ -338,7 +357,7 @@ def search():
                 ).outerjoin(
                     LocationBins, CatalogueLocationsBins.bin_id == LocationBins.id
                 ).outerjoin(
-                    Category, Catalogue.category_code == Category.code
+                    Category, Catalogue.category_id == Category.id
                 ).filter(
                     and_(Catalogue.user_id==current_user.id),
                     and_(sqlalchemy_expression)
@@ -547,7 +566,7 @@ def setup_bestbuy():
 def get_remaining_requests_func():
     return str(get_remaining_requests())
 
-# import categories using API (user securly provide API key)
+# import categories using API (user securly provide API key)  (this main API endpoint for categories, so incase you first imported catalogues and it created the categories for you, any time you can back here to update the categories created (eg: to setup level and parent code, or incase in future label of category changed so this endpoint will handle the update also for you)) best practice if started with offers import, come here and import categories to have level and parent code if
 @main.route('/import_categories_api', methods=['POST', 'GET'])
 @login_required
 @vendor_permission.require()

@@ -30,7 +30,7 @@ def get_safe_redirect(url=''):
 def valid_catalogues(excel_array):
     try:
         required_columns = [
-        "sku","product_name","product_description","brand","category_code","price","sale_price","quantity","product_model","condition","upc", "location"]
+        "sku","product_name","product_description","brand","category_code","category","price","sale_price","quantity","product_model","condition","upc", "location"]
         columns_missing = []
         if len(excel_array) == 0:
             return {'success': True, 'message': ''}
@@ -57,64 +57,66 @@ def valid_catalogues(excel_array):
 #{ "sku",  "product_name",  "product_description",  "brand",  "category_code",  "price",  "sale_price",  "quantity",  "product_model",  "condition",  "upc",  "location", }
 def get_mapped_catalogues_dicts(excel_array):
     try:
-       catalogues_valid = valid_catalogues(excel_array)
-       if catalogues_valid['success']:
-           # valid catagories confirms there must be this keys so no key must be -1 after the first row in loop
-           catalogues_columns = {
-           "sku": -1, 
-           "product_name": -1, 
-           "product_description": -1, 
-           "brand": -1, 
-           "category_code": -1, 
-           "price": -1, 
-           "sale_price": -1, 
-           "quantity": -1, 
-           "product_model": -1, 
-           "condition": -1, 
-           "upc": -1,
-           "location": -1
-           }
-           
-           db_rows = []
-           db_rows_locations = []
-           db_rows_bins = []
-           for i in range(len(excel_array)):
-               current_row = excel_array[i]
-               if i == 0:
-                   # headings
-                   for headingIndex in range(len(current_row)):
-                       heading = str(current_row[headingIndex]).strip().lower()
-                       if heading in catalogues_columns:
-                           catalogues_columns[heading] = headingIndex
-                           continue
-               else:
-                   price_type = type(current_row[catalogues_columns['price']])
-                   sale_price_type = type(current_row[catalogues_columns['sale_price']])
-                   
-                   price_n = current_row[catalogues_columns['price']] if price_type is float or price_type is int else 0.00
-                   sale_price_n = current_row[catalogues_columns['sale_price']] if sale_price_type is float or sale_price_type is int else 0.00 
+        catalogues_valid = valid_catalogues(excel_array)
+        if catalogues_valid['success']:
+            # valid catagories confirms there must be this keys so no key must be -1 after the first row in loop
+            catalogues_columns = {
+            "sku": -1, 
+            "product_name": -1, 
+            "product_description": -1, 
+            "brand": -1, 
+            "category_code": -1,
+            "category": -1,
+            "price": -1, 
+            "sale_price": -1, 
+            "quantity": -1, 
+            "product_model": -1, 
+            "condition": -1, 
+            "upc": -1,
+            "location": -1
+            }
+            
+            db_rows = []
+            db_rows_locations = []
+            db_rows_bins = []
+            for i in range(len(excel_array)):
+                current_row = excel_array[i]
+                if i == 0:
+                    # headings
+                    for headingIndex in range(len(current_row)):
+                        heading = str(current_row[headingIndex]).strip().lower()
+                        if heading in catalogues_columns:
+                            catalogues_columns[heading] = headingIndex
+                            continue
+                else:
+                    price_type = type(current_row[catalogues_columns['price']])
+                    sale_price_type = type(current_row[catalogues_columns['sale_price']])
+                    
+                    price_n = current_row[catalogues_columns['price']] if price_type is float or price_type is int else 0.00
+                    sale_price_n = current_row[catalogues_columns['sale_price']] if sale_price_type is float or sale_price_type is int else 0.00 
 
-                   """ fastest way can done to convert get_array to db sqlalchemy objects,index (dynamic mapping) by client's excel file uploaded, sku title in first column or in last ignore additonal columns for flexiblty just 1 loop (validation for ux) """
-                   db_row = {
-                   "sku": current_row[catalogues_columns['sku']], 
-                   "product_name": current_row[catalogues_columns['product_name']], 
-                   "product_description": current_row[catalogues_columns['product_description']], 
-                   "brand": current_row[catalogues_columns['brand']], 
-                   "category_code": current_row[catalogues_columns['category_code']], 
-                   "price": price_n, 
-                   "sale_price": sale_price_n, 
-                   "quantity": current_row[catalogues_columns['quantity']], 
-                   "product_model": current_row[catalogues_columns['product_model']], 
-                   "condition": current_row[catalogues_columns['condition']], 
-                   "upc": current_row[catalogues_columns['upc']]
-                   }
-                   db_rows.append(db_row)
-                   # location relational data array
-                   db_rows_locations.append(current_row[catalogues_columns['location']])
-                   
-           return {'success': True, 'message': '', 'db_rows': db_rows, 'db_rows_locations': db_rows_locations}
-       else:
-           return catalogues_valid
+                    """ fastest way can done to convert get_array to db sqlalchemy objects,index (dynamic mapping) by client's excel file uploaded, sku title in first column or in last ignore additonal columns for flexiblty just 1 loop (validation for ux) """
+                    db_row = {
+                    "sku": current_row[catalogues_columns['sku']], 
+                    "product_name": current_row[catalogues_columns['product_name']], 
+                    "product_description": current_row[catalogues_columns['product_description']], 
+                    "brand": current_row[catalogues_columns['brand']], 
+                    "category_code": current_row[catalogues_columns['category_code']],
+                    "category": current_row[catalogues_columns['category']],
+                    "price": price_n, 
+                    "sale_price": sale_price_n, 
+                    "quantity": current_row[catalogues_columns['quantity']], 
+                    "product_model": current_row[catalogues_columns['product_model']], 
+                    "condition": current_row[catalogues_columns['condition']], 
+                    "upc": current_row[catalogues_columns['upc']]
+                    }
+                    db_rows.append(db_row)
+                    # location relational data array
+                    db_rows_locations.append(current_row[catalogues_columns['location']])
+                    
+            return {'success': True, 'message': '', 'db_rows': db_rows, 'db_rows_locations': db_rows_locations}
+        else:
+            return catalogues_valid
            
     except Exception as e:
         print('System Error get_mapped_catalogues_dicts: {}'.format(sys.exc_info()))
@@ -447,13 +449,15 @@ def get_export_data(db, flask_excel, current_user_id, table_name, columns, opera
         ).outerjoin(
             LocationBins, CatalogueLocationsBins.bin_id == LocationBins.id
         ).outerjoin(
-            Category, Category.code == Catalogue.category_code
+            Category, Category.id == Catalogue.category_id
         ).filter(and_(Catalogue.user_id==current_user_id), filterBooleanClauseList).all()
         if response['data']:
             export_data = []
             
-            response['column_names'] = getAllowedColumns(column_names=Catalogue.__table__.columns.keys(), ignored_columns=['user_id', 'product_image', 'created_date', 'updated_date'])
-            response['column_names'] = [*response['column_names'], 'location']
+            # response['column_names'] = getAllowedColumns(column_names=Catalogue.__table__.columns.keys(), ignored_columns=['user_id', 'product_image', 'created_date', 'updated_date'])
+            # response['column_names'] = [*response['column_names'], 'location']
+
+            response['column_names'] = ['id', 'sku', 'product_name', 'product_description', 'brand', 'category_code', 'category', 'price', 'sale_price', 'quantity', 'product_model', 'condition', 'upc', 'location']
             export_data.append(response['column_names'])
 
             for item in response['data']:
@@ -462,7 +466,9 @@ def get_export_data(db, flask_excel, current_user_id, table_name, columns, opera
                 for cat_location in item.locations:
                     locations_arr.append(str(cat_location.warehouse_location.name))
                 locations = ','.join(locations_arr)
-                export_data.append([item.id, item.sku, item.product_name, item.product_description, item.brand, item.category_code, item.price, item.sale_price, item.quantity, item.product_model, item.condition, item.upc, locations])
+                categoryCode = item.category.code if item.category else ''
+                categoryLabel = item.category.label if item.category else ''
+                export_data.append([item.id, item.sku, item.product_name, item.product_description, item.brand, categoryCode, categoryLabel, item.price, item.sale_price, item.quantity, item.product_model, item.condition, item.upc, locations])
             # modfied array to return the addiontal relational data like locations or bins
             response['data'] = export_data
             
@@ -490,7 +496,7 @@ def get_export_data(db, flask_excel, current_user_id, table_name, columns, opera
         ).outerjoin(
             LocationBins, CatalogueLocationsBins.bin_id == LocationBins.id
         ).outerjoin(
-            Category, Catalogue.category_code == Category.code
+            Category, Catalogue.category_id == Category.id
         ).filter(
             and_(Catalogue.user_id == current_user_id),
             filterBooleanClauseList
@@ -990,8 +996,8 @@ def upload_catalogues(offers_data, current_user):
                         selected_catalogue.brand = product_brand
                         update_require = True
 
-                    if selected_catalogue.category_code != category_code:
-                        selected_catalogue.category_code = category_code
+                    if selected_catalogue.category_id != selected_category.id:
+                        selected_catalogue.category_id = selected_category.id
                         update_require = True
 
                     if float_or_none(selected_catalogue.price) != price:                        
@@ -1018,7 +1024,7 @@ def upload_catalogues(offers_data, current_user):
                         # this to help decide in next step, sync listing with changed catalogue data or not sync if catalogue not changed
                         not_changed = True
                 else:
-                    selected_catalogue = Catalogue(product_sku, current_user.id, product_name=product_title, product_description=product_description, brand=product_brand, category_code=selected_category.code, price=price, sale_price=discount_price, quantity=quantity, product_model=None, condition=None, upc=reference_type)
+                    selected_catalogue = Catalogue(product_sku, current_user.id, product_name=product_title, product_description=product_description, brand=product_brand, category_id=selected_category.id, price=price, sale_price=discount_price, quantity=quantity, product_model=None, condition=None, upc=reference_type)
                     selected_catalogue.insert()
                     result['uploaded'] += 1
                 

@@ -166,13 +166,19 @@ function searchComponent(speed='slow',easing='swing', cp=function(){return true;
         });
         
       }
+      /*
+        return Array.from([].filter.call(elements, function(element){
+          return RegExp(searchVal, 'i').test(element.getAttribute(dataAttrName));
+        }));
+      */
       // get insesntive search list, by loop over elements instead of it was using query selector, no insesntive operator in js selector *= only
       function getQueryInsensitiveList(searchTerm, dataAttrName){
         searchTerm = searchTerm.toLowerCase();
         let result = [];
+        // this is only search line
         $(`.searching_card${addon}[${dataAttrName}]`).each( (i, item)=>{
             const stringLower = $(item).attr(dataAttrName).toLowerCase();
-            if ((stringLower === searchTerm && stringLower.includes(searchTerm))){
+            if ((stringLower.includes(searchTerm))){
                 result.push(item);
             }
         });

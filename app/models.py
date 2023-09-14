@@ -281,7 +281,7 @@ class Supplier(db.Model):
 class Category(db.Model):
     __tablename__ = 'category'
     id = db.Column(db.Integer, autoincrement=True, nullable=False, primary_key=True)
-    code = db.Column(db.String(45), nullable=False, unique=True)
+    code = db.Column(db.String(45), nullable=False)
     label = db.Column(db.String(255), nullable=False)
     level = db.Column(db.Integer, nullable=True, default=0)
     parent_code = db.Column(db.String(45), nullable=True, default='')
@@ -331,7 +331,6 @@ class Catalogue(db.Model): # catelouge
     product_name = db.Column(db.String(500), nullable=True)
     product_description = db.Column(db.String(5000), nullable=True)
     brand = db.Column(db.String(255), nullable=True)
-    category_code = db.Column(db.String(45), db.ForeignKey('category.code', ondelete="SET NULL", onupdate="CASCADE"), nullable=True, default=None)
     price = db.Column(db.DECIMAL(precision=10, scale=2, asdecimal=True), nullable=True, default=0.00)
     sale_price = db.Column(db.DECIMAL(precision=10, scale=2, asdecimal=True), nullable=True, default=0.00)
     quantity = db.Column(db.Integer, nullable=True)
@@ -341,17 +340,18 @@ class Catalogue(db.Model): # catelouge
     product_image = db.Column(db.String(45), nullable=True, default='default_product.png')
     created_date = db.Column(DateTime, nullable=False, default=datetime.datetime.utcnow)
     updated_date = db.Column(DateTime, nullable=True, default=None, onupdate=datetime.datetime.utcnow)
+    category_id = db.Column(db.Integer, db.ForeignKey('category.id', ondelete="SET NULL", onupdate="CASCADE"), nullable=True, default=None)
     user_id = db.Column(db.Integer, db.ForeignKey('user.id', ondelete="CASCADE", onupdate="CASCADE"), nullable=False)
     listings = db.relationship("Listing", backref="catalogue", cascade="all, delete", passive_deletes=True)
     locations = db.relationship("CatalogueLocations", backref='catalogue', cascade="all, delete", passive_deletes=True)
 
-    def __init__(self, sku, user_id, product_name=None, product_description=None, brand=None, category_code=None, price=0.00, sale_price=0.00, quantity=None, product_model=None, condition=None, upc=None):
+    def __init__(self, sku, user_id, product_name=None, product_description=None, brand=None, category_id=None, price=0.00, sale_price=0.00, quantity=None, product_model=None, condition=None, upc=None):
         self.sku = sku
         self.product_name = product_name
         self.user_id = user_id
         self.product_description = product_description
         self.brand = brand
-        self.category_code = category_code
+        self.category_id = category_id
         self.price = price
         self.sale_price = sale_price
         self.quantity = quantity
@@ -379,7 +379,7 @@ class Catalogue(db.Model): # catelouge
         'product_name': self.product_name,
         'product_description': self.product_description,
         'brand': self.brand,
-        'category_code': self.category_code,
+        'category_id': self.category_id,
         'price': str(self.price),
         'sale_price': str(self.sale_price),
         'quantity': self.quantity,
@@ -451,9 +451,13 @@ class Listing(db.Model):
                 self.product_name = target_catalogue.product_name
                 self.product_description = target_catalogue.product_description
                 self.brand = target_catalogue.brand
-                self.category_code = target_catalogue.category_code
                 if target_catalogue.category:
+                    self.category_code = target_catalogue.category.code
                     self.category_label = target_catalogue.category.label
+                else:
+                    self.category_code = None
+                    self.category_label = None
+
                 self.price = target_catalogue.price
                 self.sale_price = target_catalogue.sale_price
                 self.quantity = target_catalogue.quantity
@@ -485,10 +489,16 @@ class Listing(db.Model):
             self.product_description = self.catalogue.product_description
         if self.brand != self.catalogue.brand:
             self.brand = self.catalogue.brand
-        if self.category_code != self.catalogue.category_code:
-            self.category_code = self.catalogue.category_code
+        if self.catalogue.category and self.catalogue.category.code != self.category_code:
+            self.category_code = self.catalogue.category.code
+        else:
+            self.category_code = None
+
         if self.catalogue.category and self.catalogue.category.label != self.category_label:
             self.category_label = self.catalogue.category.label
+        else:
+            self.category_label = None
+
         if self.price != self.catalogue.price:
             self.price = self.catalogue.price
         if self.sale_price != self.catalogue.sale_price:
@@ -883,10 +893,14 @@ def update_listing_on_catalogue_update(mapper, connection, target):
                 list_to_update.sku = target.sku
                 list_to_update.product_name = target.product_name
                 list_to_update.product_description = target.product_description
-                list_to_update.brand = target.brand
-                list_to_update.category_code = target.category_code
+                list_to_update.brand = target.brand                
                 if target.category:
+                    list_to_update.category_code = target.category.code
                     list_to_update.category_label = target.category.label
+                else:
+                    list_to_update.category_code = None
+                    list_to_update.category_label = None
+                    
                 list_to_update.price = target.price
                 list_to_update.sale_price = target.sale_price
                 list_to_update.quantity = target.quantity

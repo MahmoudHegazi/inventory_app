@@ -179,7 +179,7 @@ def add_catalogue():
 
             locations_bins_data.append(current_location_obj)
 
-        categories = [(cat.code, '{}:{}'.format(cat.code, cat.label)) for cat in Category.query.filter_by(dashboard_id=current_user.dashboard.id).all()]
+        categories = [(cat.id, '{}:{}'.format(cat.code, cat.label)) for cat in Category.query.filter_by(dashboard_id=current_user.dashboard.id).all()]
         form = addCatalogueForm()
         form.warehouse_locations.choices = locations_choices
         form.locations_bins.choices = allowed_bins_ids
@@ -193,16 +193,16 @@ def add_catalogue():
         success = None
         try:
             if form.validate_on_submit():
-                selected_category = Category.query.filter_by(code=form.category_code.data, dashboard_id=current_user.dashboard.id).first()
+                selected_category = Category.query.filter_by(id=form.category_code.data, dashboard_id=current_user.dashboard.id).first()
                 if selected_category:
                     # using sqlalchemy.orm.collections.instrumentedlist append technique to insert all relations one time if catalogue inserted, and in child locations as well so if error happend before inser which last thing all actions will ignored (1 commit for all)
-                    new_catalogue = Catalogue(user_id=current_user.id, sku=form.sku.data, product_name=form.product_name.data, product_description=form.product_description.data, brand=form.brand.data, category_code=selected_category.code, price=form.price.data, sale_price=form.sale_price.data, quantity=form.quantity.data, product_model=form.product_model.data, condition=form.condition.data, upc=form.upc.data)
+                    new_catalogue = Catalogue(user_id=current_user.id, sku=form.sku.data, product_name=form.product_name.data, product_description=form.product_description.data, brand=form.brand.data, category_id=selected_category.id, price=form.price.data, sale_price=form.sale_price.data, quantity=form.quantity.data, product_model=form.product_model.data, condition=form.condition.data, upc=form.upc.data)
                     for warehouse_location_id in form.warehouse_locations.data:
                         valid_location = WarehouseLocations.query.filter_by(dashboard_id=current_user.dashboard.id, id=warehouse_location_id).one_or_none()
                         if valid_location is not None:
                             new_catalogue_location = CatalogueLocations(location_id=valid_location.id)
                             for bin_id in form.locations_bins.data:
-                                valid_bin = LocationBins.query.filter_by(id=bin_id).one_or_none()
+                                valid_bin = LocationBins.query.filter_by(id=bin_id, location_id=valid_location.id).one_or_none()
                                 if valid_bin is not None:
                                     new_location_bin = CatalogueLocationsBins(bin_id=valid_bin.id)
                                     new_catalogue_location.bins.append(new_location_bin)
@@ -269,14 +269,15 @@ def edit_catalogue(catalogue_id):
                 for loc_bin in cat_loc.bins:
                     selected_bins_ids.append(loc_bin.bin_id)
             
-            categories = [(cat.code, '{}:{}'.format(cat.code, cat.label)) for cat in Category.query.filter_by(dashboard_id=current_user.dashboard.id).all()]
+            categories = [(cat.id, '{}:{}'.format(cat.code, cat.label)) for cat in Category.query.filter_by(dashboard_id=current_user.dashboard.id).all()]
 
+            categoryId = target_catalogue.category.id if target_catalogue.category else None
             form = editCatalogueForm(
                 sku = target_catalogue.sku,
                 product_name = target_catalogue.product_name,
                 product_description = target_catalogue.product_description,
                 brand = target_catalogue.brand,
-                category_code = target_catalogue.category_code,
+                category_code = categoryId,
                 quantity = target_catalogue.quantity,
                 product_model = target_catalogue.product_model,
                 condition = target_catalogue.condition,
@@ -316,11 +317,11 @@ def edit_catalogue(catalogue_id):
                 if target_catalogue.brand != form.brand.data:
                     target_catalogue.brand = form.brand.data
 
-                if target_catalogue.category_code != form.category_code.data:
+                if target_catalogue.category_id != form.category_code.data:
                     # code should always be valid by wtforms, incase invalid it will ignored without notifcation
-                    target_category = Category.query.filter_by(code=form.category_code.data, dashboard_id=current_user.dashboard.id).first()
+                    target_category = Category.query.filter_by(id=form.category_code.data, dashboard_id=current_user.dashboard.id).first()
                     if target_category:
-                        target_catalogue.category_code = target_category.code
+                        target_catalogue.category_id = target_category.id
 
                 if target_catalogue.price != form.price.data:
                     target_catalogue.price = form.price.data

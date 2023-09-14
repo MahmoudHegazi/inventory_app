@@ -78,9 +78,9 @@ class DashboardModalView(InventoryModelView):
     form_excluded_columns = ['created_date', 'updated_date', 'listings']
 
 class catalogueModalView(InventoryModelView):
-    column_filters = ['created_date', 'updated_date', 'sku', 'product_name', 'product_description', 'brand', 'category_code', 'price', 'sale_price','quantity', 'product_model', 'condition', 'upc', 'user']
-    column_searchable_list = ['sku', 'product_name', 'brand', 'category_code', 'price', 'product_model']
-    column_editable_list = ['product_name', 'brand', 'category_code', 'price', 'sale_price', 'quantity', 'product_model', 'condition', 'upc']
+    column_filters = ['created_date', 'updated_date', 'sku', 'product_name', 'product_description', 'brand', 'category_id', 'price', 'sale_price','quantity', 'product_model', 'condition', 'upc', 'user']
+    column_searchable_list = ['sku', 'product_name', 'brand', 'category_id', 'price', 'product_model']
+    column_editable_list = ['product_name', 'brand', 'category_id', 'price', 'sale_price', 'quantity', 'product_model', 'condition', 'upc']
     form_excluded_columns = ['created_date', 'updated_date']
 
 
@@ -99,7 +99,10 @@ class ListingModalView(InventoryModelView):
                 model.product_name = model.catalogue.product_name
                 model.product_description = model.catalogue.product_description
                 model.brand = model.catalogue.brand
-                model.category_code = model.catalogue.category_code
+                if model.catalogue.category:
+                    model.category_code = model.catalogue.category.code
+                else:
+                    model.category_code = None
                 model.price = model.catalogue.price
                 model.sale_price = model.catalogue.sale_price
                 model.quantity = model.catalogue.quantity

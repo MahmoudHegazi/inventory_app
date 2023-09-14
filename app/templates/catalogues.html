@@ -225,7 +225,6 @@
     {% endif %}    
   </div>
 </div>
-{{url_for('routes.view_catalogue', catalogue_id=1)}}
 {% import 'forms.html' as forms %}
 {{ forms.catalogues_forms(catalogues_excel=catalogues_excel,delete_catalogues=delete_catalogues, delete_all_catalogues=delete_all_catalogues, add_multiple_listings=add_multiple_listings) }}
 {% endblock %}

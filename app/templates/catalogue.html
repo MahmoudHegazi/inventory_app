@@ -41,12 +41,23 @@
         Add New Catalogue
       </a>
     </div>
+    <!-- unique platforms start -->
+    {% set unique_platforms = [] %}
+    {% for catalogue_listing in catalogue.listings %}
+    {% if catalogue_listing.platform.name not in unique_platforms %}
+      {% if unique_platforms.append(catalogue_listing.platform.name) %}{% endif %}
+    {% endif %}
+    {% endfor %}
+    <!-- unique platforms end -->
     <div class="row mt-2">
       <div class="border rounded col-4 p-3 d-flex justify-content-center align-items-center cursor-pointer text-decoration-none text-dark media_small_width_100">
         <div class="hover_shadow row container shadow p-3">
             <div class="col-sm-12 mb-3 text-center">
                 <img src="{{url_for('static', filename='assets/images/'~catalogue.product_image)}}" alt="catalogue icon" width="150"class="mxwidth-150" />
                 <h3 class="overflow_within title"><span class="badge badge-dark">Id: </span><span> {{catalogue.id}}</span></h3>
+            </div>
+            <div class="col-sm-12">
+              <p class="overflow_within"><span class="badge badge-info">Platforms: </span><span> {{', '.join(unique_platforms)}}</span></p>
             </div>
             <div class="col-sm-12">
               <p class="overflow_within"><span class="badge badge-info">SKU: </span><span> {{catalogue.sku}}</span></p>
@@ -106,7 +117,7 @@
                 </div>
                 {% endfor %}
               </p>
-            </div>      
+            </div>
             <div class="col-sm-12">
               <div class="overflow_within"><span class="badge badge-dark">Created At: </span>
                 <p class="p-1 shadow"> {{catalogue.created_date}}</p>
@@ -128,6 +139,20 @@
             </div>
         </div>
       </div>
+      <div class="col"></div>
+      <div class="col-7 border rounded p-3">
+        <h3 class="mini_green_header">Catalogue Listings:</h3>
+        <div class="container shadow p-3">
+          {% for catalogue_listing in catalogue.listings %}
+          <p>
+            <a href="{{url_for('routes.view_listing', listing_id=catalogue_listing.id)}}" target="_blank">
+              <span class="mr-2 badge badge-primary">{{catalogue_listing.platform.name}}:</span><span>{{catalogue_listing.product_name}}</span>
+            </a>
+          </p>
+          {% endfor %}
+        </div>
+      </div>
+      <div class="col"></div>
     </div>
     {% else %}
     <div class="alert alert-danger">Unable to Display Catalogue right now.</div>

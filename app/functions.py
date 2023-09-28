@@ -1,15 +1,20 @@
 import sys
 import re
 import datetime
+import math
+import time
+import requests
+import json
 from dateutil import parser
 from urllib.parse import urlparse, urljoin
-from flask import request, current_app
+from flask import request, current_app, url_for
 from flask_login import current_user
 from sqlalchemy import func
-from .models import Supplier, Dashboard, Listing, Catalogue, Purchase, Order, Platform, ListingPlatform, CatalogueLocations, CatalogueLocationsBins, WarehouseLocations, LocationBins, Category, UserMeta
+from .models import Supplier, Dashboard, Listing, Catalogue, Purchase, Order, Platform, CatalogueLocations, CatalogueLocationsBins, WarehouseLocations, LocationBins, Category, UserMeta, OrderTaxes
 from sqlalchemy.sql import extract
 from sqlalchemy import or_, and_, func , asc, desc
 from datetime import datetime, timedelta
+
 
 def is_safe_redirect_url(target):
     host_url = urlparse(request.host_url)
@@ -137,8 +142,9 @@ def updateDashboardListings(user_dashboard):
     
 
 
-def updateDashboardOrders(db, Order, Listing, user_dashboard):
+def updateDashboardOrders(db, user_dashboard):
     try:
+        # updated could be order_estate != 'refunded,etc'
         total_dashboard_orders = db.session.query(
                     func.sum(Order.quantity)
                 ).join(
@@ -210,11 +216,34 @@ def getTableColumns(tableClass, expetColumns=[]):
         raise (e)
     
 def secureRedirect(redirect_url):
-    allowed_redirect = ['/home']
-    if redirect_url in allowed_redirect:
-        return redirect_url
-    else:
-        return '/home'
+    try:
+        allowed_redirect = [
+            url_for('routes.index'),
+            url_for('routes.orders'),
+            url_for('routes.listings'),
+            url_for('routes.catalogues'),
+            url_for('routes.suppliers'),
+            url_for('main.reports'),
+            url_for('routes.setup')
+            ]
+        # to set how it works try  set redirect url to /catalogue/3808/edit remaning will not be the ids (note as urls parent relation child so this check works for listings or orders as orders is inhirted from
+        lambdas = [
+            redirect_url if str(redirect_url).startswith('/') and str(str(''.join(str(''.join(redirect_url.split('/listings'))).split('/orders'))).replace('/', '')).isnumeric() else False
+        ]
+
+        for rul in range(len(allowed_redirect)):
+            if str(allowed_redirect[rul]).lower() == str(redirect_url).lower():
+                return allowed_redirect[rul]
+        
+        for alambda_string in lambdas:
+            if alambda_string:
+                return redirect_url
+          
+    except Exception as e:
+        raise e
+        print("error in secureRedirect: {}".format(sys.exc_info()))
+
+    return '/home'
 
 """  Filter Class and its function (this class access direct functions deacleard in functions.py) """
 
@@ -253,9 +282,17 @@ class ExportSqlalchemyFilter():
         self.catalogue_locations_bins_columns = getTableColumns(CatalogueLocationsBins, ['id', 'created_date', 'updated_date', 'location_id', 'bin_id'])
 
         self.categories_columns = getTableColumns(Category, ['dashboard_id', 'created_date', 'updated_date'])
+        self.ordertaxes_columns = getTableColumns(OrderTaxes, ['id', 'created_date', 'updated_date'])
 
         # rendered with same order in js (filters_args_list ...(args))  (can change order of display in frontend)
-        catalogue_table_filters = [*self.catalogue_columns, *self.warehouse_locations_columns, *self.location_bins_columns, *self.catalogue_locations_columns, *self.catalogue_locations_bins_columns, *self.categories_columns]
+        catalogue_table_filters = [
+            *self.catalogue_columns,
+            *self.warehouse_locations_columns,
+            *self.location_bins_columns,
+            *self.catalogue_locations_columns,
+            *self.catalogue_locations_bins_columns,
+            *self.categories_columns
+            ]
         # call function here becuase i need custom ignored duplicated columns in Catalogue not the default (changed that for make test way for user without code, he can validate if catalogues data not changed) (actions done by event listeners)
         listing_table_filters = [
             *self.listing_columns,
@@ -265,7 +302,8 @@ class ExportSqlalchemyFilter():
             *self.location_bins_columns,
             *self.catalogue_locations_columns,
             *self.catalogue_locations_bins_columns,
-            *self.categories_columns
+            *self.categories_columns,
+            *self.ordertaxes_columns
             ]
         # *getTableColumns(Catalogue, ['user_id', 'sku', 'product_name', 'product_description', 'brand', 'category_code', 'price', 'sale_price', 'quantity'])
         purchase_table_filters = [*self.purchase_columns, *self.supplier_columns, *self.listing_columns, *self.catalogue_columns]
@@ -276,7 +314,7 @@ class ExportSqlalchemyFilter():
         # each export button have predefined group of allowed tables, can controled from here
         self.allowed_tables = {
             'catalogue': [Catalogue, WarehouseLocations, LocationBins, CatalogueLocations, CatalogueLocationsBins, Category],
-            'listing': [Listing, Catalogue, Platform, WarehouseLocations, LocationBins, CatalogueLocations, CatalogueLocationsBins, Category],
+            'listing': [Listing, Catalogue, Platform, WarehouseLocations, LocationBins, CatalogueLocations, CatalogueLocationsBins, Category, OrderTaxes],
             'purchase': [Purchase, Supplier, Listing, Catalogue],
             'order': [Order, Listing, Catalogue],
             'supplier': [Supplier]
@@ -427,8 +465,6 @@ def getFilterBooleanClauseList(columns, operators, values, condition, target_tab
 
 # this function automatic identify required sqlalchemy classes, and columns and return query data result with response
 def get_export_data(db, flask_excel, current_user_id, table_name, columns, operators, values, condition, usejson=False):
-    from .models import Supplier, Catalogue, Listing, Purchase, Order, Platform, ListingPlatform
-    
     # this is list of sqlalchemy filter conidtions recived from message (sqlalchemy.sql.elements.booleanclauselist) (incase no values it will not make issues)
     filterBooleanClauseList = getFilterBooleanClauseList(columns, operators, values, condition, target_table=table_name)
     export_tables = ['catalogue', 'listing', 'purchase', 'order', 'supplier']
@@ -484,9 +520,7 @@ def get_export_data(db, flask_excel, current_user_id, table_name, columns, opera
         response['data'] = db.session.query(Listing).join(
             Catalogue, Listing.catalogue_id==Catalogue.id
         ).outerjoin(
-            ListingPlatform, Listing.id==ListingPlatform.listing_id
-        ).outerjoin(
-            Platform, ListingPlatform.platform_id==Platform.id
+            Platform, Listing.platform_id==Platform.id
         ).outerjoin(
             CatalogueLocations, CatalogueLocations.catalogue_id == Catalogue.id
         ).outerjoin(
@@ -497,6 +531,10 @@ def get_export_data(db, flask_excel, current_user_id, table_name, columns, opera
             LocationBins, CatalogueLocationsBins.bin_id == LocationBins.id
         ).outerjoin(
             Category, Catalogue.category_id == Category.id
+        ).outerjoin(
+            Order, Order.listing_id == Listing.id
+        ).outerjoin(
+            OrderTaxes, OrderTaxes.order_id == Order.id
         ).filter(
             and_(Catalogue.user_id == current_user_id),
             filterBooleanClauseList
@@ -504,12 +542,11 @@ def get_export_data(db, flask_excel, current_user_id, table_name, columns, opera
         if response['data']:
             export_data = []
 
-            response['column_names'] = ['id', 'sku', 'product_name', 'product_description', 'brand', 'category_code', 'price', 'sale_price', 'quantity', 'created_date', 'updated_date', 'dashboard_id', 'catalogue_id', 'platform']
+            response['column_names'] = ['id', 'sku', 'product_name', 'product_description', 'brand', 'category_code', 'category', 'price', 'sale_price', 'quantity', 'condition', 'product_model',  'upc' ,'created_date', 'updated_date', 'dashboard_id', 'catalogue_id', 'platform']
             export_data.append(response['column_names'])
             
             for item in response['data']:
-                platforms = ",".join(["{}".format(listing_platform.platform.name) for listing_platform in item.platforms])
-                export_data.append([item.id, item.sku, item.product_name, item.product_description, item.brand, item.category_code, item.price, item.sale_price, item.quantity, item.created_date, item.updated_date, item.dashboard_id, item.catalogue_id, platforms])
+                export_data.append([item.id, item.sku, item.product_name, item.product_description, item.brand, item.category_code, item.category_label, item.price, item.sale_price, item.quantity, item.catalogue.condition, item.catalogue.product_model, item.catalogue.upc, item.created_date, item.updated_date, item.dashboard_id, item.catalogue_id, item.platform.name])
             
             response['data'] = export_data
             if usejson == False:
@@ -896,16 +933,14 @@ def get_sheet_row_locations(mapped_catalogues_dict, row_index):
 def apikey_or_none(apikey):
     result = None
     try:
-        # if sub omited will not allow if \n or spaces, better help user and protect system
         apikey = re.sub('[\s\n\r]', "", apikey)
-        valid = re.match("^[a-z0-9]+[a-z0-9\-]+[a-z0-9]+\Z", apikey, re.IGNORECASE)
+        # repeat (az09)- unlimited and end with (az09) (accept dynamic change on key)
+        valid = re.match("^([a-z0-9]+\-){1,}[a-z0-9]+\Z", apikey, re.IGNORECASE)
         if valid:
             result = valid.group()
-        return result
     except:
         print("System error in apikey_or_none: {}".format(sys.exc_info()))
-    finally:
-        return result
+    return result
     
 # divide lists into lists of length
 def chunks(data, step):
@@ -917,6 +952,12 @@ def float_or_none(float_num):
         return float(float_num)
     except:
         return None
+
+def float_or_zero(float_num):
+    try:
+        return float(float_num)
+    except:
+        return 0
     
 def int_or_none(int_num):
     try:
@@ -945,6 +986,12 @@ def mysql_strdate(timestr=''):
 def upload_catalogues(offers_data, current_user):
     try:        
         result = {'total': len(offers_data), 'uploaded': 0, 'updated': 0, 'not_changed': 0, 'luploaded': 0, 'lupdated': 0, 'lnot_changed': 0, 'new_categories': 0}
+        # create platform for best buy if not exist
+        best_buy_platform = Platform.query.filter_by(name='bestbuy', dashboard_id=current_user.dashboard.id).first()
+        if not best_buy_platform:
+            best_buy_platform = Platform(dashboard_id=current_user.dashboard.id, name='bestbuy')
+            best_buy_platform.insert()
+        
         for offer in offers_data:
             if 'product_sku' in offer and 'product_title' in offer:
                 product_sku = offer['product_sku']
@@ -1024,11 +1071,16 @@ def upload_catalogues(offers_data, current_user):
                         # this to help decide in next step, sync listing with changed catalogue data or not sync if catalogue not changed
                         not_changed = True
                 else:
-                    selected_catalogue = Catalogue(product_sku, current_user.id, product_name=product_title, product_description=product_description, brand=product_brand, category_id=selected_category.id, price=price, sale_price=discount_price, quantity=quantity, product_model=None, condition=None, upc=reference_type)
+                    selected_catalogue = Catalogue(sku=product_sku, user_id=current_user.id, product_name=product_title, product_description=product_description, brand=product_brand, category_id=selected_category.id, price=price, sale_price=discount_price, quantity=quantity, product_model=None, condition=None, upc=reference_type)
                     selected_catalogue.insert()
                     result['uploaded'] += 1
-                
-                selected_listing = Listing.query.filter_by(dashboard_id=current_user.dashboard.id, catalogue_id=selected_catalogue.id, sku=selected_catalogue.sku).first()
+
+                # check if listing exist in same platform
+                selected_listing = Listing.query.filter_by(
+                    dashboard_id=current_user.dashboard.id, catalogue_id=selected_catalogue.id,
+                    sku=selected_catalogue.sku, platform_id=best_buy_platform.id
+                ).first()
+
                 if selected_listing:
                     update_require2 = False
 
@@ -1092,15 +1144,328 @@ def upload_catalogues(offers_data, current_user):
                     if update_require2 or not_changed == False:
                         result['lupdated'] += 1
                 else:
-                    
-                    new_listing = Listing(dashboard_id=current_user.dashboard.id, catalogue_id=selected_catalogue.id, active=active, discount_start_date=discount_start_date, discount_end_date=discount_end_date, unit_discount_price=unit_discount_price, unit_origin_price=unit_origin_price, quantity_threshold=quantity_threshold, currency_iso_code=currency_iso_code, shop_sku=shop_sku, offer_id=offer_id, reference=reference, reference_type=reference_type)
+                    new_listing = Listing(dashboard_id=current_user.dashboard.id, catalogue_id=selected_catalogue.id, platform_id=best_buy_platform.id, active=active, discount_start_date=discount_start_date, discount_end_date=discount_end_date, unit_discount_price=unit_discount_price, unit_origin_price=unit_origin_price, quantity_threshold=quantity_threshold, currency_iso_code=currency_iso_code, shop_sku=shop_sku, offer_id=offer_id, reference=reference, reference_type=reference_type)
                     new_listing.insert()
                     result['luploaded'] += 1
-
+        
         return result
     except Exception as e:
         raise e
+
+def upload_orders(orders, current_user, db):
+    try:
+        result = {'missing_listing': [], 'invalid_quantity': [], 'errors': [], 'total_errors': 0, 'total_uploaded': 0, 'total_updated': 0, 'total_missing': 0, 'total_invalid': 0, 'not_changed': 0}
+        
+        user_dashboard = current_user.dashboard
+
+        best_buy_platform = Platform.query.filter_by(name='bestbuy', dashboard_id=user_dashboard.id).first()
+        if not best_buy_platform:
+            best_buy_platform = Platform(dashboard_id=current_user.dashboard.id, name='bestbuy')
+            best_buy_platform.insert()
+
+        for order in orders:
+            order_id = None
+            try:
+                update_require = False
+                quantity_updated = False
+                update_log_require = False
+
+                order_id = order['order_id'] if 'order_id' in order else None
+                # order_lines
+                order_lines_obj = order['order_lines'][0] if 'order_lines' in order and isinstance(order['order_lines'], list) and len(order['order_lines']) > 0 else None
+                # imp
+                offer_id = order_lines_obj['offer_id'] if 'offer_id' in order_lines_obj else None
+                quantity = order_lines_obj['quantity'] if order_lines_obj and 'quantity' in order_lines_obj else None
+                order_quantity = int_or_none(quantity)
+
+                # to import an order you must first have listing and catalogue for it in same platform (catalogue_id not none so if listing there must be parent catalogue)
+                target_listing = Listing.query.filter_by(offer_id=offer_id, platform_id=best_buy_platform.id).first()
+                if target_listing:
+
+                    # check if quantity accept new order (Later can improved calcas for refunded, dates! but dates crtical as if no real action done by user to provide order will lead into invalid calcuation)
+                    catalogue_quantity = int_or_none(target_listing.catalogue.quantity)
+                    int_order_quantity = order_quantity if order_quantity is not None else 0
+                    int_catalogue_quantity = catalogue_quantity if catalogue_quantity is not None else 0
+
+                    if int_order_quantity <= int_catalogue_quantity:
+
+                        can_refund = order_lines_obj['can_refund'] if order_lines_obj and 'can_refund' in order_lines_obj else None
+                        category_code = order_lines_obj['category_code'] if order_lines_obj and 'category_code' in order_lines_obj else None
+                        product_title = order_lines_obj['product_title'] if order_lines_obj and 'product_title' in order_lines_obj else None
+                        shipping_price = order_lines_obj['shipping_price'] if order_lines_obj and 'shipping_price' in order_lines_obj else None
+                        product_sku = order_lines_obj['product_sku'] if order_lines_obj and 'product_sku' in order_lines_obj else None
+
+                        # customer data
+                        customer = order['customer'] if 'customer' in order and isinstance(order['customer'], dict) else None
+                        firstname = customer['firstname'] if customer and 'firstname' in customer else None
+                        lastname = customer['lastname'] if customer and 'lastname' in customer else None
+                        # billing_address and shipping address
+                        billing_address = customer['billing_address'] if customer and 'billing_address' in customer and isinstance(customer['billing_address'], dict) else None
+                        shipping_address = customer['shipping_address'] if customer and 'shipping_address' in customer and isinstance(customer['shipping_address'], dict) else None
+                        # try to get phone, street_1, street_2 from billing or shipping data
+                        phone = billing_address['phone'] if billing_address and 'phone' in billing_address else None
+                        if phone is None:
+                            phone = shipping_address['phone'] if shipping_address and 'phone' in shipping_address else None
+                        street_1 = billing_address['street_1'] if billing_address and 'street_1' in billing_address else None
+                        if street_1 is None:
+                            street_1 = shipping_address['street_1'] if shipping_address and 'street_1' in shipping_address else None
+                        street_2 = billing_address['street_2'] if billing_address and 'street_2' in billing_address else None
+                        if street_2 is None:
+                            street_2 = shipping_address['street_2'] if shipping_address and 'street_2' in shipping_address else None
+                        zip_code = billing_address['zip_code'] if billing_address and 'zip_code' in billing_address else None
+                        if zip_code is None:
+                            zip_code = shipping_address['zip_code'] if shipping_address and 'zip_code' in shipping_address else None
+                        city = billing_address['city'] if billing_address and 'city' in billing_address else None
+                        if city is None:
+                            city = shipping_address['city'] if shipping_address and 'city' in shipping_address else None
+                        country = billing_address['country'] if billing_address and 'country' in billing_address else None
+                        if country is None:
+                            country = shipping_address['country'] if shipping_address and 'country' in shipping_address else None
+
+                        # taxes list
+                        api_taxes = order_lines_obj['taxes'] if order_lines_obj and 'taxes' in order_lines_obj else []
+                        taxes = []
+                        for tax in api_taxes:
+                            # make sure any dict provided contains both amount and code
+                            if 'amount' in tax and 'code' in tax:
+                                taxes.append({'amount': tax['amount'], 'code': tax['code']})
     
+                        shping_taxes_api = order_lines_obj['shipping_taxes'] if order_lines_obj and 'shipping_taxes' in order_lines_obj else []
+                        shipping_taxes = []
+                        for stax in shping_taxes_api:
+                            if 'amount' in stax and 'code' in stax:
+                                shipping_taxes.append({'amount': stax['amount'], 'code': stax['code']})
+    
+                        
+                        commercial_id = order['commercial_id'] if 'commercial_id' in order else None
+                        created_date = mysql_strdate(order['created_date'] if 'created_date' in order else None)
+                        currency_iso_code = order['currency_iso_code'] if 'currency_iso_code' in order else None
+                        fully_refunded = order['fully_refunded'] if 'fully_refunded' in order else None
+                        price = order['price'] if 'price' in order else None
+                        total_commission = order['total_commission'] if 'total_commission' in order else None
+                        total_price = order['total_price'] if 'total_price' in order else None
+                        order_state = order['order_state'] if 'order_state' in order else None
+    
+                        new_order = db.session.query(Order).join(Listing, Order.listing_id==Listing.id).filter(
+                            Listing.dashboard_id == user_dashboard.id,
+                            Listing.platform_id == best_buy_platform.id,
+                            Order.order_id != None,
+                            Order.order_id == order_id,
+                        ).first()
+    
+                        if new_order:
+                            # update existing order data
+                            if new_order.quantity != order_quantity:
+                                new_order.quantity = order_quantity
+                                update_require = True
+                                quantity_updated = True
+
+                            if datestr_or_none(new_order.date) != created_date:
+                                new_order.date = created_date
+                                update_require = True
+
+                            if new_order.customer_firstname != firstname:
+                                new_order.customer_firstname = firstname
+                                update_require = True
+
+                            if new_order.customer_lastname != lastname:
+                                new_order.customer_lastname = lastname
+                                update_require = True
+
+                            if float_or_none(new_order.shipping) != shipping_price:
+                                new_order.shipping = shipping_price
+                                update_require = True
+
+                            if float_or_none(new_order.commission) != total_commission:
+                                new_order.commission = total_commission
+                                update_require = True                         
+
+                            if float_or_none(new_order.total_cost) != total_price:
+                                new_order.total_cost = total_price
+                                update_require = True
+
+                            if new_order.commercial_id != commercial_id:
+                                new_order.commercial_id = commercial_id
+                                update_require = True
+
+                            if new_order.currency_iso_code != currency_iso_code:
+                                new_order.currency_iso_code = currency_iso_code
+                                update_require = True
+
+                            if new_order.phone != phone:
+                                new_order.phone = phone
+                                update_require = True
+
+                            if new_order.street_1 != street_1:
+                                new_order.street_1 = street_1
+                                update_require = True
+
+                            if new_order.street_2 != street_2:
+                                new_order.street_2 = street_2
+                                update_require = True
+
+                            if new_order.zip_code != zip_code:
+                                new_order.zip_code = zip_code
+                                update_require = True
+
+                            if new_order.city != city:
+                                new_order.city = city
+                                update_require = True
+
+                            if new_order.country != country:
+                                new_order.country = country
+                                update_require = True
+
+                            if new_order.fully_refunded != fully_refunded:
+                                new_order.fully_refunded = fully_refunded
+                                update_require = True
+
+                            if new_order.can_refund != can_refund:
+                                new_order.can_refund = can_refund
+                                update_require = True
+
+                            if new_order.order_id != order_id:
+                                new_order.order_id = order_id
+                                update_require = True
+
+                            if new_order.category_code != category_code:
+                                new_order.category_code = category_code
+                                update_require = True
+
+                            if float_or_none(new_order.price) != price:
+                                new_order.price = price
+                                update_require = True
+
+                            if new_order.product_title != product_title:
+                                new_order.product_title = product_title
+                                update_require = True
+
+                            if new_order.product_sku != product_sku:
+                                new_order.product_sku = product_sku
+                                update_require = True
+
+                            if new_order.order_state != order_state:
+                                new_order.order_state = order_state
+                                update_require = True
+
+                            
+                            for order_tax in taxes:
+                                order_tax_exist = OrderTaxes.query.filter_by(order_id=new_order.id, type='order', code=order_tax['code']).first()
+                                if not order_tax_exist:
+                                    # insert order tax if not exist
+                                    new_order.taxes.append(OrderTaxes(type='order', amount=order_tax['amount'], code=order_tax['code']))
+                                    update_require = True
+                                else:
+                                    # update existing order tax if the amount changed
+                                    if float_or_none(order_tax_exist.amount) != order_tax['amount']:
+                                        order_tax_exist.amount = order_tax['amount']
+                                        update_log_require = True
+                                        order_tax_exist.update()
+
+                            for shipping_tax in shipping_taxes:
+                                shipping_tax_exist = OrderTaxes.query.filter_by(order_id=new_order.id, type='shipping', code=shipping_tax['code']).first()
+                                if not shipping_tax_exist:
+                                    # insert order tax if not exist
+                                    new_order.taxes.append(OrderTaxes(type='shipping', amount=shipping_tax['amount'], code=shipping_tax['code']))
+                                    update_require = True
+                                else:
+                                    # update existing order tax if the amount changed
+                                    if float_or_none(shipping_tax_exist.amount) != shipping_tax['amount']:
+                                        shipping_tax_exist.amount = shipping_tax['amount']
+                                        update_log_require = True
+                                        shipping_tax_exist.update()
+                        
+                            if update_require:
+                                new_order.update()
+                                result['total_updated'] += 1
+                            elif update_log_require:
+                                result['total_updated'] += 1
+                            else:
+                                result['not_changed'] += 1
+
+                        else:
+                            # create new order
+                            new_order = Order(
+                                listing_id=target_listing.id,
+                                quantity=order_quantity,
+                                date=created_date,
+                                customer_firstname=firstname,
+                                customer_lastname=lastname,
+                                tax=0.0,
+                                shipping=shipping_price,
+                                shipping_tax=0.0,
+                                commission=total_commission,
+                                total_cost=total_price,
+                                commercial_id=commercial_id,
+                                currency_iso_code=currency_iso_code,
+                                phone=phone,
+                                street_1=street_1,
+                                street_2=street_2,
+                                zip_code=zip_code,
+                                city=city,
+                                country=country,
+                                fully_refunded=fully_refunded,
+                                can_refund=can_refund,
+                                order_id=order_id,
+                                category_code=category_code,
+                                price=price,
+                                product_title=product_title,
+                                product_sku=product_sku,
+                                order_state=order_state
+                            )
+                            # insert order taxes
+                            for order_tax in taxes:
+                                new_order.taxes.append(OrderTaxes(type='order', amount=order_tax['amount'], code=order_tax['code']))
+
+                            for shipping_tax in shipping_taxes:
+                                new_order.taxes.append(OrderTaxes(type='shipping', amount=shipping_tax['amount'], code=shipping_tax['code']))
+
+                            new_order.insert()
+                            quantity_updated = True
+                            result['total_uploaded'] += 1
+
+                        # update catalogue quantity if quantity updated or new order inserted (better performance and reduce db calls incase of update)
+                        if quantity_updated:
+                            new_quantity = int(int_catalogue_quantity - int_order_quantity)
+                            new_quantity = new_quantity if new_quantity >= 0 else 0
+                            target_listing.catalogue.quantity = new_quantity
+                            target_listing.catalogue.update()
+                    else:
+                        # API can later accept list of order_ids so user can use the invalid order_ids after fix
+                        if order_id:
+                            result['invalid_quantity'].append(order_id)
+                        result['total_invalid'] += 1
+                else:
+                    if order_id:
+                        result['missing_listing'].append(order_id)
+                    result['total_missing'] += 1
+
+            except Exception as e:
+                print("error while import one of orders {}".format(sys.exc_info()))
+                if order_id:
+                    result['errors'].append(order_id)
+                result['total_errors'] += 1
+
+        return result
+
+    except Exception as e:
+        raise e
+
+def calc_orders_result(results):
+    result = {'missing_listing': [], 'invalid_quantity': [], 'errors': [], 'total_errors': 0, 'total_uploaded': 0, 'total_updated': 0, 'total_missing': 0, 'total_invalid': 0, 'not_changed': 0}
+    for res in results:
+        result['missing_listing'] = [*result['missing_listing'], *res['missing_listing']]
+        result['invalid_quantity'] = [*result['invalid_quantity'], *res['invalid_quantity']]
+        result['errors'] = [*result['errors'], *res['errors']]
+
+        result['total_errors'] += res['total_errors']
+        result['total_uploaded'] += res['total_uploaded']
+        result['total_updated'] += res['total_updated']
+        result['total_missing'] += res['total_missing']
+        result['total_invalid'] += res['total_invalid']
+        result['not_changed'] += res['not_changed']
+    return result
+
 def calc_chunks_result(results):
     try:
         final_result = {'total': 0, 'uploaded': 0, 'updated': 0, 'not_changed': 0, 'luploaded': 0, 'lupdated': 0, 'lnot_changed': 0, 'new_categories': 0}
@@ -1123,13 +1488,28 @@ def bestbuy_ready():
         return len(UserMeta.query.filter(
             and_(UserMeta.user_id==current_user.id),
             or_(
+                and_(UserMeta.key=='bestbuy_remaining_requests'),
+                and_(UserMeta.key=='bestbuy_request_max')
+                )
+        ).all()) >= 2
+    except Exception as e:
+        raise e
+
+"""
+# this only allow fixed max requests for all users and not allow diffrent users to have diffrent max
+def bestbuy_ready():
+    try:
+        # track both new setup first time , or updated global config value
+        return len(UserMeta.query.filter(
+            and_(UserMeta.user_id==current_user.id),
+            or_(
                 and_(UserMeta.key=='bestbuy_remaining_requests', UserMeta.value==current_app.config.get('BESTBUY_RAMAINING')),
                 and_(UserMeta.key=='bestbuy_request_max', UserMeta.value==current_app.config.get('BESTBUY_MAX'))
                 )
         ).all()) >= 2
     except Exception as e:
         raise e
-
+"""
 def get_remaining_requests()->int:
     remaining_requests = 0
     try:
@@ -1146,8 +1526,11 @@ def get_remaining_requests()->int:
     
         user_remaining_requests = UserMeta.query.filter_by(key='bestbuy_remaining_requests', user_id=current_user.id).first()
         if user_remaining_requests:
-            db_remaning_requests = int(user_remaining_requests.value) if int(user_remaining_requests.value) == int(current_app.config.get('BESTBUY_RAMAINING')) else int(current_app.config.get('BESTBUY_RAMAINING'))             
+            # db_remaning_requests = int(user_remaining_requests.value) if int(user_remaining_requests.value) == int(current_app.config.get('BESTBUY_RAMAINING')) else int(current_app.config.get('BESTBUY_RAMAINING'))             
+            db_remaning_requests = int(user_remaining_requests.value)
             remaining_requests = db_remaning_requests - now_requests
+        else:
+            raise ValueError('bestbuy_remaining_requests not exist while bestbuy_ready true')
 
         # remove old requests meta for yestaerday and before to small db
         before_today_requests = UserMeta.query.filter(
@@ -1192,3 +1575,231 @@ def get_requests_before_1minute():
     except:
         print('error in get_requests_before_1minute: {}'.format(sys.exc_info()))
         return (requests_before_1minute, '60')
+
+# # advanced codeless Function, this function do repeated action which is get db objects from same length lists (so it easy to insert into db without alot of validations and with single loop)
+def get_ordered_dicts(keys=[], *lists):
+    try:
+        list_of_dicts = []
+        if not lists:
+            return list_of_dicts
+        # notice incase of providing invalid keys not equal to lists
+        if len(lists) != len(keys):
+            raise ValueError("Keys and lists length not equal")
+
+        # as previous check , checks for the length of the keys vs length of data lists , this check is deep 1 level it check for each list values and make sure all data lists have same length
+        if len(set(list(map(lambda l : len(l), lists)))) > 1:
+            raise ValueError("Data lists length not equal")
+        
+        zip_lists = list(zip(*lists))
+        for l in zip_lists:
+            list_of_dicts.append(dict(zip(keys, l)))
+
+        return list_of_dicts
+    except Exception as e:
+        print("unknown error in get_ordered_dicts, {}".format(sys.exc_info()))
+        raise e
+
+# import orders
+def order_ids_chunks(lst, n):
+    result = []
+    try:
+        for i in range(0, len(lst), n):
+            result.append(",".join(lst[i:i+n]))
+        return result
+    except Exception as e:
+        raise e
+
+def import_orders(db, apikey='', order_ids=[], bestbuy_request_max=0, user_remaining_requests=0, tomorrow_str=''):
+    results = []
+    chunks_errors = []
+    successful = 0
+    error = ''
+
+    if user_remaining_requests > 0:
+        bestbuy_request_max = int(bestbuy_request_max)
+        request_max = bestbuy_request_max if bestbuy_request_max <= 100 and bestbuy_request_max >= 0 else 100
+        headers = {'Authorization': apikey}
+        
+        order_ids_params = order_ids_chunks(order_ids, 100)
+    
+        for order_ids_group in order_ids_params:
+
+            req_url = f'https://marketplace.bestbuy.ca/api/orders?max={request_max}&order_ids={order_ids_group}'
+            r = requests.get(req_url, headers=headers)
+            new_request_meta = UserMeta(key='bestbuy_request', user_id=current_user.id, value=r.status_code)
+            new_request_meta.insert()
+    
+            if r.status_code == 200:
+    
+                response_content = json.loads(r.content) if r and r.content else None
+                # get total count of requests
+                total_count = None
+                remaing_data = 0
+                try:
+                    remaing_data = int(int(response_content['total_count']) - request_max) if int(response_content['total_count']) >= request_max else 0
+                    total_count = math.ceil(remaing_data/request_max)
+                except:
+                    print("API not sending total_count, or sending invalid int")
+                    pass
+    
+                # if total_count of required requests to imported less or equal to user_remaining_requests allow else make him send only requests with count of his reamning not block all
+                total_requests = total_count if total_count is not None and user_remaining_requests >= total_count else user_remaining_requests
+                current_upload_result0 = upload_orders(json.loads(r.content)['orders'], current_user, db)
+                results.append(current_upload_result0)
+                user_remaining_requests = get_remaining_requests()
+                if user_remaining_requests > 0:
+                    # start loop to add cooldown sleep between requests and get all data
+                    for i in range(0,total_requests):
+                        current_max = (i+2) * request_max
+                        # wait 5 seconds between each request
+                        time.sleep(5)
+                        try:
+                            # chunks remaning
+                            next_url = r.links.get('next').get('url') if r.links and r.links.get('next', None) and r.links.get('next').get('url', None) else None
+                            # even if the calcuation goes wrong for any reson this if acts like while next_url and will ignore looping and not send additional requests not needed
+                            if next_url:
+                                r = requests.get(next_url, headers=headers)
+                                new_request_meta = UserMeta(key='bestbuy_request', user_id=current_user.id, value=r.status_code)
+                                new_request_meta.insert()
+        
+                                if r.status_code == 200:
+                                    if remaing_data > 0:
+                                        remaing_data = remaing_data - request_max if (remaing_data - request_max) > 0 else 0
+                                    current_upload_result = upload_orders(json.loads(r.content)['orders'], current_user, db)
+                                    results.append(current_upload_result)
+                                    successful += 1
+    
+                        except Exception as e:
+                            print("Error in one of chunks at import_orders func: {}".format(sys.exc_info()))
+                            chunks_errors.append("Some Of data Could not be imported, Error occured in request number {}: start from {} to {}".format((i+2), current_max, (current_max-request_max)))
+    
+                else:
+                    chunks_errors.append("Could not import the Remaining {} data at the moment, you exceded the limit of requests, not all data imported".format(remaing_data))
+                    break
+            elif r.status_code == 401:
+                error = 'Invalid API key, the API refused to authorize your request.'
+                break
+            else:
+                error = 'The API cannot process your request now, please try again later, if the problem is not resolved, please report to us.'
+                break
+    else:
+        error = f'You Can not make more requests right now, please wait for {tomorrow_str} and try again'
+
+    return {'results': results, 'chunks_errors': chunks_errors, 'error': error}
+
+# js component handle sqlalchemy update order taxes (remove, insert, update) -> result in edit table action of db for child sqlalchemy table rows
+def get_orders_and_shippings(form):
+    try:
+        order_tax_codes = list(form.order_tax_codes.data.split('-_-'))
+        order_tax_amounts = list(form.order_tax_amounts.data.split('-_-'))
+        shiping_tax_codes = list(form.shiping_tax_codes.data.split('-_-'))
+        shiping_tax_amounts = list(form.shiping_tax_amounts.data.split('-_-'))
+    
+        order_tax_ids = form.order_tax_ids.data.split(',') if form.order_tax_ids.data else []
+        shiping_tax_ids = form.shiping_tax_ids.data.split(',') if form.shiping_tax_ids.data else []
+    
+        order_taxes = []
+        shipping_taxes = []
+        if order_tax_codes and order_tax_amounts and order_tax_ids:
+            type_arr = ['order' for i in range(len(order_tax_ids))]
+            order_taxes = get_ordered_dicts(['code', 'amount', 'id', 'type'], order_tax_codes, order_tax_amounts, order_tax_ids, type_arr)
+        
+
+        if shiping_tax_codes and shiping_tax_amounts and shiping_tax_ids:
+            type_arr = ['shipping' for i in range(len(shiping_tax_ids))]
+            shipping_taxes = get_ordered_dicts(['code', 'amount', 'id', 'type'], shiping_tax_codes, shiping_tax_amounts, shiping_tax_ids, type_arr)
+        
+        return {'order_taxes': order_taxes, 'shipping_taxes':shipping_taxes}
+    
+    except Exception as e:
+        raise e
+
+def update_order_taxes(form, target_order):
+    try:
+        data =get_orders_and_shippings(form)
+        order_taxes = data['order_taxes']
+        shipping_taxes = data['shipping_taxes']
+        # this short code return edited and new objects and used to get removed current rows ids
+        order_taxes_allrows = [
+            {'current': OrderTaxes.query.filter_by(id=taxobj['id'], order_id=target_order.id).one_or_none(), 'new': {'code': taxobj['code'], 'amount': taxobj['amount']}} if OrderTaxes.query.filter(OrderTaxes.id==taxobj['id'], OrderTaxes.order_id==target_order.id).one_or_none() else 
+            OrderTaxes(order_id=target_order.id, code=taxobj['code'], amount=float_or_zero(taxobj['amount']), type=taxobj['type'])
+            for taxobj in [*order_taxes, *shipping_taxes]
+        ]
+
+        # sperate results, get ids that exist after updates (updated rows ids list), new objects to inserts and list for updated rows (current sqlalchemy class and new dict of data)
+        submited_ids = []
+        new_objects = []
+        update_objects = []
+        for submited_order_tax in order_taxes_allrows:
+            #return str(submited_order_tax)
+            if submited_order_tax and isinstance(submited_order_tax, dict) and 'current' in submited_order_tax and hasattr(submited_order_tax['current'], 'id') and submited_order_tax['current'].id and hasattr(submited_order_tax['current'], 'update'):
+                # updated rows
+                update_objects.append(submited_order_tax)
+                submited_ids.append(submited_order_tax['current'].id)
+            elif submited_order_tax and hasattr(submited_order_tax, 'insert') and hasattr(submited_order_tax, 'code') and submited_order_tax.code:
+                # new rows
+                new_objects.append(submited_order_tax)
+            else:
+                continue
+
+        # get removed rows, current order rows that have id not in the updated rows ids submited by user
+        removed = []
+        removed_rows = OrderTaxes.query.filter(OrderTaxes.order_id==target_order.id, OrderTaxes.id.notin_(submited_ids)).all()
+        for removed_ordertax in removed_rows:
+            removed.append(removed_ordertax.code)
+            removed_ordertax.delete()
+        
+        
+
+        # update orders that user updated
+        updates = []
+        updates_new = []
+        for order_to_update in update_objects:
+            
+            sqlalchemy_ob = order_to_update['current']
+            data_dict = order_to_update['new']
+            updated = False
+            if sqlalchemy_ob.code != data_dict['code'] and data_dict['code'].strip() != '':
+                updates.append(sqlalchemy_ob.code)
+                sqlalchemy_ob.code = data_dict['code']
+                updates_new.append(sqlalchemy_ob.code)
+                updated = True
+            if float_or_none(sqlalchemy_ob.amount) != float_or_none(data_dict['amount']):
+                # to calc if change happed of all func or not and info about changes       
+                updates.append(sqlalchemy_ob.amount) 
+                sqlalchemy_ob.amount = float_or_zero(data_dict['amount'])
+                updates_new.append(sqlalchemy_ob.amount)
+                # to run commit or no
+                updated = True
+                
+            if updated == True:
+                sqlalchemy_ob.update()
+
+        # insert the new rows only if code not empty
+        inserted = []
+        for new_order_tax in new_objects:
+            if new_order_tax and hasattr(new_order_tax, 'insert') and hasattr(new_order_tax, 'code') and new_order_tax.code.strip() != '' and hasattr(new_order_tax, 'order_id') and new_order_tax.order_id == target_order.id:
+                # insert not empty code taxes
+                inserted.append(new_order_tax.code)
+                new_order_tax.insert()
+
+        changed = len(removed) > 0 or len(updates) > 0 or len(inserted) > 0
+        return {'removed': removed, 'updated': {'old': updates, 'new': updates_new}, 'inserted': inserted , 'changed': changed}
+    except Exception as e:
+        raise e
+    
+def get_separate_order_taxes(target_order):
+    order_taxes = []
+    shipping_taxes = []
+    try:
+        for target_order_tax in target_order.taxes:
+            if target_order_tax.type == 'order':
+                order_taxes.append(target_order_tax)
+            elif target_order_tax.type == 'shipping':
+                shipping_taxes.append(target_order_tax)
+            else:
+                continue
+    except:
+        print("error in get_separate_order_taxes: {}".format(sys.exc_info()))
+
+    return {'order_taxes': order_taxes, 'shipping_taxes': shipping_taxes}

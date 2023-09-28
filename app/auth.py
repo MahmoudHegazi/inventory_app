@@ -142,4 +142,8 @@ def logout():
     # Tell Flask-Principal the user is anonymous
     identity_changed.send(current_app._get_current_object(),
                           identity=AnonymousIdentity())
+    
+    # clear old session messages
+    session.pop('import_orders_report', None)
+
     return redirect(url_for('auth.login'))

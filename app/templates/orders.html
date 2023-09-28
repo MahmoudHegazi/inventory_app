@@ -29,7 +29,12 @@
     </div>
     <!-- settings end -->    
     <div class="d-flex justify-content-end align-items-center">
-      <!-- Button to Open the Modal for add new dashboard -->      
+      <!-- action buttons -->
+      {% if bestbuy_installed %}
+      <button type="button" data-toggle="modal" data-target="#importOrdersModal" class="btn btn-info btn-sm mr-1">Import from API</button>
+      {% else %}
+      <button type="button" data-toggle="modal" data-target="#SetupBestbuyFormModal" class="btn btn-info btn-sm mr-1">Import from API</button>
+      {% endif %}
     </div>
     {% if orders is defined %}
     <!-- search component -->
@@ -217,7 +222,7 @@
 </div>
 
 {% import 'forms.html' as forms %}
-{{ forms.orders_forms(remove_order=order_remove, action_redirect=action_redirect) }}
+{{ forms.orders_forms(remove_order=order_remove, action_redirect=action_redirect, setup_bestbuy=setup_bestbuy, import_orders=import_orders) }}
 {% endblock %}
 
 

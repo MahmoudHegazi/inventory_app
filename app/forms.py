@@ -55,7 +55,7 @@ class LoginForm(FlaskForm):
 # Listings Forms
 class listingForm(FlaskForm):
     catalogue_id = SelectField('Catalogue',choices=[], validators=[InputRequired()], coerce=int, validate_choice=True)
-    platforms = SelectMultipleField('Platforms', choices=[], coerce=int, validate_choice=True)
+    platform_id = SelectField('Platform',choices=[], validators=[InputRequired()], coerce=int, validate_choice=True)
     active = BooleanField('Active', validators=[optional()])
     discount_end_date = DateTimeLocalField('Discount End Date', validators=[optional()], format="%Y-%m-%dT%H:%M")
     discount_start_date = DateTimeLocalField('Discount Start Date', validators=[optional()], format="%Y-%m-%dT%H:%M")
@@ -133,14 +133,30 @@ class removeCataloguesForm(FlaskForm):
 class removeAllCataloguesForm(FlaskForm):
     delete_all = SubmitField('Delete All Catalgoues')
 
+# important note boolean input will not sent to server if it not checked 
 class AddMultipleListingForm(FlaskForm):
     # select platform choice here do 2 things one for ux second as fieldList.data return None instead of empty list if not selected value in select, by adding 0 force it add list with 0, !!! if not added it will broke the two lists order and access with indexs of two lists 
+    """
     platforms_selects = FieldList(SelectMultipleField(u'Select Platform', coerce=int,
                                     validate_choice=True,
                                     validators=[optional()],
                                     choices=[(0, 'Select Platform')],
                                     render_kw={'style': 'display:none;', 'title': 'Select Platforms'}))
+    """
+    platforms_selects = FieldList(SelectField('Platform', choices=[(1,'hi')], validators=[optional()], coerce=int, validate_choice=True))
     catalogue_ids = FieldList(IntegerField(validators=[optional(), NumberRange(min=1)], render_kw={'style': 'display:none;'}))
+
+    active = FieldList(SelectField('Active', validators=[optional()], choices=[(0, 'False'), (1, 'True')], default=0, coerce=int, validate_choice=True))
+    discount_end_date = FieldList(DateTimeLocalField('Discount End Date', validators=[optional()], format="%Y-%m-%dT%H:%M"))
+    discount_start_date = FieldList(DateTimeLocalField('Discount Start Date', validators=[optional()], format="%Y-%m-%dT%H:%M"))
+    unit_discount_price = FieldList(DecimalField('Unit Discount Price', validators=[optional()], default=0.00))
+    unit_origin_price = FieldList(DecimalField('Unit Origin Price', validators=[optional()], default=0.00))
+    quantity_threshold = FieldList(IntegerField('Quantity Threshold', validators=[optional()], default=0))
+    currency_iso_code = FieldList(StringField('Currency ISO code', validators=[optional(), Length(max=45)]))
+    shop_sku = FieldList(StringField('Shop SKU', validators=[optional(), Length(max=45)]))
+    offer_id = FieldList(IntegerField('Offer ID', validators=[optional()]))
+    reference = FieldList(StringField('Reference', validators=[optional(), Length(max=255)]))
+    reference_type = FieldList(StringField('Reference Type', validators=[optional(), Length(max=255)]))
     add = SubmitField('Add')
 
 # signup = SubmitField('Signup', default='checked')
@@ -237,12 +253,32 @@ class OrderForm(FlaskForm):
         default=0.00
     )
 
+    phone = StringField('Phone', validators=[Length(max=45)])
+    commercial_id = StringField('Commercial id', validators=[Length(max=255)])
+    currency_iso_code = StringField('Currency iso code', validators=[Length(max=45)])
+    street_1 = StringField('Street 1', validators=[Length(max=255)])
+    street_2 = StringField('Street 2', validators=[Length(max=255)])
+    zip_code = StringField('Zip code', validators=[Length(max=45)])
+    city = StringField('City', validators=[Length(max=100)])
+    country = StringField('Country', validators=[Length(max=80)])
+    fully_refunded = BooleanField('Fully refunded')
+    can_refund = BooleanField('Can refund')
+    order_id = StringField('order id', validators=[Length(max=45)])
+    order_state = StringField('Order state', validators=[Length(max=50)])
+    order_tax_codes = HiddenField()
+    order_tax_amounts = HiddenField()
+    shiping_tax_codes = HiddenField()
+    shiping_tax_amounts = HiddenField()
+
+
 class addOrderForm(OrderForm):
     action_redirect = HiddenField()
     add = SubmitField('Add')
 
 class editOrderForm(OrderForm):
     action_redirect = HiddenField()
+    order_tax_ids = HiddenField()
+    shiping_tax_ids = HiddenField()
     edit = SubmitField('Edit')
 
 class removeOrderForm(FlaskForm):
@@ -250,6 +286,11 @@ class removeOrderForm(FlaskForm):
     order_id = HiddenField(validators=[InputRequired()])
     delete = SubmitField('Delete Order')
 
+class importOrdersAPIForm(FlaskForm):
+    api_key = StringField('SHOP KEY', validators=[InputRequired(), Length(max=500)], render_kw={'title': 'You can get that key from your marketplace, in the API section'})
+    date_from = DateTimeLocalField('Import From', validators=[optional()], format="%Y-%m-%dT%H:%M", render_kw={'title': 'Orders will be imported starting from this date'})
+    order_ids = TextAreaField('Order IDS', validators=[optional()], render_kw={'title': 'You can speacfiy speacfic order ids to be imported order ids must be separated by a comma, usually you can use this if you recive ignored order ids after importing all orders', 'placeholder': 'You can speacfiy speacfic order ids to be imported order ids must be separated by a comma, usually you can use this if you recive ignored order ids after importing all orders'})
+    import_data = SubmitField('Import Data')
 
 # Platforms Forms
 class addPlatformForm(FlaskForm):

@@ -16,6 +16,12 @@
         <div class="container">
             <form action="{{url_for('routes.add_catalogue')}}" method="POST">          
               {{form.hidden_tag()}}
+              <div id="top_form_btns">
+                <div id="form_btns" class="d-flex justify-content-end align-items-center w-50 ml-auto">
+                  {{form.add(class='btn btn-success w-w_100px')}}
+                  <a href="{{url_for('routes.catalogues')}}" class="btn btn-primary w_100px">Cancel</a>
+                </div>
+              </div>
               <div class="form-group">
                 {{form.sku.label}}
                 {{form.sku(class='form-control', placeholder='SKU')}}
@@ -175,10 +181,7 @@
                 </ul>
                 {% endif %}
               </div>                                        
-              <div class="d-flex justify-content-center align-items-center w-50 mx-auto">
-                {{form.add(class='btn btn-success w-50')}}
-                <a href="{{url_for('routes.catalogues')}}" class="btn btn-primary w-50">Cancel</a>
-              </div>
+              <div id="bot_form_btns" class="mt-3"></div>
             </form>
         </div>
       </div>
@@ -191,14 +194,16 @@
 {% if locations_bins_data %}
 <script src="{{url_for('static', filename='assets/js/many_to_many_selector.js')}}" type="text/javascript"></script>
 <script>
-    const locations = [];
-    const locationsBinsData = {{locations_bins_data|tojson|safe}};
-    manyToManySelectorsComponent(
-      locations_bins_data=locationsBinsData, 
-      actionsCbs=[
-        (onWareHouseChange)=>{onWareHouseChange(event=null, handleBySelectedWareHouse=true);},
-        (onWareHouseChange)=>{$("#warehouse_locations").on("change", onWareHouseChange);}
-      ]);
+const locations = [];
+const locationsBinsData = {{locations_bins_data|tojson|safe}};
+manyToManySelectorsComponent(
+  locations_bins_data=locationsBinsData, 
+  actionsCbs=[
+    (onWareHouseChange)=>{onWareHouseChange(event=null, handleBySelectedWareHouse=true);},
+    (onWareHouseChange)=>{$("#warehouse_locations").on("change", onWareHouseChange);}
+  ]);
+// toggle add, cancel buttons in top and bottom based on user poistion for better ux (if he will go scoll down and think he will find button at bottom it will found, if he scroll up or excpect to found the buttons on top he will found it at top)
+toggleContentUpDown(contentSelector='#form_btns', upSelector='#top_form_btns', downSelector='#bot_form_btns');
 </script>
 {% endif %}
 {% endblock %}

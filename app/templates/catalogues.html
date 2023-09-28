@@ -349,7 +349,7 @@ function rowBuildCB(catalogue){
 
 searchComponent('fast', 'swing', cp=function(){return true;}, addon='', condition='*=', rowBuildCB=rowBuildCB, table='catalogue');
 
-
+                  
 /* multiple Listings Callbacks */
 function multipleListingOpenCB(selectedValues, selectedLabels){
   console.log("cb called", selectedValues, selectedLabels);
@@ -360,18 +360,65 @@ function multipleListingOpenCB(selectedValues, selectedLabels){
       const currentCatalogueId = selectedValues[i];
       const currentCatalogueName = selectedLabels[i];
       const currentNewListingCont = newListingContainers.eq(i);
-      const currentSelectPlatform = currentNewListingCont.find('select.multiple_platform_selects');
+      const currentCatalogueLabel = currentNewListingCont.find('h6.catalogue_label');
+
       const currentCatalogueIdInput = currentNewListingCont.find('input.multiple_platform_ids');
-      const currentCatalogueLabel = currentNewListingCont.find('label.listing_label');
+      const currentPlatformId = currentNewListingCont.find('select.multiple_platforms_selects');
+
+      const currentActive = currentNewListingCont.find('select.multiple_active');
+      const currentDiscountStart = currentNewListingCont.find('input.multiple_discount_end');
+      const currentDiscountEnd = currentNewListingCont.find('input.multiple_discount_start');
+      const currentUnitDiscount = currentNewListingCont.find('input.multiple_unit_discount');
+      const currentUnitOrigin = currentNewListingCont.find('input.multiple_unit_origin');
+      const currentQuantityThreshold = currentNewListingCont.find('input.multiple_quantity_threshold');
+      const currentCurrencyIso = currentNewListingCont.find('input.multiple_currency_iso');
+      const currentShopSKU = currentNewListingCont.find('input.multiple_shop_sku');
+      const currentOfferId = currentNewListingCont.find('input.multiple_offer_id');
+      const currentReference = currentNewListingCont.find('input.multiple_reference');
+      const currentReferenceType = currentNewListingCont.find('input.multiple_reference_type');     
       
-      if (currentSelectPlatform.length && currentCatalogueIdInput.length && currentCatalogueLabel.length){
+      if (
+        currentPlatformId.length && currentCatalogueIdInput.length && currentCatalogueLabel.length &&
+
+        currentActive.length && currentDiscountStart.length && currentDiscountEnd.length && currentUnitDiscount.length &&
+        currentUnitOrigin.length && currentQuantityThreshold.length && currentCurrencyIso.length && 
+        currentShopSKU.length && currentOfferId.length && currentReference.length && currentReferenceType.length
+        ){
         currentCatalogueIdInput.eq(0).val(currentCatalogueId);
         currentCatalogueLabel.eq(0).text(currentCatalogueName);
-        currentSelectPlatform.eq(0).show();
-        currentNewListingCont.show();
+        currentCatalogueLabel.eq(0).show();
+
+        // display inputs
+        currentPlatformId.eq(0).show();
+        currentActive.eq(0).show();
+        currentDiscountStart.eq(0).show();
+        currentDiscountEnd.eq(0).show();
+        currentUnitDiscount.eq(0).show();
+        currentUnitOrigin.eq(0).show();
+        currentQuantityThreshold.eq(0).show();
+        currentCurrencyIso.eq(0).show();
+        currentShopSKU.eq(0).show();
+        currentOfferId.eq(0).show();
+        currentReference.eq(0).show();
+        currentReferenceType.eq(0).show();
+
+        currentNewListingCont.eq(0).show();
         // add class to selected inputs to disable other not used input
         currentCatalogueIdInput.eq(0).addClass("used");
-        currentSelectPlatform.eq(0).addClass("used");
+        currentPlatformId.eq(0).addClass("used");
+
+        currentActive.eq(0).addClass("used");
+        currentDiscountStart.eq(0).addClass("used");
+        currentDiscountEnd.eq(0).addClass("used");
+        currentUnitDiscount.eq(0).addClass("used");
+        currentUnitOrigin.eq(0).addClass("used");
+        currentQuantityThreshold.eq(0).addClass("used");
+        currentCurrencyIso.eq(0).addClass("used");
+        currentShopSKU.eq(0).addClass("used");
+        currentOfferId.eq(0).addClass("used");
+        currentReference.eq(0).addClass("used");
+        currentReferenceType.eq(0).addClass("used");
+
         //multipleSelectV2();
 
       } else {
@@ -380,8 +427,19 @@ function multipleListingOpenCB(selectedValues, selectedLabels){
     }
 
     // disable all other inputs not used
-    $("select.multiple_platform_selects:not(.used)").attr("disabled", true);
     $("input.multiple_platform_ids:not(.used)").attr("disabled", true);
+    $("select.multiple_platforms_selects:not(.used)").attr("disabled", true);
+    $("select.multiple_active:not(.used)").attr("disabled", true);
+    $("input.multiple_discount_end:not(.used)").attr("disabled", true);
+    $("input.multiple_discount_start:not(.used)").attr("disabled", true);
+    $("input.multiple_unit_discount:not(.used)").attr("disabled", true);
+    $("input.multiple_unit_origin:not(.used)").attr("disabled", true);
+    $("input.multiple_quantity_threshold:not(.used)").attr("disabled", true);
+    $("input.multiple_currency_iso:not(.used)").attr("disabled", true);
+    $("input.multiple_shop_sku:not(.used)").attr("disabled", true);
+    $("input.multiple_offer_id:not(.used)").attr("disabled", true);
+    $("input.multiple_reference:not(.used)").attr("disabled", true);
+    $("input.multiple_reference_type:not(.used)").attr("disabled", true);
 
   } else {
     console.log("Invalid data multipleListingOpenCB not processed", newListingContainers.length);
@@ -389,42 +447,83 @@ function multipleListingOpenCB(selectedValues, selectedLabels){
 }
 
 function multipleListingCloseCB(){
-  $("select.multiple_platform_selects").val("");
-  $("select.multiple_platform_selects").hide();
+
+  // unset values and hide all inputs once model closed to start clean when open the model again
   $("input.multiple_platform_ids").val("");
   $("input.multiple_platform_ids").hide();
-  $("label.listing_label").text("");
+
+  $("select.multiple_platforms_selects").prop("checked", false);
+  $("select.multiple_platforms_selects").hide();
+
+  $("select.multiple_active").val("");
+  $("select.multiple_active").hide();
+
+  $("input.multiple_discount_end").val("");
+  $("input.multiple_discount_end").hide();
+
+  $("input.multiple_discount_start").val("");
+  $("input.multiple_discount_start").hide();
+  
+  $("input.multiple_unit_discount").val("");
+  $("input.multiple_unit_discount").hide();
+
+  $("input.multiple_unit_origin").val("");
+  $("input.multiple_unit_origin").hide();
+
+  $("input.multiple_quantity_threshold").val("");
+  $("input.multiple_quantity_threshold").hide();
+
+  $("input.multiple_currency_iso").val("");
+  $("input.multiple_currency_iso").hide();
+
+  $("input.multiple_shop_sku").val("");
+  $("input.multiple_shop_sku").hide();
+
+  $("input.multiple_offer_id").val("");
+  $("input.multiple_offer_id").hide();
+
+  $("input.multiple_reference").val("");
+  $("input.multiple_reference").hide();
+
+  $("input.multiple_reference_type").val("");
+  $("input.multiple_reference_type").hide();
+
+  
+  $("h6.catalogue_label").text("");
+  $("h6.catalogue_label").hide();
   $(".new_listing_containers").hide();
 
   // remove used class
-  $("select.multiple_platform_selects.used").removeClass("used");
   $("input.multiple_platform_ids.used").removeClass("used");
+  $("select.multiple_platforms_selects.used").removeClass("used");
+  $("select.multiple_active.used").removeClass("used");
+  $("input.multiple_discount_end.used").removeClass("used");
+  $("input.multiple_discount_start.used").removeClass("used");
+  $("input.multiple_unit_discount.used").removeClass("used");
+  $("input.multiple_unit_origin.used").removeClass("used");
+  $("input.multiple_quantity_threshold.used").removeClass("used");
+  $("input.multiple_currency_iso.used").removeClass("used");
+  $("input.multiple_shop_sku.used").removeClass("used");
+  $("input.multiple_offer_id.used").removeClass("used");
+  $("input.multiple_reference.used").removeClass("used");
+  $("input.multiple_reference_type.used").removeClass("used");
+
   // remove disabled from inputs
-  $("select.multiple_platform_selects").removeAttr("disabled");
-  $("input.multiple_platform_ids").removeAttr("disabled");
+  $("input.multiple_platform_ids:disabled").removeAttr("disabled");
+  $("select.multiple_platforms_selects:disabled").removeAttr("disabled");
+
+  $("select.multiple_active:disabled").removeClass("used");
+  $("input.multiple_discount_end:disabled").removeClass("used");
+  $("input.multiple_discount_start:disabled").removeClass("used");
+  $("input.multiple_unit_discount:disabled").removeClass("used");
+  $("input.multiple_unit_origin:disabled").removeClass("used");
+  $("input.multiple_quantity_threshold:disabled").removeClass("used");
+  $("input.multiple_currency_iso:disabled").removeClass("used");
+  $("input.multiple_shop_sku:disabled").removeClass("used");
+  $("input.multiple_offer_id:disabled").removeClass("used");
+  $("input.multiple_reference:disabled").removeClass("used");
+  $("input.multiple_reference_type:disabled").removeClass("used");
 }
-
-/* default on modal, here, wtforms fildList will remove entry(select Element) if user in html not selected value (user can unselect default value so before submit back it if no value selected) */
-if ($("#add_multiple_listing").length){
-  $("#add_multiple_listing").on("submit", (event)=>{
-    $("select.multiple_platform_selects.used").each( (_i, userSelectPlatform)=>{
-      if ($(userSelectPlatform).val().length === 0){
-        $(userSelectPlatform).val([0]);
-      } else {
-        // if user selected empty option with other options deslect it (note server will handle 0 value, but this send only needed data)
-        const selectedValues = $(userSelectPlatform).val();
-        if (selectedValues.length > 1 && selectedValues.includes("0")){
-          const zeroOption = $(userSelectPlatform).find("option[value='0']");
-          if (zeroOption.length > 0){
-            zeroOption.eq(0).prop("selected", false);
-          }
-        }
-      }
-    });
-  });
-}
-
-
 
 </script>
 {% endblock page_scripts %}

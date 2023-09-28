@@ -114,6 +114,61 @@ color_lightpink {
     font-family: monospace;
 }
 
+.mini_green_header {
+    text-shadow: 2px 2px 4px #000000;
+    color: white;
+    background: #a3f386;
+    width: fit-content;
+    padding: 7px 16px;
+    border-radius: 4px;
+    font-weight: bold;
+}
+.mini_header_blue {
+    text-shadow: 2px 2px 4px #000000 !important;color: #c2ffe8 !important;
+}
+.header_lightblue {
+    background: #86f3d9 !important;
+}
+
+.max-height-650 {
+    max-height:650px !important;
+    overflow: auto !important;
+}
+
+.border_darkgrey {
+    border: 1px solid darkgrey !important;
+}
+.hover_secondary:hover {
+    background: #6c757d!important;
+    color: #fff !important;
+    cursor: pointer !important;
+
+}
+.font_bold {
+    font-weight: bold !important;
+}
+
+.text_shadow_default1 {
+    text-shadow: 2px 2px 4px #000000 !important;
+}
+
+.text_shadow_default {
+    text-shadow: 2px 2px 4px #5f9ea0e0;
+}
+.text_lightblue_header {
+    text-shadow: 2px 2px 4px #000000 !important;color: #c2ffe8 !important;
+}
+
+#flashes_container {
+    max-height: 300px !important;
+    overflow: auto !important;
+}
+
+/* order page */
+.shipping_group_container {
+    overflow-y:auto !important;
+    max-height:500px !important;
+}
 /* scroll bar */
 /* width */
 ::-webkit-scrollbar {

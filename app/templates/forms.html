@@ -27,7 +27,7 @@
                 {{addform.add(class='btn btn-success btn-block')}}
             </form>
             {% else %}
-            <div class="alert-danger">Unable to Display Add Supplier form right now.</div>
+            <div class="alert alert-danger">Unable to Display Add Supplier form right now.</div>
             {% endif %}
         </div>
         <!-- Modal footer -->
@@ -68,7 +68,7 @@
                 {{editform.edit(class='btn btn-success')}}
             </form>
             {% else %}
-            <div class="alert-danger">Unable to Display Edit Supplier form right now.</div>
+            <div class="alert alert-danger">Unable to Display Edit Supplier form right now.</div>
             {% endif %}
         </div>
         <!-- Modal footer -->
@@ -99,7 +99,7 @@
                 {{deleteform.delete(class='btn btn-danger')}}
             </form>
             {% else %}
-            <div class="alert-danger">Unable to Display Delete Supplier form right now.</div>
+            <div class="alert alert-danger">Unable to Display Delete Supplier form right now.</div>
             {% endif %}
         </div>
         
@@ -134,7 +134,7 @@
             {{delete_listings.delete_listings(class='btn btn-danger btn-sm mt-3 btn-block')}}
         </form>
         {% else %}
-        <div class="alert-danger">Unable to Display Remove Listings form right now.</div>
+        <div class="alert alert-danger">Unable to Display Remove Listings form right now.</div>
         {% endif %}
       </div>
       
@@ -167,7 +167,7 @@
           {{import_offers.import_data(class='btn btn-success')}}
         </form>
         {% else %}
-        <div class="alert-danger">Unable to Display Import Offers form right now.</div>
+        <div class="alert alert-danger">Unable to Display Import Offers form right now.</div>
         {% endif %}
       </div>
       <!-- Modal footer -->
@@ -201,7 +201,7 @@
           {{setup_bestbuy.redirect(value='listings', style='display:none;')}}
         </form>
         {% else %}
-        <div class="alert-danger">Unable to Display Setup BestBuy form right now.</div>
+        <div class="alert alert-danger">Unable to Display Setup BestBuy form right now.</div>
         {% endif %}
       </div>
       <!-- Modal footer -->
@@ -235,7 +235,7 @@
             {{catalogues_excel.submit(class='btn btn-success btn-sm mt-3 btn-block')}}
         </form>
         {% else %}
-        <div class="alert-danger">Unable to Display Upload Catalogues Excel Upload form right now.</div>
+        <div class="alert alert-danger">Unable to Display Upload Catalogues Excel Upload form right now.</div>
         {% endif %}
       </div>
       
@@ -267,7 +267,7 @@
             {{delete_catalogues.delete_catalogues(class='btn btn-danger btn-sm mt-3 btn-block')}}
         </form>
         {% else %}
-        <div class="alert-danger">Unable to Display Remove Catalogues form right now.</div>
+        <div class="alert alert-danger">Unable to Display Remove Catalogues form right now.</div>
         {% endif %}
       </div>
       
@@ -299,7 +299,7 @@
             {{delete_all_catalogues.delete_all(class='btn btn-danger btn-sm mt-3 btn-block')}}
         </form>
         {% else %}
-        <div class="alert-danger">Unable to Display Remove All Catalogues form right now.</div>
+        <div class="alert alert-danger">Unable to Display Remove All Catalogues form right now.</div>
         {% endif %}
       </div>
       
@@ -311,8 +311,6 @@
     </div>
   </div>
 </div>
-
-
 <div class="modal fade" id="addMultipleListingModal">
   <div class="modal-dialog modal-xl">
     <div class="modal-content">
@@ -321,33 +319,84 @@
       <div class="modal-header">
         <h4 class="modal-title">Add Multiple Listings</h4>
         <button type="button" class="close" data-dismiss="modal">&times;</button>
-      </div>      
+      </div>
+      
       <!-- Modal body -->
-      <div class="modal-body">
+      <div class="modal-body max-height-650">
         {% if add_multiple_listings and add_multiple_listings.add and add_multiple_listings.platforms_selects is defined and add_multiple_listings.catalogue_ids is defined %}        
         <p><span>You Have selected</span><strong><span class="badge badge-primary mx-1" id="selected_catalogues_total">0</span></strong><span>Catalogues</span></p>
         <form id="add_multiple_listing" action="{{url_for('routes.multiple_listing_add')}}" method="post">
-            {{add_multiple_listings.hidden_tag()}}
-            <h5 class="text-center mt-2">Please select platforms for each listing</h5>
-            {% for platform_select in add_multiple_listings.platforms_selects %}
-            <div class="new_listing_containers mb-1 shadow-sm" id="container_{{loop.index}}" style="display:none;">
-              {% if add_multiple_listings.catalogue_ids|length > loop.index0 %}
-                <div class="row p-2">
-                  <label class="listing_label col-sm-7"></label>
-                  {{add_multiple_listings.platforms_selects[loop.index0](class='form-control multiple_platform_selects col-sm-5', style='display:none;')}}
-                </div>   
-                {{add_multiple_listings.catalogue_ids[loop.index0](class='multiple_platform_ids', style='display:none;')}}
-              {% else %}
-                {# if else must not occured only occured if 2 lists not equal for any reason #}
-                <div class="alert alert-danger">Unable to display platforms data error please report this issue</div>
-              {% endif %}
-            </div>
-            {% endfor %}
+              {{add_multiple_listings.hidden_tag()}}
+              <h5 class="text-center mt-2 mb-4">Please select data for each listing</h5>
 
-            {{add_multiple_listings.add(class='btn btn-success btn-sm mt-3 btn-block')}}
+            {% if add_multiple_listings.platforms_selects|length == add_multiple_listings.catalogue_ids|length %}
+              <!-- display listings data -->
+              {% for platform_select in add_multiple_listings.catalogue_ids %}
+              <div class="new_listing_containers mb-1 shadow-sm" id="container_{{loop.index}}" style="display:none;">
+                  <h6 class="catalogue_label mini_green_header mb-2 mx-auto" style="display:none;"></h6>
+                  {{add_multiple_listings.catalogue_ids[loop.index0](class='multiple_platform_ids', style='display:none;')}}
+                  <div class="form-group">
+                    {{add_multiple_listings.platforms_selects.label}}
+                    {{add_multiple_listings.platforms_selects[loop.index0](class='multiple_platforms_selects form-control', style='display:none;')}}
+                  </div>
+                  <div class="form-group">
+                    <div class="d-flex justify-content-start align-items-center">
+                      {{add_multiple_listings.active.label(class="mr-1")}}
+                      {{add_multiple_listings.active[loop.index0](class='multiple_active form-control mxwidth-100', style='display:none;')}} 
+                    </div>
+                  </div>
+                  <div class="form-group">
+                    {{add_multiple_listings.discount_end_date.label}}
+                    {{add_multiple_listings.discount_end_date[loop.index0](class='multiple_discount_end form-control', style='display:none;')}}
+                  </div>
+                  <div class="form-group">
+                    {{add_multiple_listings.discount_start_date.label}}
+                    {{add_multiple_listings.discount_start_date[loop.index0](class='multiple_discount_start form-control', style='display:none;')}}
+                  </div>
+                  <div class="form-group">
+                    {{add_multiple_listings.unit_discount_price.label}}
+                    {{add_multiple_listings.unit_discount_price[loop.index0](class='multiple_unit_discount form-control', style='display:none;')}}
+                  </div>
+                  <div class="form-group">
+                    {{add_multiple_listings.unit_origin_price.label}}
+                    {{add_multiple_listings.unit_origin_price[loop.index0](class='multiple_unit_origin form-control', style='display:none;')}}
+                  </div>
+                  <div class="form-group">
+                    {{add_multiple_listings.quantity_threshold.label}}
+                    {{add_multiple_listings.quantity_threshold[loop.index0](class='multiple_quantity_threshold form-control', style='display:none;')}}
+                  </div>
+                  <div class="form-group">
+                    {{add_multiple_listings.currency_iso_code.label}}
+                    {{add_multiple_listings.currency_iso_code[loop.index0](class='multiple_currency_iso form-control', style='display:none;')}}
+                  </div>
+                  <div class="form-group">
+                    {{add_multiple_listings.shop_sku.label}}
+                    {{add_multiple_listings.shop_sku[loop.index0](class='multiple_shop_sku form-control', style='display:none;')}}
+                  </div>
+                  <div class="form-group">
+                    {{add_multiple_listings.offer_id.label}}
+                    {{add_multiple_listings.offer_id[loop.index0](class='multiple_offer_id form-control', style='display:none;')}}
+                  </div>
+                  <div class="form-group">
+                    {{add_multiple_listings.reference.label}}
+                    {{add_multiple_listings.reference[loop.index0](class='multiple_reference form-control', style='display:none;')}}
+                  </div>
+                  <div class="form-group">
+                    {{add_multiple_listings.reference_type.label}}
+                    {{add_multiple_listings.reference_type[loop.index0](class='multiple_reference_type form-control', style='display:none;')}}
+                  </div>
+                  <!-- add the remaning inputs -->
+                  <hr />
+              </div>
+              {% endfor %}
+              {{add_multiple_listings.add(class='btn btn-success btn-sm mt-3 btn-block')}}
+
+            {% else %}
+              <div class="alert alert-danger">Unable to Display Listings data inputs right now.</div>
+            {% endif %}
         </form>
         {% else %}
-        <div class="alert-danger">Unable to Display Add Multiple Listings form right now.</div>
+        <div class="alert alert-danger">Unable to Display Add Multiple Listings form right now.</div>
         {% endif %}
       </div>
       
@@ -384,7 +433,7 @@
           {{deleteform.delete(class='btn btn-danger')}}
          </form>
          {% else %}
-         <div class="alert-danger">Unable to Display Remove Catalogue form right now.</div>
+         <div class="alert alert-danger">Unable to Display Remove Catalogue form right now.</div>
          {% endif %}
       </div>
       <!-- Modal footer -->
@@ -418,7 +467,7 @@
           {{deleteform.delete(class='btn btn-danger')}}
          </form>
          {% else %}
-         <div class="alert-danger">Unable to Display Remove Listing form right now.</div>
+         <div class="alert alert-danger">Unable to Display Remove Listing form right now.</div>
          {% endif %}
       </div>
       <!-- Modal footer -->
@@ -449,7 +498,7 @@
           {{delete_purchase.delete(class='btn btn-danger')}}
          </form>
          {% else %}
-         <div class="alert-danger">Unable to Display Remove Purchase form right now.</div>
+         <div class="alert alert-danger">Unable to Display Remove Purchase form right now.</div>
          {% endif %}
       </div>
       <!-- Modal footer -->
@@ -479,7 +528,7 @@
           {{delete_order.delete(class='btn btn-danger')}}
          </form>
          {% else %}
-         <div class="alert-danger">Unable to Display Remove Order form right now.</div>
+         <div class="alert alert-danger">Unable to Display Remove Order form right now.</div>
          {% endif %}
       </div>
       <!-- Modal footer -->
@@ -513,7 +562,7 @@
           {{deleteform.delete(class='btn btn-danger')}}
          </form>
          {% else %}
-         <div class="alert-danger">Unable to Display Remove Order form right now.</div>
+         <div class="alert alert-danger">Unable to Display Remove Order form right now.</div>
          {% endif %}
       </div>
       <!-- Modal footer -->
@@ -545,7 +594,7 @@
           {{deleteform.delete(class='btn btn-danger')}}
          </form>
          {% else %}
-         <div class="alert-danger">Unable to Display Remove Purchase form right now.</div>
+         <div class="alert alert-danger">Unable to Display Remove Purchase form right now.</div>
          {% endif %}
       </div>
       <!-- Modal footer -->
@@ -578,7 +627,7 @@
           {{deleteform.delete(class='btn btn-danger')}}
          </form>
          {% else %}
-         <div class="alert-danger">Unable to Display Remove Supplier form right now.</div>
+         <div class="alert alert-danger">Unable to Display Remove Supplier form right now.</div>
          {% endif %}
       </div>
       <!-- Modal footer -->
@@ -609,7 +658,7 @@
           {{delete_purchase_form.delete(class='btn btn-danger')}}
          </form>
          {% else %}
-         <div class="alert-danger">Unable to Display Remove Purchase form right now.</div>
+         <div class="alert alert-danger">Unable to Display Remove Purchase form right now.</div>
          {% endif %}
       </div>
       <!-- Modal footer -->
@@ -623,7 +672,7 @@
 {% endmacro %}
 
 
-{% macro orders_forms(remove_order, action_redirect) %}
+{% macro orders_forms(remove_order, action_redirect, setup_bestbuy, import_orders) %}
 <div class="modal fade" id="removeOrderModal">
   <div class="modal-dialog">
     <div class="modal-content">
@@ -643,7 +692,81 @@
          {{remove_order.delete(class='btn btn-danger')}}
         </form>
         {% else %}
-        <div class="alert-danger">Unable to Display Remove order form right now.</div>
+        <div class="alert alert-danger">Unable to Display Remove order form right now.</div>
+        {% endif %}
+      </div>
+      <!-- Modal footer -->
+      <div class="modal-footer">
+        <button type="button" class="btn btn-danger" data-dismiss="modal">Close</button>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="modal fade" id="SetupBestbuyFormModal">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <!-- Modal Header -->
+      <div class="modal-header">
+        <h4 class="modal-title">Setup BestBuy API</h4>
+        <button type="button" class="close" data-dismiss="modal">&times;</button>
+      </div>
+      <!-- Modal body -->
+      <div class="modal-body">
+        {% if setup_bestbuy %}
+        <p><i class="fa fa-exclamation-triangle"></i> It's looks like you did not setup bestbuy API yet, or there are new update please click on Setup API Button.</p>
+        <form id="setup_bestbuy_form" method="post" action="{{url_for('main.setup_bestbuy')}}">
+          {{setup_bestbuy.hidden_tag()}}
+          <div class="container" style="background:lavender;">
+            <img src="{{url_for('static', filename='assets/images/opps.png')}}" style="width:100%;max-height:300px;object-fit: contain;" />
+          </div>
+          <div>
+            {{setup_bestbuy.setup(class='btn btn-success btn-block')}}
+          </div>
+          {{setup_bestbuy.redirect(value='orders', style='display:none;')}}
+        </form>
+        {% else %}
+        <div class="alert alert-danger">Unable to Display Setup BestBuy form right now.</div>
+        {% endif %}
+      </div>
+      <!-- Modal footer -->
+      <div class="modal-footer">
+        <button type="button" class="btn btn-danger" data-dismiss="modal">Close</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="importOrdersModal">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <!-- Modal Header -->
+      <div class="modal-header">
+        <h4 class="modal-title">Import Orders</h4>
+        <button type="button" class="close" data-dismiss="modal">&times;</button>
+      </div>
+      <!-- Modal body -->
+      <div class="modal-body">
+        {% if import_orders %}
+        <form id="import_orders_form" method="post" action="{{url_for('main.api_import_orders')}}">
+          {{import_orders.hidden_tag()}}
+          <div class="form-group">
+            {{import_orders.api_key.label}}
+            {{import_orders.api_key(class='form-control')}}
+          </div>
+          <div class="form-group">
+            {{import_orders.date_from.label}}
+            {{import_orders.date_from(class='form-control')}}
+          </div>
+          <div class="form-group">
+            {{import_orders.order_ids.label}}
+            {{import_orders.order_ids(class='form-control')}}
+            <p>Note that if you specify order_ids the date entry will be ignored.</p>
+          </div>
+          {{import_orders.import_data(class='btn btn-success')}}
+        </form>
+        {% else %}
+        
+        <div class="alert alert-danger">Unable to Display Import Orders form right now.</div>
         {% endif %}
       </div>
       <!-- Modal footer -->
@@ -691,7 +814,7 @@
           </form>
           {% else %}
           
-          <div class="alert-danger">Unable to Display Remove order form right now.</div>
+          <div class="alert alert-danger">Unable to Display Remove order form right now.</div>
           {% endif %}
           
           </div>
@@ -729,7 +852,7 @@
             {{add_platform.add(class='btn btn-success btn-block')}}
         </form>
         {% else %}
-        <div class="alert-danger">Unable to Display Add Platform form right now.</div>
+        <div class="alert alert-danger">Unable to Display Add Platform form right now.</div>
         {% endif %}
       </div>
       <!-- Modal footer -->
@@ -761,7 +884,7 @@
             {{edit_platform.edit(class='btn btn-success btn-block')}}
         </form>
         {% else %}
-        <div class="alert-danger">Unable to Display Edit Platform form right now.</div>
+        <div class="alert alert-danger">Unable to Display Edit Platform form right now.</div>
         {% endif %}
       </div>
       <!-- Modal footer -->
@@ -790,7 +913,7 @@
          {{delete_platform.delete(class='btn btn-danger')}}
         </form>
         {% else %}
-        <div class="alert-danger">Unable to Display Remove Platform form right now.</div>
+        <div class="alert alert-danger">Unable to Display Remove Platform form right now.</div>
         {% endif %}
       </div>
       <!-- Modal footer -->
@@ -823,7 +946,7 @@
             {{add_location.add(class='btn btn-success btn-block')}}
         </form>
         {% else %}
-        <div class="alert-danger">Unable to Display Add Location form right now.</div>
+        <div class="alert alert-danger">Unable to Display Add Location form right now.</div>
         {% endif %}
       </div>
       <!-- Modal footer -->
@@ -855,7 +978,7 @@
             {{edit_location.edit(class='btn btn-success btn-block')}}
         </form>
         {% else %}
-        <div class="alert-danger">Unable to Display Edit Location form right now.</div>
+        <div class="alert alert-danger">Unable to Display Edit Location form right now.</div>
         {% endif %}
       </div>
       <!-- Modal footer -->
@@ -885,7 +1008,7 @@
          {{delete_location.delete(class='btn btn-danger')}}
         </form>
         {% else %}
-        <div class="alert-danger">Unable to Display Remove Location form right now.</div>
+        <div class="alert alert-danger">Unable to Display Remove Location form right now.</div>
         {% endif %}
       </div>
       <!-- Modal footer -->
@@ -918,7 +1041,7 @@
             {{add_bin.add(class='btn btn-success btn-block')}}
         </form>
         {% else %}
-        <div class="alert-danger">Unable to Display Add Bin form right now.</div>
+        <div class="alert alert-danger">Unable to Display Add Bin form right now.</div>
         {% endif %}
       </div>
       <!-- Modal footer -->
@@ -950,7 +1073,7 @@
             {{edit_bin.edit(class='btn btn-success btn-block')}}
         </form>
         {% else %}
-        <div class="alert-danger">Unable to Display Edit Bin form right now.</div>
+        <div class="alert alert-danger">Unable to Display Edit Bin form right now.</div>
         {% endif %}
       </div>
       <!-- Modal footer -->
@@ -979,7 +1102,7 @@
          {{delete_bin.delete(class='btn btn-danger')}}
         </form>
         {% else %}
-        <div class="alert-danger">Unable to Display Remove Bin form right now.</div>
+        <div class="alert alert-danger">Unable to Display Remove Bin form right now.</div>
         {% endif %}
       </div>
       <!-- Modal footer -->
@@ -1023,7 +1146,7 @@
             {{add_category.add(class='btn btn-success btn-block')}}
         </form>
         {% else %}
-        <div class="alert-danger">Unable to Display Add Category form right now.</div>
+        <div class="alert alert-danger">Unable to Display Add Category form right now.</div>
         {% endif %}
       </div>
       <!-- Modal footer -->
@@ -1066,7 +1189,7 @@
             {{edit_category.edit(class='btn btn-success btn-block')}}
         </form>
         {% else %}
-        <div class="alert-danger">Unable to Display Edit Category form right now.</div>
+        <div class="alert alert-danger">Unable to Display Edit Category form right now.</div>
         {% endif %}
       </div>
       <!-- Modal footer -->
@@ -1095,7 +1218,7 @@
          {{delete_category.delete(class='btn btn-danger')}}
         </form>
         {% else %}
-        <div class="alert-danger">Unable to Display Remove Category form right now.</div>
+        <div class="alert alert-danger">Unable to Display Remove Category form right now.</div>
         {% endif %}
       </div>
       <!-- Modal footer -->
@@ -1126,7 +1249,7 @@
           {{import_categories.import_data(class='btn btn-success')}}
         </form>
         {% else %}
-        <div class="alert-danger">Unable to Display Import Categories form right now.</div>
+        <div class="alert alert-danger">Unable to Display Import Categories form right now.</div>
         {% endif %}
       </div>
       <!-- Modal footer -->
@@ -1160,7 +1283,7 @@
           {{setup_bestbuy.redirect(value='setup', style='display:none;')}}
         </form>
         {% else %}
-        <div class="alert-danger">Unable to Display Setup BestBuy form right now.</div>
+        <div class="alert alert-danger">Unable to Display Setup BestBuy form right now.</div>
         {% endif %}
       </div>
       <!-- Modal footer -->

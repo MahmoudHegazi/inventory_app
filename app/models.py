@@ -342,7 +342,7 @@ class Catalogue(db.Model): # catelouge
     updated_date = db.Column(DateTime, nullable=True, default=None, onupdate=datetime.datetime.utcnow)
     category_id = db.Column(db.Integer, db.ForeignKey('category.id', ondelete="SET NULL", onupdate="CASCADE"), nullable=True, default=None)
     user_id = db.Column(db.Integer, db.ForeignKey('user.id', ondelete="CASCADE", onupdate="CASCADE"), nullable=False)
-    listings = db.relationship("Listing", backref="catalogue", cascade="all, delete", passive_deletes=True)
+    listings = db.relationship("Listing", backref="catalogue", cascade="all, delete", passive_deletes=True, order_by='Listing.platform_id.asc()')
     locations = db.relationship("CatalogueLocations", backref='catalogue', cascade="all, delete", passive_deletes=True)
 
     def __init__(self, sku, user_id, product_name=None, product_description=None, brand=None, category_id=None, price=0.00, sale_price=0.00, quantity=None, product_model=None, condition=None, upc=None):
@@ -391,7 +391,6 @@ class Catalogue(db.Model): # catelouge
         'locations': [{'location_name': catalogue_loc.warehouse_location.name, 'bins': [catalogue_loc_bin.bin.name for catalogue_loc_bin in catalogue_loc.bins]} for catalogue_loc in self.locations]
         }
 
-
 class Listing(db.Model):
     __tablename__ = 'listing'
     id = db.Column(db.Integer, primary_key=True, nullable=False)
@@ -405,17 +404,17 @@ class Listing(db.Model):
     category_code = db.Column(db.String(255), nullable=True)
     category_label = db.Column(db.String(255), nullable=True, default=None)
     # new    
-    active = db.Column(db.Boolean, nullable=True, default=None)
+    active = db.Column(db.Boolean, nullable=True, default=False)
     discount_end_date = db.Column(DateTime, nullable=True, default=None)
     discount_start_date = db.Column(DateTime, nullable=True, default=None)
     unit_discount_price = db.Column(db.DECIMAL(precision=10, scale=2, asdecimal=True), nullable=True, default=0.00)
     unit_origin_price = db.Column(db.DECIMAL(precision=10, scale=2, asdecimal=True), nullable=True, default=0.00)
-    quantity_threshold = db.Column(db.Integer, nullable=True, default=None)
-    currency_iso_code = db.Column(db.String(45), nullable=True, default=None)
-    shop_sku = db.Column(db.String(45), nullable=True, default=None)
-    offer_id = db.Column(db.Integer, nullable=True, default=None)
-    reference = db.Column(db.String(255), nullable=True, default=None)
-    reference_type = db.Column(db.String(255), nullable=True, default=None)
+    quantity_threshold = db.Column(db.Integer, nullable=True, default=0)
+    currency_iso_code = db.Column(db.String(45), nullable=True, default='')
+    shop_sku = db.Column(db.String(45), nullable=True, default='')
+    offer_id = db.Column(db.Integer, nullable=True, default=0)
+    reference = db.Column(db.String(255), nullable=True, default='')
+    reference_type = db.Column(db.String(255), nullable=True, default='')
     
 
     image = db.Column(db.String(45), nullable=True, default='default_listing.png')
@@ -423,13 +422,14 @@ class Listing(db.Model):
     updated_date = db.Column(DateTime, nullable=True, default=None, onupdate=datetime.datetime.utcnow)
     dashboard_id = db.Column(db.Integer, db.ForeignKey('dashboard.id', ondelete="CASCADE", onupdate="CASCADE"), nullable=False)
     catalogue_id = db.Column(db.Integer, db.ForeignKey('catalogue.id', ondelete="CASCADE", onupdate="CASCADE"), nullable=False)
+    platform_id = db.Column(db.Integer, db.ForeignKey('platform.id', ondelete="CASCADE", onupdate="CASCADE"), nullable=False)
     purchases = db.relationship("Purchase", backref="listing", cascade="all, delete", passive_deletes=True)
     orders = db.relationship("Order", backref="listing", cascade="all, delete", passive_deletes=True)
-    platforms = db.relationship("ListingPlatform", backref="listing", cascade="all, delete", passive_deletes=True)
 
-    def __init__(self, dashboard_id, catalogue_id, active=None, discount_start_date=None, discount_end_date=None, unit_discount_price=None, unit_origin_price=None, quantity_threshold=None, currency_iso_code=None, shop_sku=None, offer_id=None, reference=None, reference_type=None, image='default_listing.png'):
+    def __init__(self, dashboard_id, catalogue_id, platform_id, active=None, discount_start_date=None, discount_end_date=None, unit_discount_price=None, unit_origin_price=None, quantity_threshold=None, currency_iso_code=None, shop_sku=None, offer_id=None, reference=None, reference_type=None, image='default_listing.png'):
         self.dashboard_id = dashboard_id
         self.catalogue_id = catalogue_id
+        self.platform_id = platform_id
         self.active = active
         self.discount_start_date = discount_start_date
         self.discount_end_date = discount_end_date        
@@ -480,7 +480,7 @@ class Listing(db.Model):
         #    self.catalogue.update()
 
     def sync_listing(self):
-        print("synced")
+        #print("synced")
         if self.sku != self.catalogue.sku:
             self.sku = self.catalogue.sku
         if self.product_name != self.catalogue.product_name:
@@ -513,7 +513,6 @@ class Listing(db.Model):
         db.session.commit()
 
     def format(self):
-        listing_platforms = [listing_platform.platform.name for listing_platform in self.platforms]
         # for all locations string of this listing
         listing_location_strings = []
         # for looping in js over location data objects
@@ -539,8 +538,7 @@ class Listing(db.Model):
         'sale_price': str(self.sale_price),
         'quantity': self.quantity,
         'image': self.image,
-        'platform': ",".join(listing_platforms),
-        'platforms': listing_platforms,
+        'platform': self.catalogue.platform.name,
         'location': ",".join(listing_location_strings),
         'locations': listing_locations,
         'bin': ",".join(listing_bins_arr),
@@ -601,11 +599,28 @@ class Order(db.Model):
     shipping_tax = db.Column(db.DECIMAL(precision=10, scale=2, asdecimal=True), nullable=True, default=0.00)
     commission = db.Column(db.DECIMAL(precision=10, scale=2, asdecimal=True), nullable=True, default=0.00)
     total_cost = db.Column(db.DECIMAL(precision=10, scale=2, asdecimal=True), nullable=True, default=0.00)
+    # new
+    commercial_id = db.Column(db.String(255), nullable=True, default=None)
+    currency_iso_code = db.Column(db.String(45), nullable=True, default=None)
+    phone = db.Column(db.String(45), nullable=True, default=None)
+    street_1 = db.Column(db.String(255), nullable=True, default=None)
+    street_2 = db.Column(db.String(255), nullable=True, default=None)
+    zip_code = db.Column(db.String(45), nullable=True, default=None)
+    city = db.Column(db.String(100), nullable=True, default=None)
+    country = db.Column(db.String(80), nullable=True, default=None)
+    fully_refunded = db.Column(db.Boolean, nullable=True, default=False)
+    can_refund = db.Column(db.Boolean, nullable=True, default=False)
+    order_id = db.Column(db.String(45), nullable=True, default=None)
+    category_code = db.Column(db.String(45), nullable=True, default=None)
+    price = db.Column(db.DECIMAL(precision=10, scale=2, asdecimal=True), nullable=True, default=0.00)
+    product_title = db.Column(db.String(500), nullable=True, default=None)
+    product_sku = db.Column(db.String(45), nullable=True, default=None)
+    order_state = db.Column(db.String(50), nullable=True, default=None)
     created_date = db.Column(DateTime, nullable=False, default=datetime.datetime.utcnow)
     updated_date = db.Column(DateTime, nullable=True, default=None, onupdate=datetime.datetime.utcnow)
+    taxes = db.relationship("OrderTaxes", backref="order", cascade="all, delete", passive_deletes=True)
 
-
-    def __init__(self, listing_id, quantity=0, date=None, customer_firstname='', customer_lastname='', tax=0.0, shipping=0.0, shipping_tax=0.0, commission=0.0, total_cost=0.0):
+    def __init__(self, listing_id, quantity=0, date=None, customer_firstname='', customer_lastname='', tax=0.0, shipping=0.0, shipping_tax=0.0, commission=0.0, total_cost=0.0, commercial_id=None, currency_iso_code=None, phone=None, street_1=None, street_2=None, zip_code=None, city=None, country=None, fully_refunded=False, can_refund=False, order_id=None, category_code=None, price=0, product_title=None, product_sku=None, order_state=None):
         self.listing_id = listing_id
         self.quantity = quantity
         self.date = date
@@ -616,6 +631,23 @@ class Order(db.Model):
         self.shipping_tax = shipping_tax
         self.commission = commission
         self.total_cost = total_cost
+        self.commercial_id = commercial_id
+        self.currency_iso_code = currency_iso_code
+        self.phone = phone
+        self.street_1 = street_1
+        self.street_2 = street_2
+        self.zip_code = zip_code
+        self.city = city
+        self.country = country
+        self.fully_refunded = fully_refunded
+        self.can_refund = can_refund
+        self.order_id = order_id
+        self.category_code = category_code
+        self.price = price
+        self.product_title = product_title
+        self.product_sku = product_sku
+        self.order_state = order_state
+        
 
     def insert(self):
         db.session.add(self)
@@ -627,6 +659,7 @@ class Order(db.Model):
     def delete(self):
         db.session.delete(self)
         db.session.commit()
+
     # important convert date to string when sent to js in json format to get the same date displayed by jinja2
     def format(self):
         return {
@@ -641,14 +674,68 @@ class Order(db.Model):
         'shipping_tax': str(self.shipping_tax),
         'commission': str(self.commission),
         'total_cost': str(self.total_cost),
+        'commercial_id': self.commercial_id,
+        'currency_iso_code': self.currency_iso_code,
+        'phone': self.phone,
+        'street_1': self.street_1,
+        'street_2': self.street_2,
+        'zip_code': self.zip_code,
+        'city': self.city,
+        'country': self.country,
+        'fully_refunded': self.fully_refunded,
+        'can_refund': self.can_refund,
+        'order_id': self.order_id,
+        'category_code': self.category_code,
+        'price': str(self.price),
+        'product_title': self.product_title,
+        'product_sku': self.product_sku,
+        'order_state': self.order_state,
         'created_date': self.created_date,
         'updated_date': self.updated_date
         }
     
 
+class OrderTaxes(db.Model):
+    __tablename__ = 'order_taxes'
+    id = db.Column(db.Integer, primary_key=True, nullable=False)
+    amount = db.Column(db.DECIMAL(precision=10, scale=2, asdecimal=True), nullable=True, default=0)
+    code = db.Column(db.String(255), nullable=True, default=None)
+    type = db.Column(db.String(45), nullable=False)
+    order_id = db.Column(db.Integer, db.ForeignKey('order.id', ondelete="CASCADE", onupdate="CASCADE"), nullable=False)    
+    created_date = db.Column(DateTime, nullable=False, default=datetime.datetime.utcnow)
+    updated_date = db.Column(DateTime, nullable=True, default=None, onupdate=datetime.datetime.utcnow)
+
+    def __init__(self, type, order_id=None, amount=0, code=None):
+        self.type = type
+        self.order_id = order_id
+        self.amount = amount
+        self.code = code
+
+
+    def insert(self):
+        db.session.add(self)
+        db.session.commit()
+
+    def update(self):
+        db.session.commit()
+
+    def delete(self):
+        db.session.delete(self)
+        db.session.commit()
+
+    def format(self):
+        return {
+        'id': self.id,
+        'order_id': self.order_id,
+        'amount': self.amount,
+        'code': self.code,
+        'type': self.type,
+        'created_date': self.created_date,
+        'updated_date': self.updated_date
+        }
+    
 
 ################################ ---------- Tables for Dashboard Plateforms (Start) ---------------- #########################
-
 class Platform(db.Model):
     __tablename__ = 'platform'
     id = db.Column(db.Integer, primary_key=True, nullable=False)
@@ -656,7 +743,7 @@ class Platform(db.Model):
     dashboard_id = db.Column(db.Integer, db.ForeignKey('dashboard.id', ondelete="CASCADE", onupdate="CASCADE"), nullable=False)    
     created_date = db.Column(DateTime, nullable=False, default=datetime.datetime.utcnow)
     updated_date = db.Column(DateTime, nullable=True, default=None, onupdate=datetime.datetime.utcnow)
-    plateforms = db.relationship("ListingPlatform", backref="platform", cascade="all, delete", passive_deletes=True)
+    listings = db.relationship("Listing", backref='platform', cascade="all, delete", passive_deletes=True)
 
     def __init__(self, dashboard_id, name):
         self.dashboard_id = dashboard_id
@@ -679,39 +766,6 @@ class Platform(db.Model):
         'id': self.id,
         'dashboard_id': self.dashboard_id,
         'name': self.name,
-        'created_date': self.created_date,
-        'updated_date': self.updated_date
-        }
-    
-
-class ListingPlatform(db.Model):
-    __tablename__ = 'listing_platform'
-    id = db.Column(db.Integer, primary_key=True, nullable=False)
-    listing_id = db.Column(db.Integer, db.ForeignKey('listing.id', ondelete="CASCADE", onupdate="CASCADE"), nullable=False)
-    platform_id = db.Column(db.Integer, db.ForeignKey('platform.id', ondelete="CASCADE", onupdate="CASCADE"), nullable=False)
-    created_date = db.Column(DateTime, nullable=False, default=datetime.datetime.utcnow)
-    updated_date = db.Column(DateTime, nullable=True, default=None, onupdate=datetime.datetime.utcnow)
-
-    def __init__(self, listing_id, platform_id):
-        self.listing_id = listing_id
-        self.platform_id = platform_id
-
-    def insert(self):
-        db.session.add(self)
-        db.session.commit()
-
-    def update(self):
-        db.session.commit()
-
-    def delete(self):
-        db.session.delete(self)
-        db.session.commit()
-
-    def format(self):
-        return {
-        'id': self.id,
-        'listing_id': self.listing_id,
-        'platform_id': self.platform_id,
         'created_date': self.created_date,
         'updated_date': self.updated_date
         }

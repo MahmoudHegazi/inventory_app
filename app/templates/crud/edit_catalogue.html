@@ -19,6 +19,12 @@
         <div class="container">
             <form action="{{url_for('routes.edit_catalogue', catalogue_id=catalogue_id)}}" method="POST">          
               {{form.hidden_tag()}}
+              <div id="top_form_btns">
+                <div id="form_btns" class="d-flex justify-content-end align-items-center w-50 ml-auto">
+                  {{form.edit(class='btn btn-success w_100px')}}
+                  <a href="{{url_for('routes.catalogues')}}" class="btn btn-primary w_100px">Cancel</a>
+                </div>
+              </div>
               <div class="form-group">
                 {{form.sku.label}}
                 {{form.sku(class='form-control', placeholder='SKU')}}
@@ -178,12 +184,7 @@
                 </ul>
                 {% endif %}
               </div>
-
-              
-              <div class="d-flex justify-content-center align-items-center w-50 mx-auto">
-                {{form.edit(class='btn btn-success w-50')}}
-                <a href="{{url_for('routes.catalogues')}}" class="btn btn-primary w-50">Cancel</a>
-              </div>
+              <div id="bot_form_btns" class="mt-3"></div>
             </form>
         </div>
       </div>
@@ -211,8 +212,8 @@
   {% endif %}
 </div>
 
-
+<script>
+// toggle add, cancel buttons in top and bottom based on user poistion for better ux (if he will go scoll down and think he will find button at bottom it will found, if he scroll up or excpect to found the buttons on top he will found it at top)
+toggleContentUpDown(contentSelector='#form_btns', upSelector='#top_form_btns', downSelector='#bot_form_btns');
+</script>
 {% endblock %}
-
-
-

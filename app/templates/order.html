@@ -12,69 +12,147 @@
       <a href="{{url_for('routes.view_listing', listing_id=listing_id)}}" class="btn btn-success">
         Back to Listing ({{listing_id}})
       </a>
-      <a href="{{url_for('routes.edit_order', listing_id=listing_id, order_id=order.id)}}" class="ml-2 btn btn-primary">
+      <a href="{{url_for('routes.edit_order', listing_id=listing_id, order_id=order.id, redirect_url=url_for('routes.view_order', listing_id=listing_id, order_id=order.id))}}" class="ml-2 mr-2 btn btn-primary">
         Edit Order
       </a>
+      <button data-url="{{url_for('routes.delete_order', listing_id=listing_id, order_id=order.id)}}" data-toggle="modal" 
+        data-target="#deleteOrderModal" data-order-id="{{order.id}}" onclick="toggleLoadingCircle(true, 'block')" 
+        class="wtform_modal_deletebtn btn btn-danger btn-block w_100px">Delete
+      </button>
     </div>
     <div class="row mt-2">
       <div class="border rounded col-4 p-3 d-flex justify-content-center align-items-start cursor-pointer text-decoration-none text-dark media_small_width_100">
-        <div class="hover_shadow row container shadow p-3">
-            <div class="col-sm-12 mb-3 text-center">
-                <img src="{{url_for('static', filename='assets/images/default_order.png')}}" alt="dashboard icon" width="150" class="mxwidth-150" />
-                <h3 class="overflow_within title"><span class="badge badge-primary">{{order.id}}</span></h3>
-            </div>
-            <div class="col-sm-12">
-              <p class="overflow_within">Listing: <span>{{order.listing_id}}</span></p>
-            </div>
-            <div class="col-sm-12">
-              <p class="overflow_within">Quantity: <span>{{order.quantity}}</span></p>
-            </div>
-            <div class="col-sm-12">
-              <p class="overflow_within">Date: <span>{{order.date}}</span></p>
-            </div>
-            <div class="col-sm-12">
-                <p class="overflow_within">Customer Firstname: <span>{{order.customer_firstname}}</span></p>
+        <div class="row container shadow p-3">
+            <div class="">
+              <div class="col-sm-12 mb-3 text-center">
+                  <img src="{{url_for('static', filename='assets/images/default_order.png')}}" alt="dashboard icon" width="150" class="mxwidth-150" />
+                  <h3 class="overflow_within title"><span class="badge badge-primary">{{order.id}}</span></h3>
               </div>
-              <div class="col-sm-12">
-                <p class="overflow_within">Customer Lastname: <span>{{order.customer_lastname}}</span></p>
+              <div class="container hover_shadow shadow">
+                <h5 class="mb-3">Main Info:</h4>
+                <div style="max-height:300px;overflow-y: auto;">
+                  <div class="col-sm-12">
+                    <p class="overflow_within">Listing: <span>{{order.listing_id}}</span></p>
+                  </div>
+                  <div class="col-sm-12">
+                    <p class="overflow_within">Quantity: <span>{{order.quantity}}</span></p>
+                  </div>
+                  <div class="col-sm-12">
+                    <p class="overflow_within">Date: <span>{{order.date}}</span></p>
+                  </div>
+                  <div class="col-sm-12">
+                    <p class="overflow_within">Tax: <span>{{order.tax}}</span></p>
+                  </div>
+                  <div class="col-sm-12">
+                    <p class="overflow_within">Shipping: <span>{{order.shipping}}</span></p>
+                  </div>
+                  <div class="col-sm-12">
+                    <p class="overflow_within">Shipping Tax: <span>{{order.shipping_tax}}</span></p>
+                  </div>
+                  <div class="col-sm-12">
+                    <p class="overflow_within">Commission: <span>{{order.commission}}</span></p>
+                  </div>
+                  <div class="col-sm-12">
+                    <p class="overflow_within">Total Cost: <span>{{order.total_cost}}</span></p>
+                  </div>
+                  <div class="col-sm-12">
+                    <p class="overflow_within">Commercial id: <span>{{order.commercial_id}}</span></p>
+                  </div>
+                  <div class="col-sm-12">
+                    <p class="overflow_within">Currency ISO Code: <span>{{order.currency_iso_code}}</span></p>
+                  </div>
+                  <div class="col-sm-12">
+                    <p class="overflow_within">Fully Refunded: <span>{{order.fully_refunded}}</span></p>
+                  </div>
+                  <div class="col-sm-12">
+                    <p class="overflow_within">Can Refund: <span>{{order.can_refund}}</span></p>
+                  </div>
+                  <div class="col-sm-12">
+                    <p class="overflow_within">Order ID: <span>{{order.order_id}}</span></p>
+                  </div>
+                  <div class="col-sm-12">
+                    <p class="overflow_within">Category Code: <span>{{order.category_code}}</span></p>
+                  </div>
+                  <div class="col-sm-12">
+                    <p class="overflow_within">Price: <span>{{order.price}}</span></p>
+                  </div>
+                  <div class="col-sm-12">
+                    <p class="overflow_within">Product Title: <span>{{order.product_title}}</span></p>
+                  </div>
+                  <div class="col-sm-12">
+                    <p class="overflow_within">Product SKU: <span>{{order.product_sku}}</span></p>
+                  </div>
+                  <div class="col-sm-12">
+                    <p class="overflow_within">Order State: <span>{{order.order_state}}</span></p>
+                  </div>
+                  <div class="col-sm-12">
+                    <p class="overflow_within">Created At: <span class="total_orders">{{order.created_date}}</span></p>
+                  </div>
+                  <div class="col-sm-12">
+                    <p class="overflow_within">Updated At: 
+                      <span class="monthly_purchases">{% if order.updated_date %}{{order.updated_date}}{% endif %}</span>
+                    </p>
+                  </div>
+                </div>
+              </div>
             </div>
-            <div class="col-sm-12">
-              <p class="overflow_within">Tax: <span>{{order.tax}}</span></p>
+            <div class="container hover_shadow shadow mt-5 mb-3">
+              <h5 class="mb-3">Customer:</h5>
+              <div style="max-height:250px;overflow-y: auto;">
+                <div class="col-sm-12">
+                  <p class="overflow_within">Customer Firstname: <span>{{order.customer_firstname}}</span></p>
+                </div>
+                <div class="col-sm-12">
+                  <p class="overflow_within">Customer Lastname: <span>{{order.customer_lastname}}</span></p>
+                </div>
+                <div class="col-sm-12">
+                  <p class="overflow_within">Phone: <span>{{order.phone}}</span></p>
+                </div>
+                <div class="col-sm-12">
+                  <p class="overflow_within">Street 1: <span>{{order.street_1}}</span></p>
+                </div>
+                <div class="col-sm-12">
+                  <p class="overflow_within">Street 2: <span>{{order.street_2}}</span></p>
+                </div>
+                <div class="col-sm-12">
+                  <p class="overflow_within">Zip Code: <span>{{order.zip_code}}</span></p>
+                </div>
+                <div class="col-sm-12">
+                  <p class="overflow_within">City: <span>{{order.city}}</span></p>
+                </div>
+                <div class="col-sm-12">
+                  <p class="overflow_within">Country: <span>{{order.country}}</span></p>
+                </div>
+              </div>
             </div>
-            <div class="col-sm-12">
-              <p class="overflow_within">Shipping: <span>{{order.shipping}}</span></p>
-            </div>
-            <div class="col-sm-12">
-              <p class="overflow_within">Shipping Tax: <span>{{order.shipping_tax}}</span></p>
-            </div>
-            <div class="col-sm-12">
-              <p class="overflow_within">Commission: <span>{{order.commission}}</span></p>
-            </div>
-            <div class="col-sm-12">
-              <p class="overflow_within">Total Cost: <span>{{order.total_cost}}</span></p>
-            </div>     
-            <div class="col-sm-12">
-              <p class="overflow_within">Created At: <span class="total_orders">{{order.created_date}}</span></p>
-            </div>
-            <div class="col-sm-12">
-              <p class="overflow_within">Updated At: 
-                <span class="monthly_purchases">{% if order.updated_date %}{{order.updated_date}}{% endif %}</span>
-              </p>
-            </div>
-            <div class="col-sm-12 row">
-              <div class="col-sm-6">
-                <button data-url="{{url_for('routes.delete_order', listing_id=listing_id, order_id=order.id)}}" data-toggle="modal" 
-                  data-target="#deleteOrderModal" data-order-id="{{order.id}}" onclick="toggleLoadingCircle(true, 'block')" 
-                  class="wtform_modal_deletebtn btn btn-danger btn-block">Delete
-                </button>
-             </div>
+            <div class="container hover_shadow shadow mt-5 mb-3" style="max-height:350px;overflow-y: auto;">
+              <h5>Taxes:</h5>
+              <div>
+                <div class="container">
+                    <h6 class="badge badge-primary">Order Taxes:</h6>
+                  {% for order_tax in taxes_data.order_taxes %}
+                    <p>
+                      <span class="mr-1">{{order_tax.code}}:</span>{{order_tax.amount}}<span></span>
+                    </p>
+                  {% endfor %}
+                </div>
+                <hr />
+                <div class="container mb-1">
+                  <h6 class="badge badge-primary">Shipping Taxes:</h6>
+                {% for shipping_tax in taxes_data.shipping_taxes %}
+                  <p>
+                    <span class="mr-1">{{shipping_tax.code}}:</span>{{shipping_tax.amount}}<span></span>
+                  </p>
+                {% endfor %}
+                </div>
+              </div>
             </div>
         </div>
       </div>      
       <div class="col-sm-8 p-3 row border rounded">
         <div class="container">
           <div class="mt-1 mb-2 d-flex justify-content-between align-items-center">
-            <h4>Listing</h4>
+            <h4>Listing for this Order</h4>
             <div>
               <a href="{{url_for('routes.listings')}}" class="btn btn-outline-primary">Go to Listing ({{listing_id}})</a>
             </div>

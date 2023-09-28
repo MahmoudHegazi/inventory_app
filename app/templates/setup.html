@@ -26,11 +26,14 @@
                     <p style="word-break: break-word;">{{platform.name}}</p>
                   </div>
                   <div class="col-sm-6 text-right">
+                    <button data-toggle="modal" data-platformid="{{platform.id}}" data-target="#viewPlatform" class="btn btn-sm btn-info view_platform" type="button"><i class="fa fa-eye"></i></button>
+
                     <button data-toggle="modal" data-url="{{url_for('routes.edit_platform', platform_id=platform.id)}}" data-platform-id="{{platform.id}}" data-platform-name="{{platform.name}}" data-target="#editPlatformModal" class="btn btn-sm btn-warning edit_platform" type="button"><i class="fa fa-edit"></i></button>
                     <button data-toggle="modal" data-url="{{url_for('routes.delete_platform', platform_id=platform.id)}}" data-platform-id="{{platform.id}}" data-target="#deletePlatformModal" class="btn btn-sm btn-danger wtform_modal_deletebtn" type="button"><i class="fa fa-remove"></i></button>
                   </div>
                 </div>
                 {% endfor %}
+                
               </div>
             </div>
             {% else %}
@@ -126,6 +129,31 @@
     </div>
   </div>
 </div>
+
+<div class="modal fade" id="viewPlatform">
+  <div class="modal-dialog modal-xl">
+    <div class="modal-content">
+      <!-- Modal Header -->
+      <div class="modal-header">
+        <h4 class="modal-title mini_green_header header_lightblue">Platform: <span id="platform_name_txt"></span></h4>
+        <button type="button" class="close" data-dismiss="modal">&times;</button>
+      </div>
+      <!-- Modal body -->
+      <div class="modal-body">
+        <div class="container shadow">
+          <h5 class="font_bold mini_header_blue" style="text-shadow: 2px 2px 4px #000000 !important;color: #c2ffe8 !important;">Listings (<span id="total_platform_listing"></span>):</h5>
+          <div class="row p-3" id="view_platform_listings" style="max-height:400px;overflow-y: auto;">
+          </div>
+        </div>
+      </div>
+      <!-- Modal footer -->
+      <div class="modal-footer">
+        <button type="button" class="btn btn-danger" data-dismiss="modal">Close</button>
+      </div>
+    </div>
+  </div>
+</div>
+{{platforms_data}}
 {% from 'forms.html' import setup_forms %}
 {{ setup_forms(add_platform=add_platform, edit_platform=edit_platform, delete_platform=delete_platform, add_location=add_location, edit_location=edit_location, delete_location=delete_location, add_bin=add_bin, edit_bin=edit_bin, delete_bin=delete_bin, add_category=add_category, edit_category=edit_category, delete_category=delete_category, import_categories=import_categories, setup_bestbuy=setup_bestbuy) }}
 {% endblock %}
@@ -149,6 +177,57 @@ fillEditPlatForm();
 fillEditLocation();
 fillEditBin();
 fillEditCategory();
+// display platform listings
+const platformObjs = {};
+{% for platform in dashboard.platforms %}
+platformObjs['{{platform.id}}'] = {
+  'id': '{{platform.id}}}',
+  'platform': '{{platform.name}}',
+  'data': [],
+  'total': (!isNaN(parseInt('{{platform.listings|length}}')) ? parseInt('{{platform.listings|length}}') : 0)
+};
+/* nested */
+  {% for platform_jinja_listing in platform.listings %}
+  if (platformObjs['{{platform.id}}'] && Array.isArray(platformObjs['{{platform.id}}']['data'])){
+    platformObjs['{{platform.id}}']['data'].push({
+      id: `{{platform_jinja_listing.id}}`,
+      url: `{{url_for('routes.view_listing', listing_id=platform_jinja_listing.id)}}`,
+      name: `{{platform_jinja_listing.product_name}}`
+    });
+  }
+  {% endfor %}
+/* nested */
+{% endfor %}
+if ($(".view_platform").length && $("#view_platform_listings").length && $("#total_platform_listing").length && $("#platform_name_txt").length){
+  $('.view_platform').on('click', (e)=>{
+    if ($(e.currentTarget).length && $(e.currentTarget).attr('data-platformid') && platformObjs.hasOwnProperty($(e.currentTarget).attr('data-platformid'))){
+        const currentJ2Platform = platformObjs[$(e.currentTarget).attr('data-platformid')];
+          if (currentJ2Platform['total']){
+            $("#total_platform_listing").text(currentJ2Platform['total']);
+          } else {
+            $("#total_platform_listing").text("");
+          }
+          if (currentJ2Platform['platform']){
+            $("#platform_name_txt").text(currentJ2Platform['platform']);
+          } else {
+            $("#platform_name_txt").text("");
+          }
+          if (currentJ2Platform['platform'] && currentJ2Platform['total'] && Array.isArray(currentJ2Platform['data'])){
+            currentJ2Platform['data'].forEach( (jsPlatformListing)=>{
+              if (jsPlatformListing['url'] && jsPlatformListing['name']){
+                $("#view_platform_listings").append(`
+                  <a href="${jsPlatformListing.url}" target="_blank" class="col-sm-12 p-2 mb-2 border_darkgrey font_bold rounded text_shadow_default shadow hover_secondary">
+                      <span class="badge badge-primary mr-2">${jsPlatformListing.id}:</span><span>${jsPlatformListing.name}</span>
+                  </a>
+                `);
+              }
+            });
+          }
+  
+        
+    }
+  });
+}
 </script>
 {% endblock page_scripts %}
 

@@ -531,6 +531,7 @@ function setFormRedirectByUrl(customRedirect=null){
       const params = new Proxy(new URLSearchParams(window.location.search), {
         get: (searchParams, prop) => searchParams.get(prop),
       });
+      console.log(params.redirect_url)
       if (params.redirect_url){
         redirect_url = params.redirect_url;
         $("#action_redirect").val(params.redirect_url);
@@ -998,8 +999,24 @@ function limitPerPageComponent(){
   }
 }
 
+// simple function to move group of buttons based on user screen view eg if large screen and this is form if user on bottom of page put buttons at bottom else at top
+function toggleContentUpDown(contentSelector='', upSelector='', downSelector=''){
+  if (contentSelector && $(contentSelector).length && upSelector && $(upSelector).length && downSelector && $(downSelector).length){
+     $(window).scroll( ()=>{
+       if ($(window).scrollTop() != 0 && $(window).scrollTop() + $(window).height() >= ($(document).height() - 100)){
+           // down
+            $(downSelector).append($(contentSelector));
+        } else {
+           // default up (also in smallest screen default which no scroll default is up)
+           $(upSelector).append($(contentSelector));
+       }
+    });
+  }
+}
+
 $(document).ready(async function(){
     applyHoverEffect();
 });
+
 
 

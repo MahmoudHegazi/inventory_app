@@ -6,21 +6,22 @@ import decimal
 import flask_excel
 from flask import Flask, Blueprint, session, redirect, url_for, flash, Response, request, render_template, jsonify, abort, current_app
 from flask_wtf import Form
-from .models import User, Supplier, Dashboard, Listing, Catalogue, Purchase, Order, Platform, ListingPlatform, WarehouseLocations, LocationBins, \
-CatalogueLocations, CatalogueLocationsBins, Category, UserMeta
+from .models import User, Supplier, Dashboard, Listing, Catalogue, Purchase, Order, Platform, WarehouseLocations, LocationBins, \
+CatalogueLocations, CatalogueLocationsBins, Category, UserMeta, OrderTaxes
 from .forms import addListingForm, editListingForm, addCatalogueForm, editCatalogueForm, \
 removeCatalogueForm, removeListingForm, addSupplierForm, editSupplierForm, removeSupplierForm, \
 addPurchaseForm, editPurchaseForm, removePurchaseForm, addOrderForm, editOrderForm, removeOrderForm, CatalogueExcelForm, \
 removeCataloguesForm, removeListingsForm, removeAllCataloguesForm, addPlatformForm, editPlatformForm, removePlatformForm, \
 addLocationForm, editLocationForm, removeLocationForm, addBinForm, editBinForm, removeBinForm, AddMultipleListingForm, \
-addCategoryForm, editCategoryForm, removeCategoryForm, importCategoriesAPIForm, importOffersAPIForm, SetupBestbuyForm
+addCategoryForm, editCategoryForm, removeCategoryForm, importCategoriesAPIForm, importOffersAPIForm, SetupBestbuyForm, \
+importOrdersAPIForm
 from . import vendor_permission, db
 from .functions import get_safe_redirect, updateDashboardListings, updateDashboardOrders, updateDashboardPurchasesSum, secureRedirect, get_charts, \
-bestbuy_ready
+bestbuy_ready, get_ordered_dicts, float_or_none, float_or_zero, update_order_taxes, get_orders_and_shippings, get_separate_order_taxes
 from sqlalchemy.exc import IntegrityError
 from flask_login import login_required, current_user
 from flask import request as flask_request
-from sqlalchemy import or_, and_
+from sqlalchemy import or_, and_, asc
 
 routes = Blueprint('routes', __name__, template_folder='templates', static_folder='static')
 
@@ -86,30 +87,55 @@ def index():
         abort(500)
         return 'system error', 500
 
-def populate_add_multiple_form(form, platform, dashboard_id, min_entries=None, max_entries=None):
+def populate_add_multiple_form(form, dashboard_platforms, min_entries=None, max_entries=None):
     try:
+        platform_choices = [(p.id, p.name) for p in dashboard_platforms]
+
         # this function called twice on in get route to inital the form and set min, max entires and process, and fill choices, other call will be only for fill choices as already form inital and should have the entries filled with user inputs
         need_process = False
-
-        user_platforms = platform.query.filter_by(dashboard_id=dashboard_id).all()
-        platform_choices = [(platform_obj.id, platform_obj.name) for platform_obj in user_platforms]
 
         # process will update min and max entries, which will used to create the needed number of inputs for fieldList, then you can access the entries and set it's choices 
         if min_entries is not None:
             form.catalogue_ids.min_entries = min_entries
             form.platforms_selects.min_entries = min_entries
+
+            form.active.min_entries = min_entries
+            form.discount_end_date.min_entries = min_entries
+            form.discount_start_date.min_entries = min_entries
+            form.unit_discount_price.min_entries = min_entries
+            form.unit_origin_price.min_entries = min_entries
+            form.quantity_threshold.min_entries = min_entries
+            form.currency_iso_code.min_entries = min_entries
+            form.shop_sku.min_entries = min_entries
+            form.offer_id.min_entries = min_entries
+            form.reference.min_entries = min_entries
+            form.reference_type.min_entries = min_entries
             need_process = True
         
         if max_entries is not None:
             form.catalogue_ids.max_entries = max_entries
             form.platforms_selects.max_entries = max_entries
+
+            form.active.min_entries = max_entries
+            form.discount_end_date.min_entries = max_entries
+            form.discount_start_date.min_entries = max_entries
+            form.unit_discount_price.min_entries = max_entries
+            form.unit_origin_price.min_entries = max_entries
+            form.quantity_threshold.min_entries = max_entries
+            form.currency_iso_code.min_entries = max_entries
+            form.shop_sku.min_entries = max_entries
+            form.offer_id.min_entries = max_entries
+            form.reference.min_entries = max_entries
+            form.reference_type.min_entries = max_entries
             need_process = True
 
         if need_process == True:
             form.process()
 
+        # note 95% when call process it uses method something like it back in init (back to default class) and set the init attributes like min, max, etc that's why it clear the new added choices if this line below excuted before it , yes it can fill data with obj but here using for the backdefault part that allow set max and min
         for select_field in form.platforms_selects.entries:
-            select_field.choices.extend(platform_choices)
+            select_field.choices = platform_choices
+
         
     except Exception as e:
         print("error in populate_add_multiple_form")
@@ -133,7 +159,7 @@ def catalogues():
         add_multiple_listings = AddMultipleListingForm()
         #return str(delete_catalogues.hidden_tag())+str(delete_catalogues.catalogues_ids)
         user_catalogues = pagination['data']
-        populate_add_multiple_form(add_multiple_listings, Platform, current_user.dashboard.id, min_entries=len(user_catalogues), max_entries=len(user_catalogues))
+        populate_add_multiple_form(add_multiple_listings, current_user.dashboard.platforms, min_entries=len(user_catalogues), max_entries=len(user_catalogues))
 
         return render_template('catalogues.html', catalogues=user_catalogues,  catalogues_excel=catalogues_excel, pagination_btns=pagination['pagination_btns'], delete_catalogues=delete_catalogues, delete_all_catalogues=delete_all_catalogues, add_multiple_listings=add_multiple_listings)
     except Exception as e:
@@ -148,14 +174,21 @@ def catalogues():
 @vendor_permission.require(http_exception=403)
 def view_catalogue(catalogue_id):
     try:
+        
         deleteform = removeCatalogueForm()
         target_catalogue = Catalogue.query.filter_by(id=catalogue_id, user_id=current_user.id).one_or_none()
         if target_catalogue is not None:
-            return render_template('catalogue.html', catalogue=target_catalogue, deleteform=deleteform)
+            listing_platforms = [{
+                'url': url_for('routes.view_listing', listing_id=catalogue_listing.id),
+                'platform': catalogue_listing.platform.name,
+                'product': catalogue_listing.product_name
+                } for catalogue_listing in target_catalogue.listings]            
+            return render_template('catalogue.html', catalogue=target_catalogue, deleteform=deleteform, listing_platforms=listing_platforms)
         else:
             flash('Catalouge Not found or deleted', 'danger')
             return redirect(url_for('routes.catalogues'))
     except Exception as e:
+        raise e
         print('System Error: {}'.format(sys.exc_info()))
         flash('unable to display catalogues page', 'danger')
         return redirect(url_for('routes.catalogues'))
@@ -209,10 +242,10 @@ def add_catalogue():
                             new_catalogue.locations.append(new_catalogue_location)
                     new_catalogue.insert()
                     success = True
-                    flash('Successfully Created New Catalogue', 'success')
+                    flash('Successfully Created New Catalogue.', 'success')
                 else:
                     success = False
-                    flash('Invalid Category', 'danger')
+                    flash('Invalid Category.', 'danger')
             else:
                 success = False
         except Exception as e:
@@ -233,6 +266,7 @@ def add_catalogue():
             # get dashboard locations and bins data (advanced) (display locations with null bins to fill the warehouse location select options)
             return render_template('crud/add_catalogue.html', form=form, locations_bins_data=locations_bins_data)
         except Exception as e:
+            raise e
             print('System Error: {}'.format(sys.exc_info()))
             flash('unable to display Add new Catalogue page', 'danger')
             return redirect(url_for('routes.catalogues'))
@@ -252,6 +286,7 @@ def edit_catalogue(catalogue_id):
         allowed_locations_bins_ids = []
         selected_locs_ids = []
         selected_bins_ids = []
+
         current_locations = WarehouseLocations.query.filter_by(dashboard_id=current_user.dashboard.id).all()
         target_catalogue = Catalogue.query.filter_by(id=catalogue_id, user_id=current_user.id).one_or_none()
         if target_catalogue is not None:
@@ -457,7 +492,7 @@ def delete_catalogue(catalogue_id):
 
                 # update dashboard numbers
                 updateDashboardListings(current_user.dashboard)
-                updateDashboardOrders(db, Order, Listing, current_user.dashboard)
+                updateDashboardOrders(db, current_user.dashboard)
                 updateDashboardPurchasesSum(db, Purchase, Listing, current_user.dashboard)
                 flash('Successfully deleted Catalogue ID: {}'.format(catalogue_id), 'success')
             else:
@@ -495,7 +530,7 @@ def delete_catalogues():
                         selected_catalogue.delete()
             if len(deleted_ids) > 0:
                 updateDashboardListings(current_user.dashboard)
-                updateDashboardOrders(db, Order, Listing, current_user.dashboard)
+                updateDashboardOrders(db, current_user.dashboard)
                 updateDashboardPurchasesSum(db, Purchase, Listing, current_user.dashboard)
                 flash('Successfully deleted Catalogues', 'success')
             else:
@@ -526,7 +561,7 @@ def delete_all_catalogues():
 
             if deleted > 0:
                 updateDashboardListings(current_user.dashboard)
-                updateDashboardOrders(db, Order, Listing, current_user.dashboard)
+                updateDashboardOrders(db, current_user.dashboard)
                 updateDashboardPurchasesSum(db, Purchase, Listing, current_user.dashboard)
                 flash('Successfully deleted Catalogues', 'success')
             else:
@@ -556,7 +591,7 @@ def listings():
         ).filter(
             User.id == current_user.id,
             Dashboard.id == current_user.dashboard.id
-        )
+        ).order_by(asc(Listing.product_name))
         # total_pages + 1 (becuase range not take last number while i need it to display the last page)
         pagination = makePagination(
                 request.args.get('page', 1),
@@ -619,11 +654,10 @@ def view_listing(listing_id):
 @vendor_permission.require(http_exception=403)
 def add_listing():
     form = addListingForm()
-    platforms_ids = []
     try:
         user_catalogues = Catalogue.query.filter_by(user_id=current_user.id).all()
         form.catalogue_id.choices = [(catalogue.id, catalogue.product_name) for catalogue in user_catalogues]
-        form.platforms.choices = [(platform.id, platform.name) for platform in current_user.dashboard.platforms]
+        form.platform_id.choices = [(p.id, p.name) for p in current_user.dashboard.platforms]
     except:
         print('System Error: {}'.format(sys.exc_info()))
         flash('unable to display add listing form due to isssue in catalogues', 'danger')
@@ -633,31 +667,21 @@ def add_listing():
         success = None
         try:
             if form.validate_on_submit():
-                # confirm selected platforms owns by user
-                valid_platforms = True
-                current_dashboard_id = current_user.dashboard.id
-                for platform_id in form.platforms.data:
-                    target_platform = Platform.query.filter_by(id=platform_id, dashboard_id=current_dashboard_id).one_or_none()
-                    if target_platform:
-                        platforms_ids.append(target_platform.id)
+                selected_catalogue = Catalogue.query.filter_by(id=form.catalogue_id.data, user_id=current_user.id).one_or_none()
+                selected_platform = Platform.query.filter_by(id=form.platform_id.data, dashboard_id=current_user.dashboard.id).first()
+                if selected_catalogue:
+                    if selected_platform:
+                        new_listing = Listing(dashboard_id=current_user.dashboard.id, catalogue_id=selected_catalogue.id, platform_id=selected_platform.id, active=form.active.data, discount_start_date=form.discount_start_date.data, discount_end_date=form.discount_end_date.data, unit_discount_price=form.unit_discount_price.data, unit_origin_price=form.unit_origin_price.data, quantity_threshold=form.quantity_threshold.data, currency_iso_code=form.currency_iso_code.data, shop_sku=form.shop_sku.data, offer_id=form.offer_id.data, reference=form.reference.data, reference_type=form.reference_type.data)
+                        new_listing.insert()
+                        # set the number of total listings after adding action
+                        updateDashboardListings(current_user.dashboard)
+                        success = True
                     else:
-                        valid_platforms = False
-
-                if valid_platforms:
-                    user_dashboard = current_user.dashboard
-                    new_listing = Listing(dashboard_id=user_dashboard.id, catalogue_id=form.catalogue_id.data, active=form.active.data, discount_start_date=form.discount_start_date.data, discount_end_date=form.discount_end_date.data, unit_discount_price=form.unit_discount_price.data, unit_origin_price=form.unit_origin_price.data, quantity_threshold=form.quantity_threshold.data, currency_iso_code=form.currency_iso_code.data, shop_sku=form.shop_sku.data, offer_id=form.offer_id.data, reference=form.reference.data, reference_type=form.reference_type.data)
-                    new_listing.insert()
-                    # add the listing platforms
-                    for platform_id in platforms_ids:
-                        new_listing_platform = ListingPlatform(listing_id=new_listing.id, platform_id=platform_id)
-                        new_listing_platform.insert()
-
-                    # set the number of total listings after adding action
-                    updateDashboardListings(user_dashboard)
-                    success = True
+                        success = 'redirect_error'
+                        flash('Platform not found', 'danger')
                 else:
-                    flash('Unable to add listing invalid platforms', 'danger')
-                    success = False
+                    success = 'redirect_error'
+                    flash('Catalogue not found', 'danger')           
             else:
                 success = False
                 
@@ -667,13 +691,14 @@ def add_listing():
             success = None
             raise e
 
- 
         finally:
             if success == True:
                 flash('Successfully Created New Listing', 'success')
                 return redirect(url_for('routes.listings'))
             elif success == None:
                 return redirect(url_for('routes.listings'))
+            elif success == 'redirect_error':
+                return redirect(url_for('routes.add_listing'))
             else:
                 return render_template('crud/add_listing.html', form=form)
 
@@ -689,11 +714,9 @@ def add_listing():
 @login_required
 @vendor_permission.require(http_exception=403)
 def edit_listing(listing_id):
-    
     # route setup
     form = None
     target_listing = None
-    platforms_ids = []
     try:
         target_listing = db.session.query(
             Listing
@@ -708,10 +731,9 @@ def edit_listing(listing_id):
         ).one_or_none()
         
         if target_listing is not None:
-            listing_platforms = [listing_platform.platform.id for listing_platform in target_listing.platforms]
             form = editListingForm(
                 catalogue_id=target_listing.catalogue_id,
-                platforms=listing_platforms,
+                platform_id = target_listing.platform_id,
                 active=target_listing.active,
                 discount_start_date=target_listing.discount_start_date,
                 discount_end_date=target_listing.discount_end_date,
@@ -726,7 +748,7 @@ def edit_listing(listing_id):
             )
             user_catalogues = Catalogue.query.filter_by(user_id=current_user.id).all()
             form.catalogue_id.choices = [(catalogue.id, catalogue.product_name) for catalogue in user_catalogues]
-            form.platforms.choices = [(platform.id, platform.name) for platform in current_user.dashboard.platforms]
+            form.platform_id.choices = [(p.id, p.name) for p in current_user.dashboard.platforms]
         else:
             flash('Unable to display Edit listing form, target listing maybe removed', 'danger')
             return redirect(url_for('routes.listings'))
@@ -737,147 +759,127 @@ def edit_listing(listing_id):
     
     # Post Requests
     success = True
-    error_message = ''
     if request.method == 'POST':
         try:
             selected_catalogue = Catalogue.query.filter_by(id=form.catalogue_id.data, user_id=current_user.id).one_or_none()
-            
-            # confirm selected platforms owns by user
-            valid_platforms = True
-            current_dashboard_id = current_user.dashboard.id
-            for platform_id in form.platforms.data:
-                target_platform = Platform.query.filter_by(id=platform_id, dashboard_id=current_dashboard_id).one_or_none()
-                if target_platform:
-                    platforms_ids.append(target_platform.id)
-                else:
-                    valid_platforms = False
-
-            current_listing_platforms = [listing_platform.platform.id for listing_platform in target_listing.platforms]
-            
-            if form and form.validate_on_submit() and selected_catalogue and valid_platforms:
-
-                # update only what needed reduce db request
-                if target_listing.catalogue_id != form.catalogue_id.data:
-                    
-                    # back catalogue as it was before moved listing
-                    listing_purchases_quantity = sum([int(p.quantity) for p in target_listing.purchases])
-                    listing_orders_quantity = sum([int(o.quantity) for o in target_listing.orders])
-                    original_quantity = int(target_listing.catalogue.quantity) + listing_orders_quantity
-                    original_quantity = original_quantity - listing_purchases_quantity
-                    original_quantity = original_quantity if original_quantity >= 0 else 0
-                    
-
-                    # new catalogue qauntity after current listing's purchases (without work with dates)
-                    new_quantity = int(selected_catalogue.quantity) + listing_purchases_quantity
-
-                    #return str(new_quantity > listing_orders_quantity)
-                    # check if new catalogue after added purchases to it accept the number of orders or not
-                    if new_quantity >= listing_orders_quantity:
-                        # new catalogue quantity after current listing's order
-                        new_quantity = new_quantity - listing_orders_quantity
-
-
-                        target_listing.catalogue_id = form.catalogue_id.data
-                        target_listing.catalogue.quantity = original_quantity
-                        selected_catalogue.quantity = new_quantity
-
-
-                        # update platforms
-                        for old_platform in target_listing.platforms:
-                            if old_platform.platform.id not in platforms_ids:
-                                old_platform.delete()
+            selected_platform = Platform.query.filter_by(id=form.platform_id.data, dashboard_id=current_user.dashboard.id).one_or_none()
+            if form and form.validate_on_submit():
+                if selected_catalogue:
+                    if selected_platform:
+                        # update only what needed reduce db request
+                        if target_listing.catalogue_id != form.catalogue_id.data:
                             
-                        for platform_id in platforms_ids:
-                            if platform_id not in current_listing_platforms:
-                                new_listing_platform = ListingPlatform(listing_id=target_listing.id,platform_id=platform_id)
-                                new_listing_platform.insert()
+                            # back catalogue as it was before moved listing
+                            listing_purchases_quantity = sum([int(p.quantity) for p in target_listing.purchases])
+                            listing_orders_quantity = sum([int(o.quantity) for o in target_listing.orders])
+                            original_quantity = int(target_listing.catalogue.quantity) + listing_orders_quantity
+                            original_quantity = original_quantity - listing_purchases_quantity
+                            original_quantity = original_quantity if original_quantity >= 0 else 0
+                            
 
-                        if target_listing.active != form.active.data:
-                            target_listing.active = form.active.data
+                            # new catalogue qauntity after current listing's purchases (without work with dates)
+                            new_quantity = int(selected_catalogue.quantity) + listing_purchases_quantity
 
-                        if target_listing.discount_start_date != form.discount_start_date.data:
-                            target_listing.discount_start_date = form.discount_start_date.data
+                            #return str(new_quantity > listing_orders_quantity)
+                            # check if new catalogue after added purchases to it accept the number of orders or not
+                            if new_quantity >= listing_orders_quantity:
+                                # new catalogue quantity after current listing's order
+                                new_quantity = new_quantity - listing_orders_quantity
 
-                        if target_listing.discount_end_date != form.discount_end_date.data:
-                            target_listing.discount_end_date = form.discount_end_date.data
 
-                        if target_listing.unit_discount_price != form.unit_discount_price.data:
-                            target_listing.unit_discount_price = form.unit_discount_price.data
+                                target_listing.catalogue_id = form.catalogue_id.data
+                                target_listing.catalogue.quantity = original_quantity
+                                selected_catalogue.quantity = new_quantity
 
-                        if target_listing.unit_origin_price != form.unit_origin_price.data:
-                            target_listing.unit_origin_price = form.unit_origin_price.data
+                                if target_listing.platform_id != selected_platform.id:
+                                    target_listing.platform_id = selected_platform.id
 
-                        if target_listing.quantity_threshold != form.quantity_threshold.data:
-                            target_listing.quantity_threshold = form.quantity_threshold.data
+                                if target_listing.active != form.active.data:
+                                    target_listing.active = form.active.data
 
-                        if target_listing.currency_iso_code != form.currency_iso_code.data:
-                            target_listing.currency_iso_code = form.currency_iso_code.data
+                                if target_listing.discount_start_date != form.discount_start_date.data:
+                                    target_listing.discount_start_date = form.discount_start_date.data
 
-                        if target_listing.shop_sku != form.shop_sku.data:
-                            target_listing.shop_sku = form.shop_sku.data
+                                if target_listing.discount_end_date != form.discount_end_date.data:
+                                    target_listing.discount_end_date = form.discount_end_date.data
 
-                        if target_listing.offer_id != form.offer_id.data:
-                            target_listing.offer_id = form.offer_id.data
+                                if target_listing.unit_discount_price != form.unit_discount_price.data:
+                                    target_listing.unit_discount_price = form.unit_discount_price.data
 
-                        if target_listing.reference != form.reference.data:
-                            target_listing.reference = form.reference.data
+                                if target_listing.unit_origin_price != form.unit_origin_price.data:
+                                    target_listing.unit_origin_price = form.unit_origin_price.data
 
-                        if target_listing.reference_type != form.reference_type.data:
-                            target_listing.reference_type = form.reference_type.data
-                        
-                        target_listing.catalogue.update()
-                        target_listing.update()
-                        # listing sync with new catalogue done on catalogue after update (catalogue.update, and sync_listing do same event)
-                        selected_catalogue.update()
-                        target_listing.sync_listing()
+                                if target_listing.quantity_threshold != form.quantity_threshold.data:
+                                    target_listing.quantity_threshold = form.quantity_threshold.data
+
+                                if target_listing.currency_iso_code != form.currency_iso_code.data:
+                                    target_listing.currency_iso_code = form.currency_iso_code.data
+
+                                if target_listing.shop_sku != form.shop_sku.data:
+                                    target_listing.shop_sku = form.shop_sku.data
+
+                                if target_listing.offer_id != form.offer_id.data:
+                                    target_listing.offer_id = form.offer_id.data
+
+                                if target_listing.reference != form.reference.data:
+                                    target_listing.reference = form.reference.data
+
+                                if target_listing.reference_type != form.reference_type.data:
+                                    target_listing.reference_type = form.reference_type.data
+                                
+                                target_listing.catalogue.update()
+                                target_listing.update()
+                                # listing sync with new catalogue done on catalogue after update (catalogue.update, and sync_listing do same event)
+                                selected_catalogue.update()
+                                target_listing.sync_listing()
+                            else:
+                                flash("Unable to edit the list, the new catalogue quantity does not accept the listing's orders, please add purchase to this listing, or edit the new catalogue quantity before editing.", "warning")
+                                success = False
+                        else:
+
+                            if target_listing.platform_id != selected_platform.id:
+                                target_listing.platform_id = selected_platform.id
+
+                            if target_listing.active != form.active.data:
+                                target_listing.active = form.active.data
+
+                            if target_listing.discount_start_date != form.discount_start_date.data:
+                                target_listing.discount_start_date = form.discount_start_date.data
+
+                            if target_listing.discount_end_date != form.discount_end_date.data:
+                                target_listing.discount_end_date = form.discount_end_date.data
+
+                            if target_listing.unit_discount_price != form.unit_discount_price.data:
+                                target_listing.unit_discount_price = form.unit_discount_price.data
+
+                            if target_listing.unit_origin_price != form.unit_origin_price.data:
+                                target_listing.unit_origin_price = form.unit_origin_price.data
+
+                            if target_listing.quantity_threshold != form.quantity_threshold.data:
+                                target_listing.quantity_threshold = form.quantity_threshold.data
+
+                            if target_listing.currency_iso_code != form.currency_iso_code.data:
+                                target_listing.currency_iso_code = form.currency_iso_code.data
+
+                            if target_listing.shop_sku != form.shop_sku.data:
+                                target_listing.shop_sku = form.shop_sku.data
+
+                            if target_listing.offer_id != form.offer_id.data:
+                                target_listing.offer_id = form.offer_id.data
+
+                            if target_listing.reference != form.reference.data:
+                                target_listing.reference = form.reference.data
+
+                            if target_listing.reference_type != form.reference_type.data:
+                                target_listing.reference_type = form.reference_type.data
+
+                            target_listing.update()
                     else:
-                        flash("Unable to edit the list, the new catalogue quantity does not accept the listing's orders, please add purchase to this listing, or edit the new catalogue quantity before editing.", "warning")
-                        success = False
+                        success = 'redirect_error'
+                        flash('Platform not found', 'danger')
                 else:
-                    # update platforms
-                    for old_platform in target_listing.platforms:
-                        if old_platform.platform.id not in platforms_ids:
-                            old_platform.delete()
-                        
-                    for platform_id in platforms_ids:
-                        if platform_id not in current_listing_platforms:
-                            new_listing_platform = ListingPlatform(listing_id=target_listing.id,platform_id=platform_id)
-                            new_listing_platform.insert()
-
-                    if target_listing.active != form.active.data:
-                        target_listing.active = form.active.data
-
-                    if target_listing.discount_start_date != form.discount_start_date.data:
-                        target_listing.discount_start_date = form.discount_start_date.data
-
-                    if target_listing.discount_end_date != form.discount_end_date.data:
-                        target_listing.discount_end_date = form.discount_end_date.data
-
-                    if target_listing.unit_discount_price != form.unit_discount_price.data:
-                        target_listing.unit_discount_price = form.unit_discount_price.data
-
-                    if target_listing.unit_origin_price != form.unit_origin_price.data:
-                        target_listing.unit_origin_price = form.unit_origin_price.data
-
-                    if target_listing.quantity_threshold != form.quantity_threshold.data:
-                        target_listing.quantity_threshold = form.quantity_threshold.data
-
-                    if target_listing.currency_iso_code != form.currency_iso_code.data:
-                        target_listing.currency_iso_code = form.currency_iso_code.data
-
-                    if target_listing.shop_sku != form.shop_sku.data:
-                        target_listing.shop_sku = form.shop_sku.data
-
-                    if target_listing.offer_id != form.offer_id.data:
-                        target_listing.offer_id = form.offer_id.data
-
-                    if target_listing.reference != form.reference.data:
-                        target_listing.reference = form.reference.data
-
-                    if target_listing.reference_type != form.reference_type.data:
-                        target_listing.reference_type = form.reference_type.data
-
-                    target_listing.update()
+                    success = 'redirect_error'
+                    flash('Catalogue not found', 'danger')
             else:
                 success = False
         except Exception as e:
@@ -890,6 +892,8 @@ def edit_listing(listing_id):
                 return redirect(url_for('routes.view_listing', listing_id=listing_id))
             elif success == False:
                 return render_template('crud/edit_listing.html',form=form, listing_id=listing_id)
+            elif success == 'redirect_error':
+                return redirect(url_for('routes.edit_listing', listing_id=listing_id))
             else:
                 flash('Unknown error, Unable to edit listing', 'danger')
                 return redirect(url_for('routes.listings'))
@@ -933,7 +937,7 @@ def delete_listing(listing_id):
                 
                 # update number of listings after delete action
                 updateDashboardListings(user_dashboard)
-                updateDashboardOrders(db, Order, Listing, user_dashboard)
+                updateDashboardOrders(db, user_dashboard)
                 updateDashboardPurchasesSum(db, Purchase, Listing, user_dashboard)
                 flash('Successfully deleted Listing ID: {}'.format(listing_id), 'success')
             else:
@@ -996,7 +1000,7 @@ def delete_listings():
 
             # update number of listings one time  after all delete actions
             updateDashboardListings(user_dashboard)
-            updateDashboardOrders(db, Order, Listing, user_dashboard)
+            updateDashboardOrders(db, user_dashboard)
             updateDashboardPurchasesSum(db, Purchase, Listing, user_dashboard)
             flash('Successfully deleted Listings', 'success')
         else:
@@ -1015,55 +1019,61 @@ def delete_listings():
 @vendor_permission.require(http_exception=403)
 def multiple_listing_add():
     try:
-        total_created_listings = 0
         form = AddMultipleListingForm()
-        # fill choices only
-        populate_add_multiple_form(form, Platform, current_user.dashboard.id)
+        # fill choices only, if called process it back default so nothing selected in default (95%)
+        populate_add_multiple_form(form, current_user.dashboard.platforms)
         if form.validate_on_submit():
-            catalogue_ids_data = form.catalogue_ids.data
-            platforms_selects_data = form.platforms_selects.data
-
-            if len(catalogue_ids_data) == len(platforms_selects_data):
-                for i in range(len(catalogue_ids_data)):
-                    catalogue_id = catalogue_ids_data[i]
-                    platform_ids_list = platforms_selects_data[i]
-                    if catalogue_id is not None:
-                        current_catalogue = Catalogue.query.filter_by(id=catalogue_id, user_id=current_user.id).one_or_none()
-                        if current_catalogue is not None:
-                            # current_user.dashboard.id may small heavy repted query but make sure get value on time when insert
-                            new_listing = Listing(dashboard_id=current_user.dashboard.id, catalogue_id=current_catalogue.id)
-                            # create platforms using append
-                            for platform_id in platform_ids_list:
-                                # sometimes platform id will be 0 if no platform selected (coerce used always int)
-                                if platform_id != 0:
-                                    valid_platform = Platform.query.filter_by(dashboard_id=current_user.dashboard.id, id=platform_id).one_or_none()
-                                    if valid_platform is not None:
-                                        new_platform = ListingPlatform(listing_id=None, platform_id=valid_platform.id)
-                                        new_listing.platforms.append(new_platform)
-                            
-                            new_listing.insert()
-                            total_created_listings += 1
-                    else:
-                        # this error if something happend in Javascript and not filled the catalogue_id input so it must notice by user to report (this developing error)
-                        flash("one of catalogues is invalid, unable to create listing for it", "danger")
-                
-                # set the number of total listings after adding action
+            total_created = 0
+            total_invalid = 0
+            #return str(form.catalogue_ids.data)
+            # this function make the processes of any multiple insert very easy and without any unexcpted errors, this function is ultimate secure to use keys without checking
+            new_listings = get_ordered_dicts([
+                'catalogue_id', 'platform_id',
+                'active', 'discount_end_date', 'discount_start_date',
+                'unit_discount_price', 'unit_origin_price',
+                'quantity_threshold', 'currency_iso_code',
+                'shop_sku', 'offer_id', 'reference', 'reference_type'
+                ],
+                form.catalogue_ids.data,
+                form.platforms_selects.data,
+                form.active.data,
+                form.discount_end_date.data,
+                form.discount_start_date.data,
+                form.unit_discount_price.data,
+                form.unit_origin_price.data,
+                form.quantity_threshold.data,
+                form.currency_iso_code.data,
+                form.shop_sku.data,
+                form.offer_id.data,
+                form.reference.data,
+                form.reference_type.data
+            )
+            user_dashboard_id = current_user.dashboard.id
+            for new_list in new_listings:
+                valid_catalogue = Catalogue.query.filter_by(id=new_list['catalogue_id'], user_id=current_user.id).one_or_none()
+                valid_platform = Platform.query.filter_by(id=new_list['platform_id'], dashboard_id=user_dashboard_id).one_or_none()
+                if valid_catalogue and valid_platform:
+                    new_listing = Listing(dashboard_id=user_dashboard_id, **new_list)
+                    new_listing.insert()
+                    total_created += 1
+                else:
+                    total_invalid += 1
+            
+            if total_created > 0:
                 updateDashboardListings(current_user.dashboard)
-                flash("Successfully created {} listings".format(total_created_listings))
-            else:
-                # (protect mylogic from fieldList when it delete one of select feilds if user not select value)
-                print("Error in multiple_listing_add catalogues_ids data not equal to platforms_data, one of inputs missing")
-                flash("System Error while processing your request, Please report this issue.", 'danger')
 
+            ignored = ', Ignored: {}'.format(total_invalid) if total_invalid > 0 else ''
+            flash('Successfully created {} listings{}'.format(total_created, ignored))
         else:
             print('error from multiple_listing_add {}'.format(form.errors))
             flash("Error while processing your request, can not add multiple listing right now.", "danger")
     except Exception as e:
         print('System Error: {}'.format(sys.exc_info()))
         flash('Unknown error unable to add multiple listing', 'danger')
-    
+
     finally:
         return redirect(url_for('routes.catalogues'))
+
 
 
 ################ -------------------------- Listing Purchases (this purchases based on selected listing from any supplier) -------------------- ################
@@ -1409,6 +1419,7 @@ def delete_purchase_listing(listing_id, purchase_id):
 def view_order(listing_id, order_id):    
     success = True
     target_order = None
+    taxes_data = {'order_taxes': [], 'shipping_taxes': []}
     try:
         deleteform = removeOrderForm()
         # user dashboard, listing id to keep index stable and not generate invalid pages to the app (if dashboard, and listing id user can view his orders from invalid urls which not stable for indexing)
@@ -1430,16 +1441,19 @@ def view_order(listing_id, order_id):
         if target_order is None:
             success = False
             flash('unable to find selected order with id: ({}), it maybe deleted or you use invalid url', 'danger')
-
-    except Exception as e:
+        
+        taxes_data = get_separate_order_taxes(target_order)
+    except:
         print('System Error: {}'.format(sys.exc_info()))
         flash('Unknown error unable to display Order with id: {}'.format(order_id), 'danger')
         success = False
+
     finally:
         if success == True:
-            return render_template('order.html', order=target_order, listing_id=listing_id, deleteform=deleteform)
+            return render_template('order.html', order=target_order, listing_id=listing_id, deleteform=deleteform, taxes_data=taxes_data)
         else:
             return redirect(url_for('routes.view_listing', listing_id=listing_id))
+
         
 
 @routes.route('/listings/<int:listing_id>/orders/add', methods=['GET', 'POST'])
@@ -1489,8 +1503,24 @@ def add_order(listing_id):
 
     if request.method == 'POST':
         success = True
+
         try:
+            
             if form.validate_on_submit():
+                # taxes
+                order_tax_codes = form.order_tax_codes.data.split('-_-') if form.order_tax_codes.data else []
+                order_tax_amounts = form.order_tax_amounts.data.split('-_-') if form.order_tax_amounts.data else []
+                shiping_tax_codes = form.shiping_tax_codes.data.split('-_-') if form.shiping_tax_codes.data else []
+                shiping_tax_amounts = form.shiping_tax_amounts.data.split('-_-') if form.shiping_tax_amounts.data else []
+
+                order_taxes = []
+                shipping_taxes = []
+                if order_tax_codes and order_tax_amounts:
+                    order_taxes = get_ordered_dicts(['code', 'amount'], order_tax_codes, order_tax_amounts)
+                
+                if shiping_tax_codes and shiping_tax_amounts:
+                    shipping_taxes = get_ordered_dicts(['code', 'amount'], shiping_tax_codes, shiping_tax_amounts)
+
                 redirect_url = secureRedirect(form.action_redirect.data) if form.action_redirect and form.action_redirect.data else None 
                 valid_ids = int(form.listing_id.data) in [listing.id for listing in dashboard_listings]
                 
@@ -1511,8 +1541,38 @@ def add_order(listing_id):
                             shipping=form.shipping.data,
                             shipping_tax=form.shipping_tax.data,
                             commission=form.commission.data,
-                            total_cost=form.total_cost.data
+                            total_cost=form.total_cost.data,
+                            commercial_id=form.commercial_id.data,
+                            currency_iso_code=form.currency_iso_code.data,
+                            phone=form.phone.data,
+                            street_1=form.street_1.data,
+                            street_2=form.street_2.data,
+                            zip_code=form.zip_code.data,
+                            city=form.city.data,
+                            country=form.country.data,
+                            fully_refunded=form.fully_refunded.data,
+                            can_refund=form.can_refund.data,
+                            order_id=form.order_id.data,
+                            category_code=selected_listing.category_code,
+                            price=selected_listing.price,
+                            product_title=selected_listing.product_name,
+                            product_sku=selected_listing.sku,
+                            order_state=form.order_state.data
                         )
+
+                        otaxes_codes = []
+                        staxes_codes = []
+                        for otax in order_taxes:
+                            # keep use of sqlalchemy append and insert unqiue codes only
+                            if otax['code'] not in otaxes_codes:
+                                new_order.taxes.append(OrderTaxes(type='order', amount=otax['amount'], code=otax['code']))
+                                otaxes_codes.append(otax['code'])
+
+                        for stax in shipping_taxes:
+                            if stax['code'] not in staxes_codes:
+                                new_order.taxes.append(OrderTaxes(type='shipping', amount=stax['amount'], code=stax['code']))
+                                staxes_codes.append(stax['code'])
+
                         new_order.insert()
                         #manual
                         new_quantity = int(catalogue_quantity - order_quantity)
@@ -1521,7 +1581,7 @@ def add_order(listing_id):
                         selected_listing.catalogue.update()
 
                         # update dashboard orders count
-                        updateDashboardOrders(db, Order, Listing, user_dashboard)
+                        updateDashboardOrders(db, user_dashboard)
                         flash('Successfully Created New Order', 'success')
                     else:
                         flash('Unable to add order, the order quantity is greater than the available catalog quantity', 'warning')
@@ -1536,6 +1596,8 @@ def add_order(listing_id):
             print('System Error: {}'.format(sys.exc_info()))
             flash('Unknown error unable to create new Order', 'danger')        
             success = None
+            raise e
+
 
         finally:
             if success == True:
@@ -1544,7 +1606,21 @@ def add_order(listing_id):
                 else:
                     return redirect(url_for('routes.view_listing', listing_id=listing_id))
             elif success == False:
-                return render_template('crud/add_order.html', form=form, listing_id=listing_id, redirect_url=redirect_url)
+                # taxes incase error
+                order_tax_codes = form.order_tax_codes.data.split('-_-') if form.order_tax_codes.data else []
+                order_tax_amounts = form.order_tax_amounts.data.split('-_-') if form.order_tax_amounts.data else []
+                shiping_tax_codes = form.shiping_tax_codes.data.split('-_-') if form.shiping_tax_codes.data else []
+                shiping_tax_amounts = form.shiping_tax_amounts.data.split('-_-') if form.shiping_tax_amounts.data else []
+
+                order_taxes = []
+                shipping_taxes = []
+                if order_tax_codes and order_tax_amounts:
+                    order_taxes = get_ordered_dicts(['code', 'amount'], order_tax_codes, order_tax_amounts)
+                
+                if shiping_tax_codes and shiping_tax_amounts:
+                    shipping_taxes = get_ordered_dicts(['code', 'amount'], shiping_tax_codes, shiping_tax_amounts)
+
+                return render_template('crud/add_order.html', form=form, listing_id=listing_id, redirect_url=redirect_url, order_taxes=order_taxes, shipping_taxes=shipping_taxes)
             else:
                 if redirect_url is not None:
                     return redirect(redirect_url)
@@ -1552,9 +1628,8 @@ def add_order(listing_id):
                     return redirect(url_for('routes.view_listing', listing_id=listing_id))
 
     else:
-        return render_template('crud/add_order.html', form=form, listing_id=listing_id)
-
-
+        return render_template('crud/add_order.html', form=form, listing_id=listing_id, order_taxes=[], shipping_taxes=[])
+    
 @routes.route('/listings/<int:listing_id>/orders/<int:order_id>/edit', methods=['GET', 'POST'])
 @login_required
 @vendor_permission.require(http_exception=403)
@@ -1584,6 +1659,30 @@ def edit_order(listing_id, order_id):
             flash('Unable to find Order with id: ({})'.format(order_id), 'danger')
             return redirect(url_for('routes.view_listing', listing_id=listing_id))
         
+        # db taxes
+        order_tax_codes = []
+        order_tax_amounts = []
+        shiping_tax_codes = []
+        shiping_tax_amounts = []
+        order_tax_ids = []
+        shiping_tax_ids = []
+
+        order_taxes = []
+        shipping_taxes = []
+        for tax in target_order.taxes:
+            if tax.type == 'order':
+                order_tax_codes.append(tax.code)
+                order_tax_amounts.append(str(tax.amount))
+                order_tax_ids.append(str(tax.id))
+                order_taxes.append({'code': tax.code, 'amount': str(tax.amount), 'id': str(tax.id)})
+            elif tax.type == 'shipping':
+                shiping_tax_codes.append(tax.code)
+                shiping_tax_amounts.append(str(tax.amount))
+                shiping_tax_ids.append(str(tax.id))
+                shipping_taxes.append({'code': tax.code, 'amount': str(tax.amount), 'id': str(tax.id)})
+            else:
+                continue
+        
         form = editOrderForm(
             listing_id=target_order.listing_id,
             quantity=target_order.quantity,
@@ -1594,7 +1693,25 @@ def edit_order(listing_id, order_id):
             shipping=target_order.shipping,
             shipping_tax=target_order.shipping_tax,
             commission=target_order.commission,
-            total_cost=target_order.total_cost
+            total_cost=target_order.total_cost,
+            commercial_id=target_order.commercial_id,
+            currency_iso_code=target_order.currency_iso_code,
+            phone=target_order.phone,
+            street_1=target_order.street_1,
+            street_2=target_order.street_2,
+            zip_code=target_order.zip_code,
+            city=target_order.city,
+            country=target_order.country,
+            fully_refunded=target_order.fully_refunded,
+            can_refund=target_order.can_refund,
+            order_id=target_order.can_refund,
+            order_state=target_order.order_state,
+            order_tax_codes = '-_-'.join(order_tax_codes),
+            order_tax_amounts = '-_-'.join(order_tax_amounts),
+            shiping_tax_codes = '-_-'.join(shiping_tax_codes),
+            shiping_tax_amounts = '-_-'.join(shiping_tax_amounts),
+            order_tax_ids = ','.join(order_tax_ids),
+            shiping_tax_ids = ','.join(shiping_tax_ids)
         )
         # user using this route can only use the listing of selected dashboard so not allow another dashboard's listing to be submited some how using this route as it not provided
         dashboard_listings = db.session.query(
@@ -1611,7 +1728,7 @@ def edit_order(listing_id, order_id):
 
     except Exception as e:
         print('System Error: {}'.format(sys.exc_info()))
-        flash('Unknown error unable to display Add Order form', 'danger')
+        flash('Unknown error unable to display Edit Order form', 'danger')
         return redirect(url_for('routes.view_listing', listing_id=listing_id))
     
     if request.method == 'POST':
@@ -1619,9 +1736,10 @@ def edit_order(listing_id, order_id):
         actions = 0
         quantity_changed = False
         current_order_quantity = 0
-        try:            
+        try:
             if form.validate_on_submit():
                 redirect_url = secureRedirect(form.action_redirect.data) if form.action_redirect and form.action_redirect.data else None
+                
 
                 valid_ids = int(form.listing_id.data) in [listing.id for listing in dashboard_listings]
                 selected_listing = Listing.query.filter_by(id=form.listing_id.data).one_or_none()
@@ -1683,6 +1801,9 @@ def edit_order(listing_id, order_id):
                             target_order.update()
                             target_order.listing.catalogue.update()
                             selected_listing.catalogue.update()
+
+                            # update order_taxes
+                            update_order_taxes(form, target_order)
                             flash('Successfully Updated The order', 'success')
                         else:
                             flash('Unable to add edit, the order quantity is greater than the new catalog quantity', 'warning')
@@ -1743,6 +1864,8 @@ def edit_order(listing_id, order_id):
                                 target_order.total_cost = decimal.Decimal(target_order.listing.price) + decimal.Decimal(target_order.tax) + decimal.Decimal(target_order.shipping) + decimal.Decimal(target_order.shipping_tax) + decimal.Decimal(target_order.commission)
                                 actions += 1
 
+                        # one time run performance is must to run successfull if called more than one time in each if will fail message so logic says call it with performance is must (force user of function to follow performance)
+                        update_taxes_result = update_order_taxes(form, target_order)
                         if actions > 0:
                             
                             if quantity_changed:
@@ -1759,6 +1882,7 @@ def edit_order(listing_id, order_id):
                                     selected_listing.catalogue.quantity = new_quantity                          
                                     selected_listing.catalogue.update()
 
+                                    # if require updates make update action for taxes
                                     flash('Successfully Updated The order', 'success')
                                 else:
                                     flash('Unable to add edit, the order quantity is greater than the available catalog quantity', 'warning')
@@ -1768,8 +1892,12 @@ def edit_order(listing_id, order_id):
                                 target_order.update()
                                 flash('Successfully Updated The order', 'success')
                         else:
-                            # nothing changed user opened the edit page and click edit
-                            flash('No changes detected', 'success')
+                            if update_taxes_result['changed'] == True:
+                                # taxes only changed
+                                flash('Successfully Updated The order', 'success')
+                            else:
+                                # nothing changed user opened the edit page and click edit
+                                flash('No changes detected', 'success')
 
                 else:
                     flash('Unable to edit order invalid listing provided', 'danger')
@@ -1777,6 +1905,9 @@ def edit_order(listing_id, order_id):
             else:
                 # wtforms error (render_template)
                 success = False
+                data =get_orders_and_shippings(form)
+                order_taxes = data['order_taxes']
+                shipping_taxes = data['shipping_taxes']
             
         except Exception as e:
             print('System Error: {}'.format(sys.exc_info()))
@@ -1784,18 +1915,23 @@ def edit_order(listing_id, order_id):
 
         finally:
             if success == False:
-                return render_template('crud/edit_order.html', form=form, listing_id=listing_id, order_id=order_id, redirect_url=redirect_url)
+                try:
+                    order_taxes=order_taxes
+                    shipping_taxes=shipping_taxes
+                except:
+                    print("invalid success status")
+                    order_taxes=[]
+                    shipping_taxes=[]
+
+                return render_template('crud/edit_order.html', form=form, listing_id=listing_id, order_id=order_id, redirect_url=redirect_url, order_taxes=order_taxes, shipping_taxes=shipping_taxes)
             else:
-                if redirect_url is not None:
+                if redirect_url:
                     return redirect(redirect_url)
                 else:
-                    return redirect(url_for('routes.view_listing', listing_id=listing_id))
-
+                    return redirect(url_for('routes.view_order', listing_id=listing_id, order_id=order_id))
     else:
-        return render_template('crud/edit_order.html', form=form, listing_id=listing_id, order_id=order_id)
+        return render_template('crud/edit_order.html', form=form, listing_id=listing_id, order_id=order_id, order_taxes=order_taxes, shipping_taxes=shipping_taxes)
         
-
-
 
 @routes.route('/listings/<int:listing_id>/orders/<int:order_id>/delete', methods=['GET', 'POST'])
 @login_required
@@ -1832,7 +1968,7 @@ def delete_order(listing_id, order_id):
                 target_order.delete()
 
                 # update dashboard orders count
-                updateDashboardOrders(db, Order, Listing, user_dashboard)
+                updateDashboardOrders(db, user_dashboard)
                 flash('Successfully removed order with ID: {}'.format(order_id), 'success')
             else:
                 # security wtform
@@ -1873,9 +2009,19 @@ def orders():
             lambda total_pages: [url_for('routes.orders', page=page_index) for page_index in range(1, total_pages+1)]
         )
             
-        action_redirect = url_for('routes.orders', page=request_page)
+        action_redirect = url_for('routes.orders')
         orders = pagination['data']
-        return render_template('orders.html', orders=orders, pagination_btns=pagination['pagination_btns'], order_remove=order_remove, action_redirect=action_redirect)
+
+        setup_bestbuy = SetupBestbuyForm()
+        bestbuy_installed = bestbuy_ready()
+        import_orders = importOrdersAPIForm()
+
+        import_orders_report = session.get('import_orders_report', None)
+        if import_orders_report:
+            flash(import_orders_report)
+            session.pop('import_orders_report', None)
+        
+        return render_template('orders.html', orders=orders, pagination_btns=pagination['pagination_btns'], order_remove=order_remove, action_redirect=action_redirect, setup_bestbuy=setup_bestbuy, bestbuy_installed=bestbuy_installed, import_orders=import_orders)
 
     except Exception as e:
         print('System Error orders: {}'.format(sys.exc_info()))

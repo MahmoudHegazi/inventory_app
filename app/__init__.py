@@ -6,6 +6,7 @@ from flask_bcrypt import Bcrypt
 from flask_principal import Principal, Permission, RoleNeed
 from flask_admin import Admin, expose, BaseView
 import flask_excel as excel
+from flask_session import Session
 
 UPLOAD_FOLDER = os.path.join(os.path.dirname(__file__), '/static/assets/uploads')
 
@@ -17,8 +18,11 @@ app.config['SQLALCHEMY_DATABASE_URI'] = 'mysql://mr204h:Ilda2011@localhost/inven
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 app.config['MAX_CONTENT_LENGTH'] = 50 * 1024 * 1024
 app.config['AUTH_ALLOWED_FILES'] = {'png', 'jpg', 'jpeg', 'gif'}
+# configure backend-session
+app.config['SESSION_PERMANENT'] = False
+app.config["SESSION_TYPE"] = "filesystem"
 # here setup global variables for remaning requests per user and max request
-app.config['BESTBUY_RAMAINING'] = 50
+app.config['BESTBUY_RAMAINING'] = 100
 app.config['BESTBUY_MAX'] = 100
 #app.config['SALAT'] = os.environ.get('SALAT')
 db = SQLAlchemy(app)
@@ -48,6 +52,9 @@ authincation = app.register_blueprint(auth)
 systemActions = app.register_blueprint(main)
 
 admin = Admin(app, name='Inventory', template_mode='bootstrap4')
+
+# setup backend-session
+flaskSession = Session(app)
 
 from .admin_models import InventoryModelView, userModalView, roleModalView, userRolesModalView, dashboardModalView, listingModalView, cataloguedModalView, purchaseModalView, orderModalView, supplierModalView, backlink
 from flask_admin.contrib.fileadmin import FileAdmin

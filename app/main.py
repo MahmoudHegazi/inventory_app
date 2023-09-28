@@ -6,11 +6,12 @@ import time
 import math
 from flask import Flask, Blueprint, session, redirect, url_for, flash, Response, request, render_template, jsonify, Request, Response, current_app
 from .models import *
-from .forms import CatalogueExcelForm, ExportDataForm, importCategoriesAPIForm, importOffersAPIForm, SetupBestbuyForm
+from .forms import CatalogueExcelForm, ExportDataForm, importCategoriesAPIForm, importOffersAPIForm, SetupBestbuyForm, importOrdersAPIForm
 from . import vendor_permission, admin_permission, db, excel
 from .functions import get_mapped_catalogues_dicts, getTableColumns, getFilterBooleanClauseList, ExportSqlalchemyFilter,\
-get_export_data, get_charts, get_excel_rows, get_sheet_row_locations, apikey_or_none, chunks, upload_catalogues, calc_chunks_result, \
-bestbuy_ready, get_remaining_requests, get_requests_before_1minute
+get_export_data, get_charts, get_excel_rows, get_sheet_row_locations, chunks, apikey_or_none, upload_catalogues, calc_chunks_result, \
+bestbuy_ready, get_remaining_requests, get_requests_before_1minute, upload_orders, calc_orders_result, updateDashboardListings,\
+updateDashboardOrders, import_orders, order_ids_chunks
 from flask_login import login_required, current_user
 import flask_excel
 import pyexcel
@@ -345,9 +346,7 @@ def search():
                 data = [data_obj.format() for data_obj in db.session.query(Listing).join(
                     Catalogue, Listing.catalogue_id == Catalogue.id
                 ).outerjoin(
-                    ListingPlatform, Listing.id==ListingPlatform.listing_id
-                ).outerjoin(
-                    Platform, ListingPlatform.platform_id==Platform.id
+                    Platform, Listing.platform_id == Platform.id
                 ).outerjoin(
                     CatalogueLocations, Catalogue.id == CatalogueLocations.catalogue_id
                 ).outerjoin(
@@ -496,7 +495,7 @@ def savelimit():
 @login_required
 @vendor_permission.require()
 def setup_bestbuy():
-    redirects = {'setup': url_for('routes.setup'), 'listings': url_for('routes.listings')}
+    redirects = {'setup': url_for('routes.setup'), 'listings': url_for('routes.listings'), 'orders': url_for('routes.orders')}
     redirect_url = url_for('routes.setup')
     message = ''
     status = 'danger'
@@ -656,7 +655,6 @@ def api_import_categories():
     finally:
         return redirect(url_for('routes.setup'))
 
-
 # remaning listing info report
 # import categories using API (user securly provide API key)
 @main.route('/import_offers_api', methods=['POST', 'GET'])
@@ -666,12 +664,12 @@ def api_offers_import():
     results = []
     try:
         tomorrow_str = (datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0) + timedelta(hours=24)).strftime('%Y-%m-%d')
-        #a750a16c-054e-407c-9825-3da7d4b2a9c1
+        # a750a16c-054e-407c-9825-3da7d4b2a9c1
         form = importOffersAPIForm()
         if form.validate_on_submit():
             bestbuy_instaled = bestbuy_ready()
             bestbuy_request_max = UserMeta.query.filter_by(key='bestbuy_request_max', user_id=current_user.id).first()
-            if bestbuy_instaled and bestbuy_request_max:
+            if bestbuy_instaled and bestbuy_request_max is not None:
                 bestbuy_request_max = int(bestbuy_request_max.value)
                 user_remaining_requests = get_remaining_requests()
                 request_max = bestbuy_request_max if bestbuy_request_max <= 100 and bestbuy_request_max >= 0 else 100
@@ -686,18 +684,19 @@ def api_offers_import():
                         successful = 0
                         # better send small test request, to confirm API key, and API comunication
                         r = requests.get(req_url, headers=headers)
-                        
-                        #400/100 = 40, range(0,40)
-                        # this is like status test request (API endpoint health check before start multiple requests, with time.sleep(10) per each, incase invalid api key user will wait alot if not tested)
-                        if r.status_code == 200:
 
+                        new_request_meta = UserMeta(key='bestbuy_request', user_id=current_user.id, value=r.status_code)
+                        new_request_meta.insert()
+                        # 400/100 = 40, range(0,40)
+                        # this is like status test request (API endpoint health check before start multiple requests, with time.sleep(10) per each, incase invalid api key user will wait alot if not tested)
+                        if r.status_code == 200:                    
                             response_content = json.loads(r.content) if r and r.content else None                    
                             # get total count of requests
                             total_count = None
                             remaing_data = 0
                             try:
-                                remaing_data = int(response_content['total_count']) - request_max if int(response_content['total_count']) >= request_max else 0
-                                total_count = math.ceil(int(response_content['total_count'])/request_max)                            
+                                remaing_data = int(int(response_content['total_count']) - request_max) if int(response_content['total_count']) >= request_max else 0
+                                total_count = math.ceil(remaing_data/request_max)
                             except:
                                 print("API not sending total_count, or sending invalid int")
                                 pass
@@ -712,6 +711,7 @@ def api_offers_import():
                             if user_remaining_requests > 0:
                                 # start loop to add cooldown sleep between requests and get all data
                                 for i in range(0,total_requests):
+                                    current_max = (i+2) * request_max
                                     # wait 5 seconds between each request
                                     time.sleep(5)
                                     try:
@@ -719,19 +719,24 @@ def api_offers_import():
                                         next_url = r.links.get('next').get('url') if r.links and r.links.get('next', None) and r.links.get('next').get('url', None) else None
                                         if next_url:
                                             r = requests.get(next_url, headers=headers)
+                                            new_request_meta = UserMeta(key='bestbuy_request', user_id=current_user.id, value=r.status_code)
+                                            new_request_meta.insert()
+
                                             if r.status_code == 200:
                                                 if remaing_data > 0:
                                                     remaing_data = remaing_data - request_max if (remaing_data - request_max) > 0 else 0
                                                 current_upload_result = upload_catalogues(json.loads(r.content)['offers'], current_user)
                                                 results.append(current_upload_result)
-                                                successful += 1           
+                                                successful += 1
+
                                     except Exception as e:
                                         print("Error in one of chunks at api_offers_import: {}".format(sys.exc_info()))
-                                        chunks_errors.append("Some Of data Could not be imported, Error occured in request number 2: start from 200 to 300")
-                                        raise e
+                                        chunks_errors.append("Some Of data Could not be imported, Error occured in request number {}: start from {} to {}".format((i+2), current_max, (current_max-request_max)))
+
                             else:
-                                chunks_errors.append("Could not import the Remaining {} data at the moment, you exceded the limit of requests, not all data imported".format(remaing_data))                    
-                        
+                                chunks_errors.append("Could not import the Remaining {} data at the moment, you exceded the limit of requests, not all data imported".format(remaing_data))
+
+                            updateDashboardListings(current_user.dashboard)                               
                             total_result = calc_chunks_result(results)
                             str_part1 = 'Succsefully imported {total_imported} of Catalogues from total: {total} Catalogues, Updated {total_updated} of catalogues from total: {total} catalogues, and {not_changed} not changed Catalogues'.format(total_imported=total_result['uploaded'],total=total_result['total'],total_updated=total_result['updated'],not_changed=total_result['not_changed'])
                             str_part2 = '--- AND imported {total_imported} of Listings from total: {total} Listings, Updated {total_updated} of listings from total: {total} listings,and created {new_categories} new Categories'.format(total_imported=total_result['luploaded'],total=total_result['total'],total_updated=total_result['lupdated'],not_changed=total_result['lnot_changed'], new_categories=total_result['new_categories'])
@@ -745,10 +750,10 @@ def api_offers_import():
                                     flash(chunk_error, 'danger')
                             else:
                                 flash('Unable to connect to the API right now to get Data, please try again later.', 'danger')
+
                         elif r.status_code == 401:
                             flash('Invalid API key, the API refused to authorize your request.', 'danger')
                         else:
-                            return jsonify(json.loads(r.content))
                             flash('The API cannot process your request now, please try again later, if the problem is not resolved, please report to us.', 'danger')
                     else:
                         flash(f'You Can not make more requests right now, please wait for {tomorrow_str} and try again', 'warning')
@@ -765,5 +770,159 @@ def api_offers_import():
     except Exception as e:
         flash('System Error, Could not process your request right now', 'danger')
         print('System error in api_offers_import, info: {}'.format(sys.exc_info()))
+
     finally:
         return redirect(url_for('routes.listings'))
+
+    
+@main.route('/import_orders_api', methods=['POST', 'GET'])
+@login_required
+@vendor_permission.require()
+def api_import_orders():
+    results = []
+    try:
+        
+        tomorrow_str = (datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0) + timedelta(hours=24)).strftime('%Y-%m-%d')
+        form = importOrdersAPIForm()
+        if form.validate_on_submit():
+            bestbuy_instaled = bestbuy_ready()
+            bestbuy_request_max = UserMeta.query.filter_by(key='bestbuy_request_max', user_id=current_user.id).first()
+            if bestbuy_instaled and bestbuy_request_max is not None:
+                user_remaining_requests = get_remaining_requests()
+                bestbuy_request_max = int(bestbuy_request_max.value)                
+                request_max = bestbuy_request_max if bestbuy_request_max <= 100 and bestbuy_request_max >= 0 else 100
+
+                # created date sent by user
+                start_date_parameter = '&start_date={}'.format(form.date_from.data.strftime("%Y-%m-%dT%H:%M:%SZ")) if form.date_from.data else ''
+                # secure api key
+                apikey = apikey_or_none(form.api_key.data)
+                req_url = f'https://marketplace.bestbuy.ca/api/orders?max={request_max}{start_date_parameter}'
+                if apikey:
+                    if not form.order_ids.data:
+                        if user_remaining_requests > 0:
+                            headers = {'Authorization': apikey}
+                            chunks_errors = []
+                            successful = 0
+
+                            r = requests.get(req_url, headers=headers)
+                            new_request_meta = UserMeta(key='bestbuy_request', user_id=current_user.id, value=r.status_code)
+                            new_request_meta.insert()
+                            
+                            if r.status_code == 200:
+    
+                                response_content = json.loads(r.content) if r and r.content else None
+                                # get total count of requests
+                                total_count = None
+                                remaing_data = 0
+                                try:
+                                    remaing_data = int(int(response_content['total_count']) - request_max) if int(response_content['total_count']) >= request_max else 0
+                                    total_count = math.ceil(remaing_data/request_max)
+                                except:
+                                    print("API not sending total_count, or sending invalid int")
+                                    pass
+    
+                                # if total_count of required requests to imported less or equal to user_remaining_requests allow else make him send only requests with count of his reamning not block all
+                                total_requests = total_count if total_count is not None and user_remaining_requests >= total_count else user_remaining_requests
+                                current_upload_result0 = upload_orders(json.loads(r.content)['orders'], current_user, db)
+                                results.append(current_upload_result0)
+                                user_remaining_requests = get_remaining_requests()
+                                if user_remaining_requests > 0:
+                                    # start loop to add cooldown sleep between requests and get all data
+                                    for i in range(0,total_requests):
+                                        current_max = (i+2) * request_max
+                                        # wait 5 seconds between each request
+                                        time.sleep(5)
+                                        try:
+                                            # chunks remaning
+                                            next_url = r.links.get('next').get('url') if r.links and r.links.get('next', None) and r.links.get('next').get('url', None) else None
+                                            # even if the calcuation goes wrong for any reson this if acts like while next_url and will ignore looping and not send additional requests not needed
+                                            if next_url:
+                                                r = requests.get(next_url, headers=headers)
+                                                new_request_meta = UserMeta(key='bestbuy_request', user_id=current_user.id, value=r.status_code)
+                                                new_request_meta.insert()
+    
+                                                if r.status_code == 200:
+                                                    if remaing_data > 0:
+                                                        remaing_data = remaing_data - request_max if (remaing_data - request_max) > 0 else 0
+                                                    current_upload_result = upload_orders(json.loads(r.content)['orders'], current_user, db)
+                                                    results.append(current_upload_result)
+                                                    successful += 1
+    
+                                        except Exception as e:
+                                            print("Error in one of chunks at api_import_orders: {}".format(sys.exc_info()))
+                                            chunks_errors.append("Some Of data Could not be imported, Error occured in request number {}: start from {} to {}".format((i+2), current_max, (current_max-request_max)))
+    
+                                else:
+                                    chunks_errors.append("Could not import the Remaining {} data at the moment, you exceded the limit of requests, not all data imported".format(remaing_data))
+                            
+                                result = calc_orders_result(results)
+                                str_part1 = 'total uploaded: {}, total updated: {}, total not changed: {}, total invalid quantity: {}, total missing listing: {}, total upload error: {}'.format(result['total_uploaded'], result['total_updated'], result['not_changed'], result['total_invalid'], result['total_missing'], result['total_errors'])
+                                total_data = result['total_uploaded'] + result['total_updated'] + result['not_changed'] + result['total_invalid'] + result['total_missing'] + result['total_errors']
+
+
+                                if len(chunks_errors) == 0:
+                                    flash('Succsefully Imported All Data from total ({}), Import Report: {}'.format(total_data, str_part1), 'success')
+                                else:
+                                    # one or more request blocked, but not all, inform user which requests have issue (API later automatic will handle when import data, but notify user with his stuiation)
+                                    flash('Succsefully Imported some of Data from total ({}), one or more requests failed, Import Report: {}'.format(total_data, str_part1), 'success')
+                                    for chunk_error in chunks_errors:
+                                        flash(chunk_error, 'danger')
+    
+                                # update dashboard orders totals after all inserts
+                                updateDashboardOrders(db, current_user.dashboard)
+    
+                                # handle ignored values
+                                #if len(result['invalid_quantity']) > 0 or len(result['missing_listing']) > 0 or len(result['errors']) > 0:
+                                session['import_orders_report'] = 'Report of ignored data, you may need this ids to able to get the same data later from API, invalid quantity ids: [{}], missing listing ids: [{}], errors ids: [{}]'.format(','.join(result['invalid_quantity']), ','.join(result['missing_listing']), ','.join(result['errors']))
+    
+                            elif r.status_code == 401:
+                                flash('Invalid API key, the API refused to authorize your request.', 'danger')
+                            else:
+                                flash('The API cannot process your request now, please try again later, if the problem is not resolved, please report to us.', 'danger')
+                        else:
+                            flash(f'You Can not make more requests right now, please wait for {tomorrow_str} and try again', 'warning')
+                    else:
+                        order_ids = form.order_ids.data.split(",")
+                        speacfic_orders = import_orders(db, apikey, order_ids, bestbuy_request_max, user_remaining_requests, tomorrow_str)
+
+                        if not speacfic_orders['error']:
+                            results = speacfic_orders['results']
+                            chunks_errors = speacfic_orders['chunks_errors']
+
+                            # import speacfic order ids
+                            result = calc_orders_result(results)
+                            str_part1 = 'total uploaded: {}, total updated: {}, total not changed: {}, total invalid quantity: {}, total missing listing: {}, total upload error: {}'.format(result['total_uploaded'], result['total_updated'], result['not_changed'], result['total_invalid'], result['total_missing'], result['total_errors'])
+
+                            total_data = result['total_uploaded'] + result['total_updated'] + result['not_changed'] + result['total_invalid'] + result['total_missing'] + result['total_errors']
+
+                            if len(chunks_errors) == 0:
+                                flash('Succsefully Imported All Data from total ({}), Import Report: {}'.format(total_data, str_part1), 'success')
+                            else:
+                                # one or more request blocked, but not all, inform user which requests have issue (API later automatic will handle when import data, but notify user with his stuiation)
+                                flash('Succsefully Imported some of Data from total ({}), one or more requests failed, Import Report: {}'.format(total_data, str_part1), 'success')
+                                for chunk_error in chunks_errors:
+                                    flash(chunk_error, 'danger')
+    
+                            # update dashboard orders totals after all inserts
+                            updateDashboardOrders(db, current_user.dashboard)
+    
+                            # handle ignored values
+                            #if len(result['invalid_quantity']) > 0 or len(result['missing_listing']) > 0 or len(result['errors']) > 0:
+                            session['import_orders_report'] = 'Report of ignored data, you may need this ids to able to get the same data later from API, invalid quantity ids: [{}], missing listing ids: [{}], errors ids: [{}]'.format(','.join(result['invalid_quantity']), ','.join(result['missing_listing']), ','.join(result['errors']))
+                        else:
+                            flash(speacfic_orders['error'], 'danger')
+                else:
+                    flash('Invalid API Key.', 'danger')
+            else:
+                flash('Please update or configure bestbuy API settings first, by clicking on same import button clicked.', 'danger')
+        else:
+            for field, errors in form.errors.items():
+                if field == 'csrf_token':
+                    flash("Error can not import orders Please restart page and try again", "danger")
+                    continue
+                flash('Error in {} : {}'.format(field, ','.join(errors)), 'danger')
+    except Exception as e:
+        flash('System Error, Could not process your request right now', 'danger')
+        print('System error in api_import_orders, info: {}'.format(sys.exc_info()))
+
+    return redirect(url_for('routes.orders'))

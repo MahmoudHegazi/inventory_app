@@ -66,7 +66,7 @@
               <p class="overflow_within"><span class="badge badge-info">Category Parent Code: </span><span class="p-1 shadow">{% if listing.catalogue and listing.catalogue.category %}{{listing.catalogue.category.parent_code}}{% endif %}</span></p>
             </div>
             <div class="col-sm-12">
-              <p class="overflow_within"><span class="badge badge-dark">Plateform: </span><span class="p-1 shadow"> {% for listing_platform in listing.platforms %}<span class="badge badge-secondary">{{listing_platform.platform.name}}</span> {% endfor %}</span></p>
+              <p class="overflow_within"><span class="badge badge-dark">Plateform: </span><span class="p-1 shadow">{{listing.platform.name}}</span></p>
             </div>
             <div class="col-sm-12">
               <p class="overflow_within"><span class="badge badge-info">Active: </span><span class="p-1 shadow"> {{listing.active}}</span></p>
@@ -257,7 +257,7 @@
                       <td>
                         <div class="d-flex justify-content-around align-items-center">
                           <a href="{{url_for('routes.view_order', listing_id=listing.id, order_id=order.id)}}" class="btn btn-primary btn-sm"><i class="fa fa-eye"></i></a>
-                          <a href="{{url_for('routes.edit_order', listing_id=listing.id, order_id=order.id)}}" class="btn btn-secondary btn-sm"><i class="fa fa-edit"></i></a>
+                          <a href="{{url_for('routes.edit_order', listing_id=listing.id, order_id=order.id, redirect_url=url_for('routes.view_listing', listing_id=listing.id))}}" class="btn btn-secondary btn-sm"><i class="fa fa-edit"></i></a>
 
                           <button data-url="{{url_for('routes.delete_order', listing_id=listing.id, order_id=order.id)}}" data-toggle="modal" 
                           data-target="#deleteOrderModal" data-order-id="{{order.id}}" onclick="toggleLoadingCircle(true, 'block')" 

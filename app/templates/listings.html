@@ -111,19 +111,10 @@
       {% set listing_category_label  =  '' %}
       {% endif %}
 
-      {# create platforms search string #}
-      {% set ns = namespace(platforms_string='') %}
-      {% for listing_platform in listing.platforms %}
-        {% set ns.platforms_string = ns.platforms_string ~ listing_platform.platform.name  %}
-        {% if not loop.last %}
-        {% set ns.platforms_string = ns.platforms_string ~ ', ' %}
-        {% endif %}
-      {% endfor %}
-
       <div class="searching_card col-4 p-3 d-flex justify-content-center align-items-stretch cursor-pointer text-decoration-none text-dark media_small_width_100"
       data-search-id="{{listing.id}}" data-search-category="{{listing_category_label}}" data-search-sku="{{listing.sku}}"
       data-search-product_name="{{listing.product_name}}" data-search-price="{{listing.price}}" 
-      data-search-sale_price="{{listing.sale_price}}" data-search-quantity="{{listing.quantity}}" data-search-platform="{{ns.platforms_string}}">
+      data-search-sale_price="{{listing.sale_price}}" data-search-quantity="{{listing.quantity}}" data-search-platform="{{listing.platform.name}}">
 
       <div class="hover_shadow row container border rounded shadow p-3">
           <div class="col-sm-12 mb-3 text-center">
@@ -137,7 +128,7 @@
             <div class="overflow_within">Price: <span>{{listing.price}}</span></div>
             <div class="overflow_within">Sale Price: <span>{{listing.sale_price}}</span></div>
             <div class="overflow_within">Quantity: <span>{{listing.quantity}}</span></div>
-            <div class="overflow_within">Platform: <span>{% for listing_platform in listing.platforms %}<span class="badge badge-secondary">{{listing_platform.platform.name}}</span>{% endfor %}</span></div>
+            <div class="overflow_within">Platform: <span>{{listing.platform.name}}</span></div>
           </div>
           <div class="col-sm-12 row">
             <div class="col-sm-6">
@@ -175,14 +166,6 @@
           </thead>
           <tbody>
             {% for listing in listings %}
-              {# create platforms search string #}
-              {% set ns = namespace(platforms_string='') %}
-              {% for listing_platform in listing.platforms %}
-                {% set ns.platforms_string = ns.platforms_string ~ listing_platform.platform.name  %}
-                {% if not loop.last %}
-                {% set ns.platforms_string = ns.platforms_string ~ ', ' %}
-                {% endif %}
-              {% endfor %}
 
               {# additional for current search get locations string #}
               {% set locations_arr = [] %}
@@ -212,7 +195,7 @@
               
             <tr class="searching_card" data-search-id="{{listing.id}}" data-search-category="{{listing_category_label}}" data-search-sku="{{listing.sku}}"
             data-search-product_name="{{listing.product_name}}" data-search-price="{{listing.price}}" 
-            data-search-sale_price="{{listing.sale_price}}" data-search-quantity="{{listing.quantity}}" data-search-platform="{{ns.platforms_string}}" data-search-location="{{location_string}}" data-search-bin="{{bin_string}}">
+            data-search-sale_price="{{listing.sale_price}}" data-search-quantity="{{listing.quantity}}" data-search-platform="{{listing.platform.name}}" data-search-location="{{location_string}}" data-search-bin="{{bin_string}}">
               <td>
                 <p class="overflow_within"><input type="checkbox" data-check-listing="{{listing.product_name}}" class="select_listings form-control" name="select_listings" value="{{listing.id}}" /></p>
               </td>
@@ -238,7 +221,7 @@
                 <p class="overflow_within">{{listing.quantity}}</p>
               </td>
               <td>
-                <p class="overflow_within">{% for listing_platform in listing.platforms %}<span class="badge badge-secondary">{{listing_platform.platform.name}}</span>{% endfor %}</p>
+                <p class="overflow_within">{{listing.platform.name}}</p>
               </td>
               <td>
                 <div class="overflow_within" style="max-height:180px !important;overflow: auto;word-wrap: break-word;">
@@ -330,7 +313,7 @@ function rowBuildCB(listing){
   const delete_change_event = (typeof(publicOnChangeCheckBoxSelectAll) == 'function' ? `onchange="publicOnChangeCheckBoxSelectAll(event)" ` : '');
 
   let rowHTML = '';
-  if (listing && listing.id !== undefined && listing.sku !== undefined && listing.product_name !== undefined && listing.price !== undefined && listing.platform !== undefined && listing.listing_image_url !== undefined && listing.location !== undefined && listing.bin !== undefined && listing.view_listing !== undefined && listing.edit_listing !== undefined && Array.isArray(listing.platforms) && Array.isArray(listing.locations) ){
+  if (listing && listing.id !== undefined && listing.sku !== undefined && listing.product_name !== undefined && listing.price !== undefined && listing.platform !== undefined && listing.listing_image_url !== undefined && listing.location !== undefined && listing.bin !== undefined && listing.view_listing !== undefined && listing.edit_listing !== undefined && Array.isArray(listing.locations) ){
     rowHTML += `<tr class="searching_card search_all_card" data-search-id="${listing.id}" data-search-category="${listing.category}" data-search-sku="${listing.sku}"
               data-search-product_name="${listing.product_name}" data-search-price="${listing.price}" 
               data-search-sale_price="${listing.sale_price}" data-search-quantity="${listing.quantity}" data-search-platform="${listing.platform}"
@@ -361,14 +344,7 @@ function rowBuildCB(listing){
                 <p class="overflow_within">${listing.quantity}</p>
               </td>
               <td>
-                <p class="overflow_within">`;
-                
-                  for (let l=0; l<listing.platforms.length; l++){
-                    const listingPlatformName = listing.platforms[l];
-                    rowHTML += `<span class="badge badge-secondary">${listingPlatformName}</span>`;
-                  }
-    rowHTML += `
-                </p>
+                <p class="overflow_within">${listing.platform}</p>
               </td>
               <td>
                 <div class="overflow_within" style="max-height:180px !important;overflow: auto;word-wrap: break-word;">`;

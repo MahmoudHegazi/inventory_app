@@ -22,8 +22,14 @@
       <!-- Logged User Dashboards  -->
       <div class="col-12 p-3 d-flex justify-content-center align-items-center cursor-pointer text-decoration-none text-dark media_small_width_100">
         <div class="container">
-            <form action="{{url_for('routes.add_order', listing_id=listing_id)}}" method="POST">          
+            <form action="{{url_for('routes.add_order', listing_id=listing_id)}}" method="POST" id="add_order_form">          
               {{form.hidden_tag()}}
+              <div id="top_form_btns">
+                <div id="form_btns" class="d-flex justify-content-end align-items-center w-50 ml-auto">
+                  {{form.add(class='btn btn-success w_100px')}}
+                  <a id="cancel_link" href="{{url_for('routes.view_listing', listing_id=listing_id)}}" class="btn btn-primary w_100px">Cancel</a>
+                </div>
+              </div>
               <div class="form-group">
                 {{form.listing_id.label}}
                 {{form.listing_id(class='form-control', placeholder='Listing')}}
@@ -79,6 +85,78 @@
                 {% if form.customer_lastname.errors %}
                 <ul class="errors bg-danger text-white">
                     {% for error in form.customer_lastname.errors %}
+                        <li class="p-1 mb-1">{{ error }}</li>
+                    {% endfor %}
+                </ul>
+                {% endif %}
+              </div>
+              <div class="form-group">
+                {{form.phone.label}}
+                {{form.phone(class='form-control', placeholder='Phone')}}
+                
+                {% if form.phone.errors %}
+                <ul class="errors bg-danger text-white">
+                    {% for error in form.phone.errors %}
+                        <li class="p-1 mb-1">{{ error }}</li>
+                    {% endfor %}
+                </ul>
+                {% endif %}
+              </div>
+              <div class="form-group">
+                {{form.street_1.label}}
+                {{form.street_1(class='form-control', placeholder='Street 1')}}
+                
+                {% if form.street_1.errors %}
+                <ul class="errors bg-danger text-white">
+                    {% for error in form.street_1.errors %}
+                        <li class="p-1 mb-1">{{ error }}</li>
+                    {% endfor %}
+                </ul>
+                {% endif %}
+              </div>
+              <div class="form-group">
+                {{form.street_2.label}}
+                {{form.street_2(class='form-control', placeholder='Street 2')}}
+                
+                {% if form.street_2.errors %}
+                <ul class="errors bg-danger text-white">
+                    {% for error in form.street_2.errors %}
+                        <li class="p-1 mb-1">{{ error }}</li>
+                    {% endfor %}
+                </ul>
+                {% endif %}
+              </div>
+              <div class="form-group">
+                {{form.zip_code.label}}
+                {{form.zip_code(class='form-control', placeholder='Zip Code')}}
+                
+                {% if form.zip_code.errors %}
+                <ul class="errors bg-danger text-white">
+                    {% for error in form.zip_code.errors %}
+                        <li class="p-1 mb-1">{{ error }}</li>
+                    {% endfor %}
+                </ul>
+                {% endif %}
+              </div>
+              <div class="form-group">
+                {{form.city.label}}
+                {{form.city(class='form-control', placeholder='City')}}
+                
+                {% if form.city.errors %}
+                <ul class="errors bg-danger text-white">
+                    {% for error in form.city.errors %}
+                        <li class="p-1 mb-1">{{ error }}</li>
+                    {% endfor %}
+                </ul>
+                {% endif %}
+              </div>
+              <div class="form-group">
+                {{form.country.label}}
+                {{form.country(class='form-control', placeholder='Country')}}
+                
+                {% if form.country.errors %}
+                <ul class="errors bg-danger text-white">
+                    {% for error in form.country.errors %}
                         <li class="p-1 mb-1">{{ error }}</li>
                     {% endfor %}
                 </ul>
@@ -144,10 +222,125 @@
                 </ul>
                 {% endif %}
               </div>
-              <div class="d-flex justify-content-center align-items-center w-50 mx-auto">
-                {{form.add(class='btn btn-success w-50')}}
-                <a id="cancel_link" href="{{url_for('routes.view_listing', listing_id=listing_id)}}" class="btn btn-primary w-50">Cancel</a>
+              <div class="form-group">
+                {{form.commercial_id.label}}
+                {{form.commercial_id(class='form-control', placeholder='Commercial id')}}
+                
+                {% if form.commercial_id.errors %}
+                <ul class="errors bg-danger text-white">
+                    {% for error in form.commercial_id.errors %}
+                        <li class="p-1 mb-1">{{ error }}</li>
+                    {% endfor %}
+                </ul>
+                {% endif %}
               </div>
+              <div class="form-group">
+                {{form.currency_iso_code.label}}
+                {{form.currency_iso_code(class='form-control', placeholder='Currency iso code')}}
+                
+                {% if form.currency_iso_code.errors %}
+                <ul class="errors bg-danger text-white">
+                    {% for error in form.currency_iso_code.errors %}
+                        <li class="p-1 mb-1">{{ error }}</li>
+                    {% endfor %}
+                </ul>
+                {% endif %}
+              </div>
+              <div class="form-group">
+                <div>
+                  {{form.fully_refunded.label}}
+                </div>
+                {{form.fully_refunded(placeholder='Fully refunded')}}
+                {% if form.fully_refunded.errors %}
+                <ul class="errors bg-danger text-white">
+                    {% for error in form.fully_refunded.errors %}
+                        <li class="p-1 mb-1">{{ error }}</li>
+                    {% endfor %}
+                </ul>
+                {% endif %}
+              </div>
+              <div class="form-group">
+                <div>
+                  {{form.can_refund.label}}
+                </div>
+                {{form.can_refund(placeholder='Can Refund')}}
+                {% if form.can_refund.errors %}
+                <ul class="errors bg-danger text-white">
+                    {% for error in form.can_refund.errors %}
+                        <li class="p-1 mb-1">{{ error }}</li>
+                    {% endfor %}
+                </ul>
+                {% endif %}
+              </div>
+              <div class="form-group">
+                {{form.order_id.label}}
+                {{form.order_id(class='form-control', placeholder='Order id')}}
+                
+                {% if form.order_id.errors %}
+                <ul class="errors bg-danger text-white">
+                    {% for error in form.order_id.errors %}
+                        <li class="p-1 mb-1">{{ error }}</li>
+                    {% endfor %}
+                </ul>
+                {% endif %}
+              </div>
+              <div class="form-group">
+                {{form.order_state.label}}
+                {{form.order_state(class='form-control', placeholder='Order state')}}
+                
+                {% if form.order_state.errors %}
+                <ul class="errors bg-danger text-white">
+                    {% for error in form.order_state.errors %}
+                        <li class="p-1 mb-1">{{ error }}</li>
+                    {% endfor %}
+                </ul>
+                {% endif %}
+              </div>
+              <div id="order_main_container" class="shipping_group_container border border-secondary rounded p-2 my-2" class="border border-secondary rounded my-2">
+                <h4>Order Taxes:</h4>
+                <div class="form-group shadow p-2" id="order_tax_main">
+                  <div class="row order_row" style="max-width:97%;">
+                    <div class="col-sm">
+                      <div>
+                        <label>Code:</label>
+                      </div>
+                      <input class="form-control order_tax_code" required="required" />
+                    </div>
+                    <div class="col-sm">
+                      <div>
+                        <label>Amount:</label>
+                      </div>
+                      <input type="number" step=".01" class="form-control order_tax_amount" />
+                    </div>
+                  </div>
+                  <div class="d-flex justify-content-between align-items-center mt-1">
+                    <button class="btn btn-success btn-sm" data-cont="#order_tax_main" data-class="order_row" data-ext="order_tax_main" data-code="order_tax_code" data-amount="order_tax_amount" type="button" onclick="addInputGroup(event)"><i class="fa fa-plus"></i></button>
+                  </div>
+                </div>
+              </div>
+              <div id="shipping_main_container" class="shipping_group_container border border-secondary rounded p-2 my-2" class="border border-secondary rounded my-2">
+                <h4>Shipping Taxes:</h4>
+                <div class="form-group shadow p-2" id="shipping_tax_main">
+                  <div class="row shipping_row" style="max-width:97%;">
+                    <div class="col-sm">
+                      <div>
+                        <label>Code:</label>
+                      </div>
+                      <input class="form-control shipping_tax_code" required="required"/>
+                    </div>
+                    <div class="col-sm">
+                      <div>
+                        <label>Amount:</label>
+                      </div>
+                      <input type="number" step=".01" class="form-control shipping_tax_amount" />
+                    </div>
+                  </div>
+                  <div class="d-flex justify-content-between align-items-center mt-1">
+                    <button class="btn btn-success btn-sm" data-cont="#shipping_tax_main" data-class="shipping_row" data-ext="shipping_tax_main" data-code="shipping_tax_code" data-amount="shipping_tax_amount" type="button" onclick="addInputGroup(event)"><i class="fa fa-plus"></i></button>
+                  </div>
+                </div>
+              </div>
+              <div id="bot_form_btns" class="mt-3"></div>
             </form>
         </div>
       </div>
@@ -172,31 +365,187 @@
 
 {% block page_scripts %}
 <script>
-    /* order page redirected from a speacfic listing, for flex form allow user to select diffrent listing, this function to inform user if value changed and clear when value back as inital when page started*/
-    function displayUpdateOrderAlert(){
-        if ($("#listing_id").length){
-            const listingIdVal = $("#listing_id").val();
-            $("#listing_id").on('change', (event)=>{
-                if ($(event.currentTarget).length){
-                    if ($(event.currentTarget).val() != listingIdVal){
-                        displayAjaxError('Please Note if you change the listing id this order will added for diffrent listing', 'warning');
-                    } else {
-                        /* clear ajax message */
-                        displayAjaxError(null, null);
-                    }
+/* order page redirected from a speacfic listing, for flex form allow user to select diffrent listing, this function to inform user if value changed and clear when value back as inital when page started*/
+function displayUpdateOrderAlert(){
+    if ($("#listing_id").length){
+        const listingIdVal = $("#listing_id").val();
+        $("#listing_id").on('change', (event)=>{
+            if ($(event.currentTarget).length){
+                if ($(event.currentTarget).val() != listingIdVal){
+                    displayAjaxError('Please Note if you change the listing id this order will added for diffrent listing', 'warning');
+                } else {
+                    /* clear ajax message */
+                    displayAjaxError(null, null);
                 }
-            });
-            return true;
-        } else {
-            console.log('unable to display update order alert listing_id input not found');
-        }
+            }
+        });
+        return true;
+    } else {
+        console.log('unable to display update order alert listing_id input not found');
     }
-    displayUpdateOrderAlert();
+}
+displayUpdateOrderAlert();
 
-    let customRedirect = {% if redirect_url %}{{redirect_url|tojson}}{% else %}null{% endif %};
-    $(document).ready(function() {
-        setFormRedirectByUrl(customRedirect);
+// toggle add, cancel buttons in top and bottom based on user poistion for better ux (if he will go scoll down and think he will find button at bottom it will found, if he scroll up or excpect to found the buttons on top he will found it at top)
+toggleContentUpDown(contentSelector='#form_btns', upSelector='#top_form_btns', downSelector='#bot_form_btns');
+
+let customRedirect = {% if redirect_url %}{{redirect_url|tojson}}{% else %}null{% endif %};
+$(document).ready(function() {
+    setFormRedirectByUrl(customRedirect);
+});
+
+/* tax group inputs */
+/* tax group inputs */
+const orderTaxes = {{order_taxes|tojson|safe}};
+const shippingTaxes = {{shipping_taxes|tojson|safe}};
+let addedInputs = {
+  order_tax_main: 0,
+  shipping_tax_main: 0
+};
+
+function removeInputGroup(e){
+  if ($(e.currentTarget).length && $(e.currentTarget).attr("data-cont") && $($(e.currentTarget).attr("data-cont")).length){
+    $($(e.currentTarget).attr("data-cont")).remove();
+  } else {
+    console.log("removeInputGroup did not work missing required input or data attr");
+  }
+}
+
+function addInputGroup(e=null, dataExt=null, dataCode=null, dataAmount=null, dataClass=null, code='', amount=''){
+  if (
+
+     (e && $(e.currentTarget).length && $(e.currentTarget).attr("data-ext") &&
+     $(e.currentTarget).attr("data-code") && $(e.currentTarget).attr("data-amount") &&
+     $(e.currentTarget).attr("data-class") && addedInputs.hasOwnProperty($(e.currentTarget).attr("data-ext")) &&
+     $(e.currentTarget).attr("data-cont") && $($(e.currentTarget).attr("data-cont")).length) || 
+     (dataExt && dataCode && dataAmount && dataClass && addedInputs.hasOwnProperty(dataExt))
+     ){
+
+    let usedDataExt = '';
+    let useddataCode = '';
+    let useddataAmount = '';
+    let useddataClass = '';
+    let targetCont = null;
+
+    if (e){
+      usedDataExt = $(e.currentTarget).attr("data-ext");
+      useddataCode = $(e.currentTarget).attr("data-code");
+      useddataAmount = $(e.currentTarget).attr("data-amount");
+      useddataClass = $(e.currentTarget).attr("data-class");
+      targetCont = $($(e.currentTarget).attr("data-cont"));
+
+    } else {
+      usedDataExt = dataExt;
+      useddataCode = dataCode;
+      useddataAmount = dataAmount;
+      useddataClass = dataClass;
+      if (addedInputs[dataExt] == 0){
+        targetCont = `#${usedDataExt}`;
+      } else {
+        targetCont = `#${usedDataExt}${addedInputs[usedDataExt]}`;
+      }
+    }
+    addedInputs[usedDataExt] += 1;
+    $(`<div class="form-group p-2 shadow" id="${usedDataExt}${addedInputs[usedDataExt]}">
+         <div class="row ${useddataClass}" style="max-width:97%;">
+           <div class="col-sm">
+             <div>
+               <label>Code:</label>
+             </div>
+             <input class="form-control ${useddataCode}" value="${code}" required="required" />
+           </div>
+           <div class="col-sm">
+             <div>
+               <label>Amount:</label>
+             </div>
+             <input class="form-control ${useddataAmount}" value="${amount}" type="number" step="0.01" />
+           </div>
+         </div>
+         <div class="d-flex justify-content-between align-items-center mt-1">
+           <button class="btn btn-success btn-sm" data-cont="#${usedDataExt}${addedInputs[usedDataExt]}" data-class="${useddataClass}" data-ext="${usedDataExt}" data-code="${useddataCode}" data-amount="${useddataAmount}" type="button" onclick="addInputGroup(event)"><i class="fa fa-plus"></i></button>
+           <button class="btn btn-danger btn-sm" data-cont="#${usedDataExt}${addedInputs[usedDataExt]}" type="button" onclick="removeInputGroup(event)"><i class="fa fa-minus"></i></button>
+         </div>
+       </div>`).insertAfter(targetCont);
+    
+  } else {
+    console.log("addInputGroup did not work missing required input or data attr");
+  }
+}
+
+// prevent separator used in the code
+$(".order_tax_code, .shipping_tax_code").on("input", (e)=>{
+  if ($(e.currentTarget).length && $(e.currentTarget).val()){
+    const currentVal = $(e.currentTarget).val();
+    if (currentVal.includes('-_-')){
+      $(e.currentTarget).val(currentVal.replace("-_-", ""));
+    }
+  }
+});
+
+// browser for some reason when return render template incase wtform error it will not fire the form submit event when form submitted so use click event instead
+$("form #add").on("click", (e)=>{
+  if ($("#order_tax_codes").length && $("#order_tax_amounts").length && $("#shiping_tax_codes").length && $("#shiping_tax_amounts").length){    
+    const order_tax_codesl = [];
+    const order_tax_amountsl = [];
+    const shipping_tax_codesl = [];
+    const shipping_tax_amountsl = [];
+
+    $(".order_row").each( (_i, elm)=>{
+      const currentCode = $(elm).find('.order_tax_code');
+      const currentAmount = $(elm).find('.order_tax_amount');
+      if (currentCode.length && currentAmount.length){
+        if (currentCode.eq(0).val()){
+          order_tax_codesl.push(currentCode.eq(0).val());
+          order_tax_amountsl.push(currentAmount.eq(0).val());
+        }
+      }
     });
+    $(".shipping_row").each( (_i, elm)=>{
+      const currentCode = $(elm).find('.shipping_tax_code');
+      const currentAmount = $(elm).find('.shipping_tax_amount');
+      if (currentCode.length && currentAmount.length){
+        if (currentCode.eq(0).val()){
+          shipping_tax_codesl.push(currentCode.eq(0).val());
+          shipping_tax_amountsl.push(currentAmount.eq(0).val());
+        }
+      }
+    });
+    $("#order_tax_codes").val(order_tax_codesl.join("-_-"));
+    $("#order_tax_amounts").val(order_tax_amountsl.join("-_-"));
+    $("#shiping_tax_codes").val(shipping_tax_codesl.join("-_-"));
+    $("#shiping_tax_amounts").val(shipping_tax_amountsl.join("-_-"));
+
+  }
+});
+
+// display shipping and order taxes for edit process
+if ($("#order_tax_main").length && $("#order_tax_main .order_tax_code").length && $("#order_tax_main .order_tax_amount").length){
+  orderTaxes.forEach( (obj, i)=>{
+    if (obj.hasOwnProperty('code') && obj.hasOwnProperty('amount') && obj.hasOwnProperty('id')){
+      if (i == 0){
+        $("#order_tax_main .order_tax_code").val(obj.code);
+        $("#order_tax_main .order_tax_amount").val(obj.amount);
+      } else {
+        addInputGroup(e=null, dataExt='order_tax_main', dataCode='order_tax_code', dataAmount='order_tax_amount', dataClass='order_row', code=obj.code, amount=obj.amount, oId=obj.id);
+      }
+    }
+  });
+}
+
+if ($("#shipping_tax_main").length && $("#shipping_tax_main .shipping_tax_code").length && $("#shipping_tax_main .shipping_tax_amount").length){
+  shippingTaxes.forEach( (obj, i)=>{
+    if (obj.hasOwnProperty('code') && obj.hasOwnProperty('amount') && obj.hasOwnProperty('id')){
+      if (i == 0){
+        $("#shipping_tax_main .shipping_tax_code").val(obj.code);
+        $("#shipping_tax_main .shipping_tax_amount").val(obj.amount);
+      } else {
+        addInputGroup(e=null, dataExt='shipping_tax_main', dataCode='shipping_tax_code', dataAmount='shipping_tax_amount', dataClass='shipping_row', code=obj.code, amount=obj.amount, oId=obj.id);
+      }
+    }
+  });
+}
+
+
 </script>
 {% endblock page_scripts %}
 

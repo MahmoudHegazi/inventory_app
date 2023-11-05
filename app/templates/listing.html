@@ -166,7 +166,7 @@
           </div>
           <!-- search component end -->
           <div class="overflow-350">
-              <table class="table table-bordered" id="table_display">
+              <table class="table table-bordered arrangable" id="table_display" data-ignore="3">
                 <thead>
                   <tr>
                     <th>Id</th>
@@ -236,7 +236,7 @@
             </div>
             <!-- search component end -->            
             <div class="overflow-350">
-                <table class="table table-bordered" id="table_display2">
+                <table class="table table-bordered arrangable" id="table_display2" data-ignore="3">
                   <thead>
                     <tr>
                       <th>Quantity</th>
@@ -366,6 +366,8 @@ searchComponent('mid', 'swing', ()=>{return true;}, addon='', condition='*=', ro
 
 searchComponent('mid', 'swing', ()=>{return true;}, addon='2', condition='*=', rowBuildCB=rowOrderBuildCB, table='listing_orders', parent_id=listingId);
 
+// add order by component to arrange table rows using table headers this consider level 2 of all components used
+orderByColumnsComponent();
 </script>
 {% endif %}
 {% endblock page_scripts %}

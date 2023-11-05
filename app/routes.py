@@ -7,17 +7,17 @@ import flask_excel
 from flask import Flask, Blueprint, session, redirect, url_for, flash, Response, request, render_template, jsonify, abort, current_app
 from flask_wtf import Form
 from .models import User, Supplier, Dashboard, Listing, Catalogue, Purchase, Order, Platform, WarehouseLocations, LocationBins, \
-CatalogueLocations, CatalogueLocationsBins, Category, UserMeta, OrderTaxes
+CatalogueLocations, CatalogueLocationsBins, Category, UserMeta, OrderTaxes, Condition
 from .forms import addListingForm, editListingForm, addCatalogueForm, editCatalogueForm, \
 removeCatalogueForm, removeListingForm, addSupplierForm, editSupplierForm, removeSupplierForm, \
 addPurchaseForm, editPurchaseForm, removePurchaseForm, addOrderForm, editOrderForm, removeOrderForm, CatalogueExcelForm, \
 removeCataloguesForm, removeListingsForm, removeAllCataloguesForm, addPlatformForm, editPlatformForm, removePlatformForm, \
 addLocationForm, editLocationForm, removeLocationForm, addBinForm, editBinForm, removeBinForm, AddMultipleListingForm, \
 addCategoryForm, editCategoryForm, removeCategoryForm, importCategoriesAPIForm, importOffersAPIForm, SetupBestbuyForm, \
-importOrdersAPIForm
+importOrdersAPIForm, addConditionForm, editConditionForm, removeConditionForm, generateCatalogueBarcodeForm
 from . import vendor_permission, db
 from .functions import get_safe_redirect, updateDashboardListings, updateDashboardOrders, updateDashboardPurchasesSum, secureRedirect, get_charts, \
-bestbuy_ready, get_ordered_dicts, float_or_none, float_or_zero, update_order_taxes, get_orders_and_shippings, get_separate_order_taxes
+bestbuy_ready, get_ordered_dicts, float_or_none, float_or_zero, update_order_taxes, get_orders_and_shippings, get_separate_order_taxes, fill_generate_barcode
 from sqlalchemy.exc import IntegrityError
 from flask_login import login_required, current_user
 from flask import request as flask_request
@@ -157,6 +157,7 @@ def catalogues():
         delete_catalogues = removeCataloguesForm()
         delete_all_catalogues = removeAllCataloguesForm()
         add_multiple_listings = AddMultipleListingForm()
+
         #return str(delete_catalogues.hidden_tag())+str(delete_catalogues.catalogues_ids)
         user_catalogues = pagination['data']
         populate_add_multiple_form(add_multiple_listings, current_user.dashboard.platforms, min_entries=len(user_catalogues), max_entries=len(user_catalogues))
@@ -174,7 +175,6 @@ def catalogues():
 @vendor_permission.require(http_exception=403)
 def view_catalogue(catalogue_id):
     try:
-        
         deleteform = removeCatalogueForm()
         target_catalogue = Catalogue.query.filter_by(id=catalogue_id, user_id=current_user.id).one_or_none()
         if target_catalogue is not None:
@@ -182,8 +182,22 @@ def view_catalogue(catalogue_id):
                 'url': url_for('routes.view_listing', listing_id=catalogue_listing.id),
                 'platform': catalogue_listing.platform.name,
                 'product': catalogue_listing.product_name
-                } for catalogue_listing in target_catalogue.listings]            
-            return render_template('catalogue.html', catalogue=target_catalogue, deleteform=deleteform, listing_platforms=listing_platforms)
+                } for catalogue_listing in target_catalogue.listings]
+            
+            #return str(getattr(Catalogue.query.first(), 'id'))
+            generate_barcode_form = generateCatalogueBarcodeForm()
+            # select data to be added as pre selected in wtforms for UI and javascript (can be used in any endpoint for example generate barcode for listings table or any developer tables, require wtforms installed and javascript method you pass the wtforms select ids to js function) it can also add more than one choice using data from example in relational category i need code and label so i need two choices with two diffrent names and js also know them
+            fill_generate_barcode(generate_barcode_form, Catalogue, catalogue_id,
+                                    ['created_date', 'updated_date', 'user_id', 'product_image'],
+                                    # get category code and label as two options, and only from condition get the condition name (any relation as sqlalchemy db) or other custom not relational for unrelational ds
+                                    {
+                                        'category_id': lambda x : [('category_code',x.category.code), ('category_label', x.category.label)] if x and x.category else None,
+                                        'condition_id': lambda x : [('condition', x.condition.name)] if x and x.condition else None
+                                    },
+                                    [lambda x : [('location_names', '_'.join([loc.warehouse_location.name for loc in x.locations]))]]
+                                  )
+            generate_redirect = url_for('main.generate_barcode', catalogue_id=catalogue_id)
+            return render_template('catalogue.html', catalogue=target_catalogue, deleteform=deleteform, listing_platforms=listing_platforms, generate_barcode_form=generate_barcode_form, generate_redirect=generate_redirect)
         else:
             flash('Catalouge Not found or deleted', 'danger')
             return redirect(url_for('routes.catalogues'))
@@ -213,10 +227,12 @@ def add_catalogue():
             locations_bins_data.append(current_location_obj)
 
         categories = [(cat.id, '{}:{}'.format(cat.code, cat.label)) for cat in Category.query.filter_by(dashboard_id=current_user.dashboard.id).all()]
+        conditions = [(cond.id, '{}: {}'.format(cond.id, cond.name)) for cond in Condition.query.filter_by(dashboard_id=current_user.dashboard.id).all()]
         form = addCatalogueForm()
         form.warehouse_locations.choices = locations_choices
         form.locations_bins.choices = allowed_bins_ids
         form.category_code.choices = categories
+        form.condition.choices = conditions
     except Exception as e:
         print('System Error: {}'.format(sys.exc_info()))
         flash('unable to process your request', 'danger')
@@ -228,21 +244,26 @@ def add_catalogue():
             if form.validate_on_submit():
                 selected_category = Category.query.filter_by(id=form.category_code.data, dashboard_id=current_user.dashboard.id).first()
                 if selected_category:
-                    # using sqlalchemy.orm.collections.instrumentedlist append technique to insert all relations one time if catalogue inserted, and in child locations as well so if error happend before inser which last thing all actions will ignored (1 commit for all)
-                    new_catalogue = Catalogue(user_id=current_user.id, sku=form.sku.data, product_name=form.product_name.data, product_description=form.product_description.data, brand=form.brand.data, category_id=selected_category.id, price=form.price.data, sale_price=form.sale_price.data, quantity=form.quantity.data, product_model=form.product_model.data, condition=form.condition.data, upc=form.upc.data)
-                    for warehouse_location_id in form.warehouse_locations.data:
-                        valid_location = WarehouseLocations.query.filter_by(dashboard_id=current_user.dashboard.id, id=warehouse_location_id).one_or_none()
-                        if valid_location is not None:
-                            new_catalogue_location = CatalogueLocations(location_id=valid_location.id)
-                            for bin_id in form.locations_bins.data:
-                                valid_bin = LocationBins.query.filter_by(id=bin_id, location_id=valid_location.id).one_or_none()
-                                if valid_bin is not None:
-                                    new_location_bin = CatalogueLocationsBins(bin_id=valid_bin.id)
-                                    new_catalogue_location.bins.append(new_location_bin)
-                            new_catalogue.locations.append(new_catalogue_location)
-                    new_catalogue.insert()
-                    success = True
-                    flash('Successfully Created New Catalogue.', 'success')
+                    selected_condition = Condition.query.filter_by(id=form.condition.data, dashboard_id=current_user.dashboard.id).first()
+                    if selected_condition:
+                        # using sqlalchemy.orm.collections.instrumentedlist append technique to insert all relations one time if catalogue inserted, and in child locations as well so if error happend before inser which last thing all actions will ignored (1 commit for all)
+                        new_catalogue = Catalogue(user_id=current_user.id, sku=form.sku.data, product_name=form.product_name.data, product_description=form.product_description.data, brand=form.brand.data, category_id=selected_category.id, price=form.price.data, sale_price=form.sale_price.data, quantity=form.quantity.data, product_model=form.product_model.data, upc=form.upc.data, condition_id=form.condition.data)
+                        for warehouse_location_id in form.warehouse_locations.data:
+                            valid_location = WarehouseLocations.query.filter_by(dashboard_id=current_user.dashboard.id, id=warehouse_location_id).one_or_none()
+                            if valid_location is not None:
+                                new_catalogue_location = CatalogueLocations(location_id=valid_location.id)
+                                for bin_id in form.locations_bins.data:
+                                    valid_bin = LocationBins.query.filter_by(id=bin_id, location_id=valid_location.id).one_or_none()
+                                    if valid_bin is not None:
+                                        new_location_bin = CatalogueLocationsBins(bin_id=valid_bin.id)
+                                        new_catalogue_location.bins.append(new_location_bin)
+                                new_catalogue.locations.append(new_catalogue_location)
+                        new_catalogue.insert()
+                        success = True
+                        flash('Successfully Created New Catalogue.', 'success')
+                    else:
+                        success = False
+                        flash('Invalid Condition.', 'danger')
                 else:
                     success = False
                     flash('Invalid Category.', 'danger')
@@ -251,7 +272,6 @@ def add_catalogue():
         except Exception as e:
             print('System Error: {}'.format(sys.exc_info()))
             flash('Unknown Error unable to create new Catalogue', 'danger')
-            raise e
         
         finally:
             if success == True:
@@ -305,6 +325,7 @@ def edit_catalogue(catalogue_id):
                     selected_bins_ids.append(loc_bin.bin_id)
             
             categories = [(cat.id, '{}:{}'.format(cat.code, cat.label)) for cat in Category.query.filter_by(dashboard_id=current_user.dashboard.id).all()]
+            conditions = [(cond.id, '{}: {}'.format(cond.id, cond.name)) for cond in Condition.query.filter_by(dashboard_id=current_user.dashboard.id).all()]
 
             categoryId = target_catalogue.category.id if target_catalogue.category else None
             form = editCatalogueForm(
@@ -315,16 +336,17 @@ def edit_catalogue(catalogue_id):
                 category_code = categoryId,
                 quantity = target_catalogue.quantity,
                 product_model = target_catalogue.product_model,
-                condition = target_catalogue.condition,
+                condition = target_catalogue.condition_id,
                 upc = target_catalogue.upc,
-                price = target_catalogue.price,
-                sale_price = target_catalogue.sale_price,
+                price = target_catalogue.price if target_catalogue.price is not None else 0.00,
+                sale_price = target_catalogue.sale_price if target_catalogue.sale_price is not None else 0.00,
                 warehouse_locations=selected_locs_ids,
                 locations_bins=selected_bins_ids # sample as write hello world
                 )
             form.warehouse_locations.choices = locations_choices
             form.locations_bins.choices = allowed_bins_ids
             form.category_code.choices = categories
+            form.condition.choices = conditions
 
         else:
             flash('Unable to find the selected catalogue, it maybe deleted', 'danger')
@@ -358,6 +380,12 @@ def edit_catalogue(catalogue_id):
                     if target_category:
                         target_catalogue.category_id = target_category.id
 
+                if target_catalogue.condition_id != form.condition.data:
+                    # note there are shield before that which is wtforms validation so if wtforms hacked and could sent invalid id, this check will prevent add this invalid id
+                    target_condition = Condition.query.filter_by(id=form.condition.data, dashboard_id=current_user.dashboard.id).first()
+                    if target_condition:
+                        target_catalogue.condition_id = target_condition.id
+
                 if target_catalogue.price != form.price.data:
                     target_catalogue.price = form.price.data
 
@@ -369,9 +397,6 @@ def edit_catalogue(catalogue_id):
 
                 if target_catalogue.product_model != form.product_model.data:
                     target_catalogue.product_model = form.product_model.data
-
-                if target_catalogue.condition != form.condition.data:
-                    target_catalogue.condition = form.condition.data
 
                 if target_catalogue.upc != form.upc.data:
                     target_catalogue.upc = form.upc.data
@@ -401,7 +426,6 @@ def edit_catalogue(catalogue_id):
                         removed_loc = CatalogueLocations.query.filter_by(location_id=old_selected_loc_id, catalogue_id=target_catalogue.id).one_or_none()
                         if removed_loc:
                             removed_loc.delete()
-               
 
                 # handle new inserts
 
@@ -452,12 +476,10 @@ def edit_catalogue(catalogue_id):
         except Exception as e:
             print('System Error: {}'.format(sys.exc_info()))
             # update event will done after success = True, so incase error in that event set success to False 
-            success = None
-            raise e
-        
+            success = None        
 
         finally:
-            if success == True:                
+            if success == True:           
                 # success 
                 return redirect(url_for('routes.view_catalogue', catalogue_id=catalogue_id))
             elif success == False:
@@ -468,8 +490,6 @@ def edit_catalogue(catalogue_id):
                 # not success system error, log error and redirect to main page
                 flash('Unknown eror, unable to edit catalogue', 'danger')
                 return redirect(url_for('routes.catalogues'))
-
-
     else:
         # GET Requests
         try:
@@ -2487,13 +2507,17 @@ def setup():
         edit_category = editCategoryForm()
         delete_category = removeCategoryForm()
 
+        add_condition = addConditionForm()
+        edit_condition = editConditionForm()
+        remove_condition = removeConditionForm()
+        
         import_categories = importCategoriesAPIForm()
 
         setup_bestbuy = SetupBestbuyForm()
     
         # check if user have bestbuy_metas created for remanaing and max per request for current user  (note if global app config numbers changed next time user will try import data will require to setup again the api and auto update the global config number only if required update)
         bestbuy_installed = bestbuy_ready()
-        return render_template('setup.html', dashboard=current_user.dashboard, add_platform=add_platform, edit_platform=edit_platform, delete_platform=delete_platform, add_location=add_location, edit_location=edit_location, delete_location=delete_location, add_bin=add_bin, edit_bin=edit_bin, delete_bin=delete_bin, add_category=add_category, edit_category=edit_category, delete_category=delete_category, import_categories=import_categories, setup_bestbuy=setup_bestbuy, bestbuy_installed=bestbuy_installed)
+        return render_template('setup.html', dashboard=current_user.dashboard, add_platform=add_platform, edit_platform=edit_platform, delete_platform=delete_platform, add_location=add_location, edit_location=edit_location, delete_location=delete_location, add_bin=add_bin, edit_bin=edit_bin, delete_bin=delete_bin, add_category=add_category, edit_category=edit_category, delete_category=delete_category, add_condition=add_condition, edit_condition=edit_condition, remove_condition=remove_condition, import_categories=import_categories, setup_bestbuy=setup_bestbuy, bestbuy_installed=bestbuy_installed)
     except Exception as e:
         print("Error in setup page Error: {}".format(sys.exc_info()))
         flash('Unknown error Unable to setup page', 'danger')
@@ -2792,6 +2816,99 @@ def delete_bin(location_id, bin_id):
     finally:
         return redirect(url_for('routes.setup'))
 
+
+###########################  Setup Conditions  ##############################
+@routes.route('/conditions/add', methods=['POST'])
+@login_required
+@vendor_permission.require(http_exception=403)
+def add_condition():
+    try:
+        form = addConditionForm()
+        if form.validate_on_submit():
+            condition_exist = Condition.query.filter_by(dashboard_id=current_user.dashboard.id, name=form.name_add.data).first()
+            if not condition_exist:
+                new_platform = Condition(dashboard_id=current_user.dashboard.id, name=form.name_add.data)
+                new_platform.insert()
+                flash('Successfully Created New Condition', 'success')
+            else:
+                flash('Can not add Condition, condition with same name [{}] already exist'.format(form.name_add.data), 'danger')
+        else:
+            for field, errors in form.errors.items():
+                if field == 'csrf_token':
+                    flash("Error can not create condition Please restart page and try again", "danger")
+                    continue
+                if field == 'name_add':
+                    field = 'name'
+                flash('Error in {} : {}'.format(field, ','.join(errors)), 'danger')
+
+    except Exception as e:
+        print('System Error: {}'.format(sys.exc_info()))
+        flash('Unknown Error unable to create new condition', 'danger')
+    finally:       
+        return redirect(url_for('routes.setup'))
+
+@routes.route('/conditions/<int:condition_id>/edit', methods=['GET', 'POST'])
+@login_required
+@vendor_permission.require(http_exception=403)
+def edit_condition(condition_id):
+    success = True
+    actions = 0
+    try:
+        form = editConditionForm()
+        if form.validate_on_submit():
+            target_condition = Condition.query.filter_by(id=condition_id, dashboard_id=current_user.dashboard.id).one_or_none()
+            if target_condition is not None:
+                if target_condition.name != form.name_edit.data:
+                    condition_name_exist = Condition.query.filter_by(dashboard_id=current_user.dashboard.id, name=form.name_edit.data).first()
+                    if not condition_name_exist:
+                        target_condition.name = form.name_edit.data
+                        target_condition.update()
+                        flash('Successfully edit condition ID:({})'.format(condition_id), 'success')
+                    else:
+                        flash('Can not edit condition, condition with same name [{}] already exist'.format(form.name_edit.data), 'danger')
+                else:
+                    flash('No changes detected.', 'success')
+            else:
+                flash('Condition with ID: ({}) not found or deleted'.format(condition_id), 'danger')
+        else:
+            for field, errors in form.errors.items():
+                if field == 'csrf_token':
+                    flash("Error can not edit condition, please restart page and try again", "danger")
+                    continue
+
+                if field == 'name_edit':
+                    field = 'name'
+
+                flash('Error in {} : {}'.format(field, ','.join(errors)), 'danger')
+            success = False
+    except Exception as e:
+        print('System Error: {}'.format(sys.exc_info()))
+        flash('Unknown error unable to edit condition', 'danger')
+        success = False
+    finally:
+        return redirect(url_for('routes.setup'))
+
+@routes.route('/conditions/<int:condition_id>/delete', methods=['POST'])
+@login_required
+@vendor_permission.require(http_exception=403)
+def delete_condition(condition_id):
+    try:
+        form = removeConditionForm()
+        target_condition = Condition.query.filter_by(id=condition_id,dashboard_id=current_user.dashboard.id).one_or_none()
+        if target_condition is not None:
+            if form.validate_on_submit():
+                target_condition.delete()
+                flash('Successfully deleted condition with ID: {}'.format(condition_id), 'success')
+            else:
+                flash('Unable to delete condition with ID: {}'.format(condition_id), 'danger')
+        else:
+            flash('Condition not found it maybe deleted provided ID: {}'.format(condition_id), 'danger')
+    except Exception as e:
+        print('System Error: {}'.format(sys.exc_info()))
+        flash('Unknown error unable to delete condition', 'danger')
+    finally:
+        return redirect(url_for('routes.setup'))
+    
 ###########################  Categories  ##############################
 @routes.route('/categories/add', methods=['POST'])
 @login_required

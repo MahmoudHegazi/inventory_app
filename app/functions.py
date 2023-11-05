@@ -5,15 +5,18 @@ import math
 import time
 import requests
 import json
+import re
 from dateutil import parser
 from urllib.parse import urlparse, urljoin
 from flask import request, current_app, url_for
 from flask_login import current_user
 from sqlalchemy import func
-from .models import Supplier, Dashboard, Listing, Catalogue, Purchase, Order, Platform, CatalogueLocations, CatalogueLocationsBins, WarehouseLocations, LocationBins, Category, UserMeta, OrderTaxes
+from .models import Supplier, Dashboard, Listing, Catalogue, Purchase, Order, Platform, CatalogueLocations, CatalogueLocationsBins,\
+    WarehouseLocations, LocationBins, Category, UserMeta, OrderTaxes, Condition
 from sqlalchemy.sql import extract
 from sqlalchemy import or_, and_, func , asc, desc
 from datetime import datetime, timedelta
+import barcode
 
 
 def is_safe_redirect_url(target):
@@ -245,7 +248,7 @@ def secureRedirect(redirect_url):
 
     return '/home'
 
-"""  Filter Class and its function (this class access direct functions deacleard in functions.py) """
+"""  Filter Class and its function (this class access direct functions deacleard in functions.py) (this can used for both act as API to export system data with any dynamic column name as query paramter or as main export csv both code already done) """
 
 class ExportSqlalchemyFilter():
     # user sqlalchemy to create secure sqlalchemy filters arugments list (controlled easy)
@@ -282,6 +285,7 @@ class ExportSqlalchemyFilter():
         self.catalogue_locations_bins_columns = getTableColumns(CatalogueLocationsBins, ['id', 'created_date', 'updated_date', 'location_id', 'bin_id'])
 
         self.categories_columns = getTableColumns(Category, ['dashboard_id', 'created_date', 'updated_date'])
+        self.conditions_columns = getTableColumns(Condition, ['dashboard_id', 'created_date', 'updated_date'])
         self.ordertaxes_columns = getTableColumns(OrderTaxes, ['id', 'created_date', 'updated_date'])
 
         # rendered with same order in js (filters_args_list ...(args))  (can change order of display in frontend)
@@ -291,7 +295,8 @@ class ExportSqlalchemyFilter():
             *self.location_bins_columns,
             *self.catalogue_locations_columns,
             *self.catalogue_locations_bins_columns,
-            *self.categories_columns
+            *self.categories_columns,
+            *self.conditions_columns
             ]
         # call function here becuase i need custom ignored duplicated columns in Catalogue not the default (changed that for make test way for user without code, he can validate if catalogues data not changed) (actions done by event listeners)
         listing_table_filters = [
@@ -303,7 +308,8 @@ class ExportSqlalchemyFilter():
             *self.catalogue_locations_columns,
             *self.catalogue_locations_bins_columns,
             *self.categories_columns,
-            *self.ordertaxes_columns
+            *self.ordertaxes_columns,
+            *self.conditions_columns
             ]
         # *getTableColumns(Catalogue, ['user_id', 'sku', 'product_name', 'product_description', 'brand', 'category_code', 'price', 'sale_price', 'quantity'])
         purchase_table_filters = [*self.purchase_columns, *self.supplier_columns, *self.listing_columns, *self.catalogue_columns]
@@ -313,8 +319,8 @@ class ExportSqlalchemyFilter():
 
         # each export button have predefined group of allowed tables, can controled from here
         self.allowed_tables = {
-            'catalogue': [Catalogue, WarehouseLocations, LocationBins, CatalogueLocations, CatalogueLocationsBins, Category],
-            'listing': [Listing, Catalogue, Platform, WarehouseLocations, LocationBins, CatalogueLocations, CatalogueLocationsBins, Category, OrderTaxes],
+            'catalogue': [Catalogue, WarehouseLocations, LocationBins, CatalogueLocations, CatalogueLocationsBins, Category, Condition],
+            'listing': [Listing, Catalogue, Platform, WarehouseLocations, LocationBins, CatalogueLocations, CatalogueLocationsBins, Category, OrderTaxes, Condition],
             'purchase': [Purchase, Supplier, Listing, Catalogue],
             'order': [Order, Listing, Catalogue],
             'supplier': [Supplier]
@@ -486,6 +492,8 @@ def get_export_data(db, flask_excel, current_user_id, table_name, columns, opera
             LocationBins, CatalogueLocationsBins.bin_id == LocationBins.id
         ).outerjoin(
             Category, Category.id == Catalogue.category_id
+        ).outerjoin(
+            Condition, Condition.id == Catalogue.condition_id
         ).filter(and_(Catalogue.user_id==current_user_id), filterBooleanClauseList).all()
         if response['data']:
             export_data = []
@@ -504,7 +512,7 @@ def get_export_data(db, flask_excel, current_user_id, table_name, columns, opera
                 locations = ','.join(locations_arr)
                 categoryCode = item.category.code if item.category else ''
                 categoryLabel = item.category.label if item.category else ''
-                export_data.append([item.id, item.sku, item.product_name, item.product_description, item.brand, categoryCode, categoryLabel, item.price, item.sale_price, item.quantity, item.product_model, item.condition, item.upc, locations])
+                export_data.append([item.id, item.sku, item.product_name, item.product_description, item.brand, categoryCode, categoryLabel, item.price, item.sale_price, item.quantity, item.product_model, item.condition.name, item.upc, locations])
             # modfied array to return the addiontal relational data like locations or bins
             response['data'] = export_data
             
@@ -532,6 +540,8 @@ def get_export_data(db, flask_excel, current_user_id, table_name, columns, opera
         ).outerjoin(
             Category, Catalogue.category_id == Category.id
         ).outerjoin(
+            Condition, Condition.id == Catalogue.condition_id
+        ).outerjoin(
             Order, Order.listing_id == Listing.id
         ).outerjoin(
             OrderTaxes, OrderTaxes.order_id == Order.id
@@ -546,7 +556,7 @@ def get_export_data(db, flask_excel, current_user_id, table_name, columns, opera
             export_data.append(response['column_names'])
             
             for item in response['data']:
-                export_data.append([item.id, item.sku, item.product_name, item.product_description, item.brand, item.category_code, item.category_label, item.price, item.sale_price, item.quantity, item.catalogue.condition, item.catalogue.product_model, item.catalogue.upc, item.created_date, item.updated_date, item.dashboard_id, item.catalogue_id, item.platform.name])
+                export_data.append([item.id, item.sku, item.product_name, item.product_description, item.brand, item.category_code, item.category_label, item.price, item.sale_price, item.quantity, item.catalogue.condition.name, item.catalogue.product_model, item.catalogue.upc, item.created_date, item.updated_date, item.dashboard_id, item.catalogue_id, item.platform.name])
             
             response['data'] = export_data
             if usejson == False:
@@ -638,7 +648,7 @@ def get_charts(db, current_user, charts_ids=[]):
                 if chart_id == 'top_ordered_products':
                     # chart 1
                     chart_query = db.session.query(
-                        Listing.sku,
+                        Listing.product_name,
                         func.sum(Order.quantity).label('total_quantities')
                     ).join(
                         Catalogue, Listing.catalogue_id == Catalogue.id
@@ -656,7 +666,8 @@ def get_charts(db, current_user, charts_ids=[]):
                         'label': 'Top Ordered Products',
                         'background_colors': [ 'rgba(255, 99, 132, 0.2)', 'rgba(255, 159, 64, 0.2)', 'rgba(255, 205, 86, 0.2)', 'rgba(75, 192, 192, 0.2)', 'rgba(54, 162, 235, 0.2)', 'rgba(153, 102, 255, 0.2)', 'rgba(201, 203, 207, 0.2)'],
                         'border_colors': [ 'rgb(255, 99, 132)', 'rgb(255, 159, 64)', 'rgb(255, 205, 86)', 'rgb(75, 192, 192)', 'rgb(54, 162, 235)', 'rgb(153, 102, 255)', 'rgb(201, 203, 207)' ],
-                        'description': 'Products with the largest number of orders'
+                        'description': 'Products with the largest number of orders',
+                        'col': 12
                     }
                     result[chart_id] = True
                     result_array.append(chart_data)
@@ -665,7 +676,7 @@ def get_charts(db, current_user, charts_ids=[]):
                 elif chart_id == 'less_ordered_products':
                     # chart 1
                     chart_query = db.session.query(
-                        Listing.sku,
+                        Listing.product_name,
                         func.sum(Order.quantity).label('total_quantities')
                     ).join(
                         Catalogue, Listing.catalogue_id == Catalogue.id
@@ -683,7 +694,8 @@ def get_charts(db, current_user, charts_ids=[]):
                         'label': 'least demanded products',
                         'background_colors': [ 'rgba(255, 99, 132, 0.2)', 'rgba(255, 159, 64, 0.2)', 'rgba(255, 205, 86, 0.2)', 'rgba(75, 192, 192, 0.2)', 'rgba(54, 162, 235, 0.2)', 'rgba(153, 102, 255, 0.2)', 'rgba(201, 203, 207, 0.2)'],
                         'border_colors': [ 'rgb(255, 99, 132)', 'rgb(255, 159, 64)', 'rgb(255, 205, 86)', 'rgb(75, 192, 192)', 'rgb(54, 162, 235)', 'rgb(153, 102, 255)', 'rgb(201, 203, 207)' ],
-                        'description': 'Products with the lowest number of orders'
+                        'description': 'Products with the lowest number of orders',
+                        'col': 12
                     }
                     result[chart_id] = True
                     result_array.append(chart_data)
@@ -692,7 +704,7 @@ def get_charts(db, current_user, charts_ids=[]):
                 elif chart_id == 'most_purchased_products':
                     # chart 2
                     chart_query = db.session.query(
-                        Listing.sku,
+                        Listing.product_name,
                         func.sum(Purchase.quantity).label('total_quantities')
                     ).join(
                         Purchase, Listing.id == Purchase.listing_id
@@ -704,11 +716,12 @@ def get_charts(db, current_user, charts_ids=[]):
                     chartdata = getChartData(chart_query, label_i=0, data_i=1)
                     chart_data = {
                         'id': 'most_purchased_products',
-                        'type': 'bar',
+                        'type': 'doughnut',
                         'data': chartdata['data'],
                         'labels': chartdata['labels'],
                         'label': 'Most purchased products',
-                        'description': 'Products with the largest number of purchases'
+                        'description': 'Products with the largest number of purchases',
+                        'col': 12
                     }
                     result[chart_id] = True
                     result_array.append(chart_data)
@@ -718,7 +731,7 @@ def get_charts(db, current_user, charts_ids=[]):
     
                     # chart 3
                     chart_query = db.session.query(
-                        Listing.sku,
+                        Listing.product_name,
                         func.sum(Purchase.quantity).label('total_quantities')
                     ).join(
                         Purchase, Listing.id == Purchase.listing_id
@@ -730,11 +743,12 @@ def get_charts(db, current_user, charts_ids=[]):
                     chartdata = getChartData(chart_query, label_i=0, data_i=1)
                     chart_data = {
                         'id': 'less_purchased_products',
-                        'type': 'bar',
+                        'type': 'pie',
                         'data': chartdata['data'],
                         'labels': chartdata['labels'],
                         'label': 'least purchased products',
-                        'description': 'Products with the lowest number of purchases'
+                        'description': 'Products with the lowest number of purchases',
+                        'col': 12
                     }
                     result[chart_id] = True
                     result_array.append(chart_data)
@@ -1010,6 +1024,7 @@ def upload_catalogues(offers_data, current_user):
 
                 # it big but confirm 0 errors (risk managment rules)
                 reference = offer['product_references'][0]['reference'] if 'product_references' in offer and isinstance(offer['product_references'], list) and len(offer['product_references']) > 0 and isinstance(offer['product_references'][0], dict) and 'reference' in offer['product_references'][0] else None
+                # ex UPC-A UPC-E that part of UPC barcodes (that can help knows which barcode type used based on countries and global systems)
                 reference_type = offer['product_references'][0]['reference_type'] if 'product_references' in offer and isinstance(offer['product_references'], list) and len(offer['product_references']) > 0 and isinstance(offer['product_references'][0], dict) and 'reference_type' in offer['product_references'][0] else None
                 
                 quantity_threshold = offer['all_prices'][0]['volume_prices'][0]['quantity_threshold'] if 'all_prices' in offer and isinstance(offer['all_prices'], list) and len(offer['all_prices']) > 0 and isinstance(offer['all_prices'][0], dict) and 'volume_prices' in offer['all_prices'][0] and isinstance(offer['all_prices'][0]['volume_prices'], list) and len(offer['all_prices'][0]['volume_prices']) > 0 and isinstance(offer['all_prices'][0]['volume_prices'][0], dict) and 'quantity_threshold' in offer['all_prices'][0]['volume_prices'][0] else None
@@ -1059,7 +1074,11 @@ def upload_catalogues(offers_data, current_user):
                         selected_catalogue.quantity = quantity
                         update_require = True
 
-                    if selected_catalogue.upc != reference_type:
+                    if selected_catalogue.upc != reference:
+                        selected_catalogue.upc = reference
+                        update_require = True
+
+                    if selected_catalogue.reference_type != reference_type:
                         selected_catalogue.upc = reference_type
                         update_require = True
 
@@ -1071,7 +1090,7 @@ def upload_catalogues(offers_data, current_user):
                         # this to help decide in next step, sync listing with changed catalogue data or not sync if catalogue not changed
                         not_changed = True
                 else:
-                    selected_catalogue = Catalogue(sku=product_sku, user_id=current_user.id, product_name=product_title, product_description=product_description, brand=product_brand, category_id=selected_category.id, price=price, sale_price=discount_price, quantity=quantity, product_model=None, condition=None, upc=reference_type)
+                    selected_catalogue = Catalogue(sku=product_sku, user_id=current_user.id, product_name=product_title, product_description=product_description, brand=product_brand, category_id=selected_category.id, price=price, sale_price=discount_price, quantity=quantity, product_model=None, condition_id=None, upc=reference, reference_type=reference_type)
                     selected_catalogue.insert()
                     result['uploaded'] += 1
 
@@ -1187,76 +1206,82 @@ def upload_orders(orders, current_user, db):
                     int_order_quantity = order_quantity if order_quantity is not None else 0
                     int_catalogue_quantity = catalogue_quantity if catalogue_quantity is not None else 0
 
-                    if int_order_quantity <= int_catalogue_quantity:
+                    can_refund = order_lines_obj['can_refund'] if order_lines_obj and 'can_refund' in order_lines_obj else None
+                    category_code = order_lines_obj['category_code'] if order_lines_obj and 'category_code' in order_lines_obj else None
+                    product_title = order_lines_obj['product_title'] if order_lines_obj and 'product_title' in order_lines_obj else None
+                    shipping_price = order_lines_obj['shipping_price'] if order_lines_obj and 'shipping_price' in order_lines_obj else None
+                    product_sku = order_lines_obj['product_sku'] if order_lines_obj and 'product_sku' in order_lines_obj else None
 
-                        can_refund = order_lines_obj['can_refund'] if order_lines_obj and 'can_refund' in order_lines_obj else None
-                        category_code = order_lines_obj['category_code'] if order_lines_obj and 'category_code' in order_lines_obj else None
-                        product_title = order_lines_obj['product_title'] if order_lines_obj and 'product_title' in order_lines_obj else None
-                        shipping_price = order_lines_obj['shipping_price'] if order_lines_obj and 'shipping_price' in order_lines_obj else None
-                        product_sku = order_lines_obj['product_sku'] if order_lines_obj and 'product_sku' in order_lines_obj else None
+                    # customer data
+                    customer = order['customer'] if 'customer' in order and isinstance(order['customer'], dict) else None
+                    firstname = customer['firstname'] if customer and 'firstname' in customer else None
+                    lastname = customer['lastname'] if customer and 'lastname' in customer else None
+                    # billing_address and shipping address
+                    billing_address = customer['billing_address'] if customer and 'billing_address' in customer and isinstance(customer['billing_address'], dict) else None
+                    shipping_address = customer['shipping_address'] if customer and 'shipping_address' in customer and isinstance(customer['shipping_address'], dict) else None
+                    # try to get phone, street_1, street_2 from billing or shipping data
+                    phone = billing_address['phone'] if billing_address and 'phone' in billing_address else None
+                    if phone is None:
+                        phone = shipping_address['phone'] if shipping_address and 'phone' in shipping_address else None
+                    street_1 = billing_address['street_1'] if billing_address and 'street_1' in billing_address else None
+                    if street_1 is None:
+                        street_1 = shipping_address['street_1'] if shipping_address and 'street_1' in shipping_address else None
+                    street_2 = billing_address['street_2'] if billing_address and 'street_2' in billing_address else None
+                    if street_2 is None:
+                        street_2 = shipping_address['street_2'] if shipping_address and 'street_2' in shipping_address else None
+                    zip_code = billing_address['zip_code'] if billing_address and 'zip_code' in billing_address else None
+                    if zip_code is None:
+                        zip_code = shipping_address['zip_code'] if shipping_address and 'zip_code' in shipping_address else None
+                    city = billing_address['city'] if billing_address and 'city' in billing_address else None
+                    if city is None:
+                        city = shipping_address['city'] if shipping_address and 'city' in shipping_address else None
+                    country = billing_address['country'] if billing_address and 'country' in billing_address else None
+                    if country is None:
+                        country = shipping_address['country'] if shipping_address and 'country' in shipping_address else None
 
-                        # customer data
-                        customer = order['customer'] if 'customer' in order and isinstance(order['customer'], dict) else None
-                        firstname = customer['firstname'] if customer and 'firstname' in customer else None
-                        lastname = customer['lastname'] if customer and 'lastname' in customer else None
-                        # billing_address and shipping address
-                        billing_address = customer['billing_address'] if customer and 'billing_address' in customer and isinstance(customer['billing_address'], dict) else None
-                        shipping_address = customer['shipping_address'] if customer and 'shipping_address' in customer and isinstance(customer['shipping_address'], dict) else None
-                        # try to get phone, street_1, street_2 from billing or shipping data
-                        phone = billing_address['phone'] if billing_address and 'phone' in billing_address else None
-                        if phone is None:
-                            phone = shipping_address['phone'] if shipping_address and 'phone' in shipping_address else None
-                        street_1 = billing_address['street_1'] if billing_address and 'street_1' in billing_address else None
-                        if street_1 is None:
-                            street_1 = shipping_address['street_1'] if shipping_address and 'street_1' in shipping_address else None
-                        street_2 = billing_address['street_2'] if billing_address and 'street_2' in billing_address else None
-                        if street_2 is None:
-                            street_2 = shipping_address['street_2'] if shipping_address and 'street_2' in shipping_address else None
-                        zip_code = billing_address['zip_code'] if billing_address and 'zip_code' in billing_address else None
-                        if zip_code is None:
-                            zip_code = shipping_address['zip_code'] if shipping_address and 'zip_code' in shipping_address else None
-                        city = billing_address['city'] if billing_address and 'city' in billing_address else None
-                        if city is None:
-                            city = shipping_address['city'] if shipping_address and 'city' in shipping_address else None
-                        country = billing_address['country'] if billing_address and 'country' in billing_address else None
-                        if country is None:
-                            country = shipping_address['country'] if shipping_address and 'country' in shipping_address else None
+                    # taxes list
+                    api_taxes = order_lines_obj['taxes'] if order_lines_obj and 'taxes' in order_lines_obj else []
+                    taxes = []
+                    for tax in api_taxes:
+                        # make sure any dict provided contains both amount and code
+                        if 'amount' in tax and 'code' in tax:
+                            taxes.append({'amount': tax['amount'], 'code': tax['code']})
+    
+                    shping_taxes_api = order_lines_obj['shipping_taxes'] if order_lines_obj and 'shipping_taxes' in order_lines_obj else []
+                    shipping_taxes = []
+                    for stax in shping_taxes_api:
+                        if 'amount' in stax and 'code' in stax:
+                            shipping_taxes.append({'amount': stax['amount'], 'code': stax['code']})
+    
+                    
+                    commercial_id = order['commercial_id'] if 'commercial_id' in order else None
+                    created_date = mysql_strdate(order['created_date'] if 'created_date' in order else None)
+                    currency_iso_code = order['currency_iso_code'] if 'currency_iso_code' in order else None
+                    fully_refunded = order['fully_refunded'] if 'fully_refunded' in order else None
+                    price = order['price'] if 'price' in order else None
+                    total_commission = order['total_commission'] if 'total_commission' in order else None
+                    total_price = order['total_price'] if 'total_price' in order else None
+                    order_state = order['order_state'] if 'order_state' in order else None
+    
+                    new_order = db.session.query(Order).join(Listing, Order.listing_id==Listing.id).filter(
+                        Listing.dashboard_id == user_dashboard.id,
+                        Listing.platform_id == best_buy_platform.id,
+                        Order.order_id != None,
+                        Order.order_id == order_id,
+                    ).first()
+    
+                    if new_order:
+                        # update existing order data
+                        # 1-back catalogue qauntity as it was and check if the new quantity <= original catalogue qunatity or not (if added in quantity check it will not acurate data so ignore all order data or accept all else it may edit part of data and keep invalid quantity and not report that order ignored as invalid quantity)
+                        current_order_quantity = int_or_none(new_order.quantity)
+                        # catalogue db not accept null or string val, order must have quantity so incase one of both is null there are error and order must ignored
+                        original_catalogue_quantity = int(int_catalogue_quantity + current_order_quantity) if current_order_quantity is not None else None
 
-                        # taxes list
-                        api_taxes = order_lines_obj['taxes'] if order_lines_obj and 'taxes' in order_lines_obj else []
-                        taxes = []
-                        for tax in api_taxes:
-                            # make sure any dict provided contains both amount and code
-                            if 'amount' in tax and 'code' in tax:
-                                taxes.append({'amount': tax['amount'], 'code': tax['code']})
-    
-                        shping_taxes_api = order_lines_obj['shipping_taxes'] if order_lines_obj and 'shipping_taxes' in order_lines_obj else []
-                        shipping_taxes = []
-                        for stax in shping_taxes_api:
-                            if 'amount' in stax and 'code' in stax:
-                                shipping_taxes.append({'amount': stax['amount'], 'code': stax['code']})
-    
-                        
-                        commercial_id = order['commercial_id'] if 'commercial_id' in order else None
-                        created_date = mysql_strdate(order['created_date'] if 'created_date' in order else None)
-                        currency_iso_code = order['currency_iso_code'] if 'currency_iso_code' in order else None
-                        fully_refunded = order['fully_refunded'] if 'fully_refunded' in order else None
-                        price = order['price'] if 'price' in order else None
-                        total_commission = order['total_commission'] if 'total_commission' in order else None
-                        total_price = order['total_price'] if 'total_price' in order else None
-                        order_state = order['order_state'] if 'order_state' in order else None
-    
-                        new_order = db.session.query(Order).join(Listing, Order.listing_id==Listing.id).filter(
-                            Listing.dashboard_id == user_dashboard.id,
-                            Listing.platform_id == best_buy_platform.id,
-                            Order.order_id != None,
-                            Order.order_id == order_id,
-                        ).first()
-    
-                        if new_order:
-                            # update existing order data
+                        if original_catalogue_quantity is not None and int_order_quantity <= original_catalogue_quantity:
                             if new_order.quantity != order_quantity:
                                 new_order.quantity = order_quantity
+                                # here set the int of catalogue.qunatity to the original before any subtrict for new quantity only when quantity changed
+                                int_catalogue_quantity = original_catalogue_quantity
                                 update_require = True
                                 quantity_updated = True
 
@@ -1382,9 +1407,14 @@ def upload_orders(orders, current_user, db):
                                 result['total_updated'] += 1
                             else:
                                 result['not_changed'] += 1
-
                         else:
-                            # create new order
+                            if order_id:
+                                result['missing_listing'].append(order_id)
+                            result['total_missing'] += 1
+
+                    else:
+                        # create new order
+                        if int_order_quantity <= int_catalogue_quantity:
                             new_order = Order(
                                 listing_id=target_listing.id,
                                 quantity=order_quantity,
@@ -1423,18 +1453,20 @@ def upload_orders(orders, current_user, db):
                             new_order.insert()
                             quantity_updated = True
                             result['total_uploaded'] += 1
+                        else:
+                            # API can later accept list of order_ids so user can use the invalid order_ids after fix
+                            if order_id:
+                                result['invalid_quantity'].append(order_id)
+                            result['total_invalid'] += 1                            
 
-                        # update catalogue quantity if quantity updated or new order inserted (better performance and reduce db calls incase of update)
-                        if quantity_updated:
-                            new_quantity = int(int_catalogue_quantity - int_order_quantity)
-                            new_quantity = new_quantity if new_quantity >= 0 else 0
-                            target_listing.catalogue.quantity = new_quantity
-                            target_listing.catalogue.update()
-                    else:
-                        # API can later accept list of order_ids so user can use the invalid order_ids after fix
-                        if order_id:
-                            result['invalid_quantity'].append(order_id)
-                        result['total_invalid'] += 1
+                    # update catalogue quantity if quantity updated or new order inserted (better performance and reduce db calls incase of update)
+                    if quantity_updated:
+                        # note incase of quantity changed by update action int_catalogue_quantity will back to original catalogue quantity then from begning start subtsrict the new order quantity, ex: catalogue 0 quantity and have x order with 3, when update x order and make it 2, catalogue quantity will back 3 as it was then substrict new quantity which is 2 result new remaning quantity is 1
+                        new_quantity = int(int_catalogue_quantity - int_order_quantity)
+                        # note I checked in previous nested if int_order_quantity <= int_catalogue_quantity so incase came here and found nagtive it python bug can not vaildate <= so this always have right value even if python got error in check <= this will not accept nagtive value
+                        new_quantity = new_quantity if new_quantity >= 0 else 0
+                        target_listing.catalogue.quantity = new_quantity
+                        target_listing.catalogue.update()
                 else:
                     if order_id:
                         result['missing_listing'].append(order_id)
@@ -1444,6 +1476,7 @@ def upload_orders(orders, current_user, db):
                 print("error while import one of orders {}".format(sys.exc_info()))
                 if order_id:
                     result['errors'].append(order_id)
+
                 result['total_errors'] += 1
 
         return result
@@ -1787,7 +1820,8 @@ def update_order_taxes(form, target_order):
         return {'removed': removed, 'updated': {'old': updates, 'new': updates_new}, 'inserted': inserted , 'changed': changed}
     except Exception as e:
         raise e
-    
+
+
 def get_separate_order_taxes(target_order):
     order_taxes = []
     shipping_taxes = []
@@ -1803,3 +1837,42 @@ def get_separate_order_taxes(target_order):
         print("error in get_separate_order_taxes: {}".format(sys.exc_info()))
 
     return {'order_taxes': order_taxes, 'shipping_taxes': shipping_taxes}
+
+def format_name(col):
+    return re.sub( r'(^[a-z]|\_[a-z])', lambda x : x.group().upper(), col, re.IGNORECASE).replace('_',' ')
+
+# can used to fill barcode form for any table/multiple endpoints
+def fill_generate_barcode(form, table_class, itemid, excluded=[], relations={}, customs=[]):
+    new_choices = []
+    data_attrs = {}
+    table_cols = table_class.__table__.columns.keys()
+    db_class = table_class.query.filter_by(id=itemid).first()
+    if db_class:
+        for col in table_cols:
+            if col not in excluded:
+                if col in relations and callable(relations[col]):
+                    # custom set relational value of used class (can used with any table eg i do not need category_id i need category name etc)
+                    cb = relations[col]
+                    choice = cb(db_class)
+                    if choice:
+                        for choice_tup in choice:
+                            if len(choice_tup) == 2:
+                                new_choices.append((choice_tup[0],format_name(choice_tup[0])))
+                                data_attrs['data-{}'.format(choice_tup[0])] = choice_tup[1]
+                else:
+                    new_choices.append((col, format_name(col)))
+                    # dynamic set required javascript data attribute with wtforms
+                    data_attrs['data-{}'.format(col)] = getattr(db_class, col)
+
+        # use for both un relational data and custom options it can also be for relation property of class for example access catalogue.locations , note table_class.__table__.columns.keys() returns only direct columns of db not relations like locations, parent_user, etc
+        for custom in customs:
+            if callable(custom):
+                choice = custom(db_class)
+                if choice:
+                    for choice_tup in choice:
+                        if len(choice_tup) == 2:
+                            new_choices.append((choice_tup[0],format_name(choice_tup[0])))
+                            data_attrs['data-{}'.format(choice_tup[0])] = choice_tup[1]
+
+        form.columns.choices = new_choices
+        form.columns.render_kw = data_attrs

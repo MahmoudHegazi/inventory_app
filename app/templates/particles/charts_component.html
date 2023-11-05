@@ -23,9 +23,9 @@
     </div>
   {% endfor %}
 </div>
-
 <script>
     var chartsData = {{charts_data|tojson|safe}};
+
     addEventListener("DOMContentLoaded", (event) => {
       const charts = {};
       const options = {
@@ -71,9 +71,15 @@
           if ( chartData.border_colors && Array.isArray(chartData.border_colors) ){
             borderColors =  chartData.border_colors;
           }
-    
+
+          // fix chart.js long text
+          let currentLabels = chartData.labels;
+          if (chartData.type.trim() == 'bar'){
+            currentLabels = chartJsLabelsFix(currentLabels);
+          }
+          
           var data = {
-            labels: chartData.labels,
+            labels: currentLabels,
             datasets: [{
               label: chartData.label,
               data: chartData.data,
@@ -98,7 +104,48 @@
       });
     
     });
-    
+
+
+/* fix for long texts in bar charts */
+function wordBreakAll(str) {
+  // return string or array of strings based on max length
+  const maxLength = 9;
+  let current = '';
+  if (str.length > maxLength){
+      current = [];
+      let counter = 0;
+      let part = '';
+      for (let i=0; i<str.length; i++) {
+          counter += 1;
+          if (counter < maxLength && i != (str.length - 1)) {
+              part += str[i];
+          } else if (counter == maxLength) {
+              part += str[i];
+              current.push(part);
+              part = '';
+              counter = 0;
+          } else if (counter < maxLength && i == (str.length - 1)) {
+              part += str[i];
+              current.push(part);
+              part = '';
+              counter = 0;
+          } else {
+              throw 'error from wordBreaker';
+          }
+      }
+  } else {
+      current = str;
+  }
+  return current;
+}
+
+function chartJsLabelsFix(labels){
+    const newLabels = [];
+    labels.forEach((labelStr)=>{
+        newLabels.push(wordBreakAll(labelStr));
+    });
+    return newLabels;
+}
 </script>
 {% else %}
 <div class="alert alert-danger text-center h">Unable to Display charts right now.</div>

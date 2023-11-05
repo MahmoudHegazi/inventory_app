@@ -18,7 +18,7 @@
             <div class="div border shadow rounded p-2">
               <h5 class="mt-2 mb-3"><span>Platforms: </span> 
               <button type="button" data-toggle="modal" data-target="#addPlatformModal" class="btn btn-success btn-sm" style="float:right;"><i class="fa fa-plus"></i></button></h5>
-              <div class="row mt-4" style="max-height:300px;overflow: auto;">
+              <div class="row mt-4 p-2" style="max-height:300px;overflow: auto;">
                 <!-- plateforms -->
                 {% for platform in dashboard.platforms %}
                 <div class="col-sm-12 row">
@@ -92,6 +92,32 @@
             </div>
         </div>
         <!-- Locations end -->
+        <!-- Conditions Start -->
+        <div class="container mb-5">
+          {% if dashboard is defined and dashboard.conditions is defined %}
+          <div class="div border shadow rounded p-2">
+            <h5 class="mt-2 mb-3"><span>Conditions: </span> 
+            <button type="button" data-toggle="modal" data-target="#addConditionModal" class="btn btn-success btn-sm" style="float:right;"><i class="fa fa-plus"></i></button></h5>
+            <div class="row mt-4 p-2" style="max-height:300px;overflow: auto;">
+              <!-- conditions dashboard.conditions -->
+              {% for condition in dashboard.conditions %}
+              <div class="col-sm-12 row">
+                <div class="col-sm-6">
+                  <p style="word-break: break-word;">{{condition.id}}: {{condition.name}}</p>
+                </div>
+                <div class="col-sm-6 text-right">
+                  <button data-toggle="modal" data-url="{{url_for('routes.edit_condition', condition_id=condition.id)}}" data-condition-id="{{condition.id}}" data-condition-name="{{condition.name}}" data-target="#editConditionModal" class="btn btn-sm btn-warning edit_condition" type="button"><i class="fa fa-edit"></i></button>
+                  <button data-toggle="modal" data-url="{{url_for('routes.delete_condition', condition_id=condition.id)}}" data-condition-id="{{condition.id}}" data-target="#deleteConditionModal" class="btn btn-sm btn-danger wtform_modal_deletebtn" type="button"><i class="fa fa-remove"></i></button>
+                </div>
+              </div>
+              {% endfor %}
+            </div>
+          </div>
+          {% else %}
+          <div class="alert alert-danger">Unable to Display Condition right now.</div>
+          {% endif %}
+        </div>
+        <!-- Conditions End -->
         <!-- Categories start -->
         <div class="container mb-2">
           {% if dashboard is defined and dashboard.categories is defined %}
@@ -155,7 +181,7 @@
 </div>
 {{platforms_data}}
 {% from 'forms.html' import setup_forms %}
-{{ setup_forms(add_platform=add_platform, edit_platform=edit_platform, delete_platform=delete_platform, add_location=add_location, edit_location=edit_location, delete_location=delete_location, add_bin=add_bin, edit_bin=edit_bin, delete_bin=delete_bin, add_category=add_category, edit_category=edit_category, delete_category=delete_category, import_categories=import_categories, setup_bestbuy=setup_bestbuy) }}
+{{ setup_forms(add_platform=add_platform, edit_platform=edit_platform, delete_platform=delete_platform, add_location=add_location, edit_location=edit_location, delete_location=delete_location, add_bin=add_bin, edit_bin=edit_bin, delete_bin=delete_bin, add_category=add_category, edit_category=edit_category, delete_category=delete_category, add_condition=add_condition, edit_condition=edit_condition, remove_condition=remove_condition, import_categories=import_categories, setup_bestbuy=setup_bestbuy) }}
 {% endblock %}
 
 {% block page_scripts %}
@@ -163,6 +189,8 @@
 deleteWtformsModalProccess(dataAttId='data-platform-id', formId='remove_platform_form', idInputId='platform_id_remove', modalId='deletePlatformModal');
 
 deleteWtformsModalProccess(dataAttId='data-location-id', formId='remove_location_form', idInputId='location_id_remove', modalId='deleteLocationModal');
+
+deleteWtformsModalProccess(dataAttId='data-condition-id', formId='remove_condition_form', idInputId='condition_id_remove', modalId='deleteConditionModal');
 
 deleteWtformsModalProccess(dataAttId='data-category-id', formId='remove_category_form', idInputId='category_id', modalId='deleteCategoryModal');
 
@@ -177,6 +205,16 @@ fillEditPlatForm();
 fillEditLocation();
 fillEditBin();
 fillEditCategory();
+
+// the dynamic version for fill any edit bs form data (this would used for all new edits)
+fillEditForm(triggerSelector='.edit_condition', formSelector='#edit_condition_form', modalSelector='#editConditionModal', dataAttrs={
+  id: 'data-condition-id',
+  name: 'data-condition-name'
+}, inputIds={
+  id: '#condition_id_edit',
+  name: '#condition_name_edit'
+});
+
 // display platform listings
 const platformObjs = {};
 {% for platform in dashboard.platforms %}

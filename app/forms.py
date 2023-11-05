@@ -98,8 +98,8 @@ class catalogueModal(FlaskForm):
     category_code = SelectField('Category Code',choices=[], validators=[InputRequired()], validate_choice=True)
     quantity = IntegerField('Quantity')
     product_model = StringField('Product Model',validators=[Length(max=255)])
-    condition = StringField('Condition',validators=[Length(max=255)])
     upc = StringField('UPC',validators=[Length(max=255)])
+    condition = SelectField('Condition',choices=[], validators=[InputRequired()], coerce=int, validate_choice=True)
     warehouse_locations = SelectMultipleField('Warehouses Locations', choices=[], coerce=int, validate_choice=True)
     locations_bins = SelectMultipleField('Bins', choices=[], coerce=int, validate_choice=True, render_kw={'style': 'visibility:hidden;'})
 
@@ -128,6 +128,12 @@ class removeCatalogueForm(FlaskForm):
 class removeCataloguesForm(FlaskForm):
     catalogues_ids = HiddenField()
     delete_catalogues = SubmitField('Delete Catalgoues')
+
+class generateCatalogueBarcodeForm(FlaskForm):
+    columns = SelectMultipleField('Catalogue Columns', choices=[],validate_choice=False)
+    data = TextAreaField('Barcode Data',validators=[Length(max=48), InputRequired()], render_kw={'rows': 2})
+    generate = SubmitField('Generate')
+
 
 # Using wtforms in all app + prevent any unknown delet request that can delete catalogues of system By depend on wtforms
 class removeAllCataloguesForm(FlaskForm):
@@ -304,7 +310,7 @@ class editPlatformForm(FlaskForm):
 
 class removePlatformForm(FlaskForm):
     platform_id_remove = HiddenField()
-    delete = SubmitField('Delete Order')
+    delete = SubmitField('Delete Platform')
 
 # Locations forms
 class addLocationForm(FlaskForm):
@@ -359,6 +365,20 @@ class removeCategoryForm(FlaskForm):
 class importCategoriesAPIForm(FlaskForm):
     api_key = StringField('SHOP KEY', validators=[InputRequired(), Length(max=500)], render_kw={'title': 'You can get that key from your marketplace, in the API section'})
     import_data = SubmitField('Import Data')
+
+# Condition forms
+class addConditionForm(FlaskForm):
+    name_add = StringField('Name', id='condition_name_add', validators=[InputRequired(), Length(max=255)])
+    add = SubmitField('Add')
+
+class editConditionForm(FlaskForm):    
+    name_edit = StringField('Name', id='condition_name_edit', validators=[InputRequired(), Length(max=255)])
+    condition_id_edit = HiddenField()
+    edit = SubmitField('Edit')
+
+class removeConditionForm(FlaskForm):
+    condition_id_remove = HiddenField(validators=[InputRequired()])
+    delete = SubmitField('Delete Condition')
 
 ###############################  main Forms ###############################################
 class CatalogueExcelForm(FlaskForm):

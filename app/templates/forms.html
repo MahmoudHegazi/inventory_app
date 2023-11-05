@@ -413,7 +413,7 @@
 {% endmacro %}
 
 
-{% macro catalogue_forms(deleteform) %}
+{% macro catalogue_forms(deleteform, generate_barcode_form, generate_redirect) %}
 <div class="modal fade" id="deleteCatalogueModal">
   <div class="modal-dialog">
     <div class="modal-content">
@@ -444,6 +444,47 @@
     </div>
   </div>
 </div>
+
+<div class="modal fade" id="barcodeCatalogueModal">
+  <div class="modal-dialog">
+    <div class="modal-content">
+    
+      <!-- Modal Header -->
+      <div class="modal-header">
+        <h4 class="modal-title">Generate BarCode</h4>
+        <button type="button" class="close" data-dismiss="modal">&times;</button>
+      </div>
+      
+      <!-- Modal body -->
+      <div class="modal-body">
+         {% if generate_barcode_form %}
+         <form id="generate_barcode_catalogue" method="post" action="{{generate_redirect}}">
+          <p>Please select product's data to apear on the barcode, you can add as many as you need based on your type of barcode used</p>
+          {{generate_barcode_form.hidden_tag()}}
+          <div class="form-group">
+            {{generate_barcode_form.label}}
+            {{generate_barcode_form.columns(class='form-control')}}
+          </div>
+          <div class="form-group">
+            {{generate_barcode_form.data.label}}
+            {{generate_barcode_form.data(class='form-control', placeholder='You Can always edit this string as you like for example replace comma with underscore _ etc or add custom data, or write full custom string to that product without select columns')}}
+          </div>
+          {{generate_barcode_form.generate(class='btn btn-primary')}}
+         </form>
+         {% else %}
+         <div class="alert alert-danger">Unable to Display Generate Barcode form right now.</div>
+         {% endif %}
+      </div>
+      <!-- Modal footer -->
+      <div class="modal-footer">
+        <button type="button" class="btn btn-danger" data-dismiss="modal">Close</button>
+      </div>
+      
+    </div>
+  </div>
+</div>
+
+
 {% endmacro %}
 
 
@@ -830,7 +871,7 @@
 </div>
 {% endmacro %}
 
-{% macro setup_forms(add_platform, edit_platform, delete_platform, add_location, edit_location, delete_location, add_bin, edit_bin, delete_bin, add_category, edit_category, delete_category, import_categories, setup_bestbuy) %}
+{% macro setup_forms(add_platform, edit_platform, delete_platform, add_location, edit_location, delete_location, add_bin, edit_bin, delete_bin, add_category, edit_category, delete_category, add_condition, edit_condition, remove_condition, import_categories, setup_bestbuy) %}
 <div class="modal fade" id="addPlatformModal">
   <div class="modal-dialog">
     <div class="modal-content">
@@ -1219,6 +1260,95 @@
         </form>
         {% else %}
         <div class="alert alert-danger">Unable to Display Remove Category form right now.</div>
+        {% endif %}
+      </div>
+      <!-- Modal footer -->
+      <div class="modal-footer">
+        <button type="button" class="btn btn-danger" data-dismiss="modal">Close</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- conditions -->
+<div class="modal fade" id="addConditionModal">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <!-- Modal Header -->
+      <div class="modal-header">
+        <h4 class="modal-title">Add Condition</h4>
+        <button type="button" class="close" data-dismiss="modal">&times;</button>
+      </div>
+      <!-- Modal body -->
+      <div class="modal-body">
+        {% if add_condition %}
+        <form id="add_condition_form" method="post" action="{{url_for('routes.add_condition')}}">
+            {{add_condition.hidden_tag()}}                
+            <div class="form-group">
+              {{add_condition.name_add.label}}
+              {{add_condition.name_add(class='form-control', placeholder='Enter Condition', maxlength='255')}}
+            </div>
+            {{add_condition.add(class='btn btn-success btn-block')}}
+        </form>
+        {% else %}
+        <div class="alert alert-danger">Unable to Display Add Condition form right now.</div>
+        {% endif %}
+      </div>
+      <!-- Modal footer -->
+      <div class="modal-footer">
+        <button type="button" class="btn btn-danger" data-dismiss="modal">Close</button>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="modal fade" id="editConditionModal">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <!-- Modal Header -->
+      <div class="modal-header">
+        <h4 class="modal-title">Edit Condition</h4>
+        <button type="button" class="close" data-dismiss="modal">&times;</button>
+      </div>      
+      <!-- Modal body -->
+      <div class="modal-body">
+        {% if edit_condition %}
+        <form id="edit_condition_form" method="post" action="">
+            {{edit_condition.hidden_tag()}}                
+            <div class="form-group">
+              {{edit_condition.name_edit.label}}
+              {{edit_condition.name_edit(class='form-control', placeholder='Enter Condition', maxlength='255')}}
+            </div>
+            {{edit_condition.edit(class='btn btn-success btn-block')}}
+        </form>
+        {% else %}
+        <div class="alert alert-danger">Unable to Display Edit Condition form right now.</div>
+        {% endif %}
+      </div>
+      <!-- Modal footer -->
+      <div class="modal-footer">
+        <button type="button" class="btn btn-danger" data-dismiss="modal">Close</button>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="modal fade" id="deleteConditionModal">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <!-- Modal Header -->
+      <div class="modal-header">
+        <h4 class="modal-title">Remove Condition</h4>
+        <button type="button" class="close" data-dismiss="modal">&times;</button>
+      </div>
+      <!-- Modal body -->
+      <div class="modal-body">
+        {% if remove_condition %}
+        <form id="remove_condition_form" method="post" action="">
+         <p>Are you Sure you want remove Category</p>
+         {{remove_condition.hidden_tag()}}
+         {{remove_condition.delete(class='btn btn-danger')}}
+        </form>
+        {% else %}
+        <div class="alert alert-danger">Unable to Display Remove Condition form right now.</div>
         {% endif %}
       </div>
       <!-- Modal footer -->

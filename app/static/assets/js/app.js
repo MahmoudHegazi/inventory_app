@@ -218,8 +218,10 @@ function searchComponent(speed='slow',easing='swing', cp=function(){return true;
           $(`#cancel_search${addon}`).show();
           
         } else if (searchColumn && selectType == 'all' && typeof(rowBuildCB) === 'function') {
-          //searchColumn && searchValue && selectType == 'all' && typeof(rowBuildCB) === 'function'
-          // hide current page or previous cards (targetCardsArr will be data from server in this scope)
+          //searchColumn && searchValue && selectType == 'all' && typeof(rowBuildCB) === 'function'          
+          const searchResponse = await postData('/search', {column: searchColumn, value: searchValue, table: table, parent_id: parent_id});
+
+          // hide current page or previous cards (targetCardsArr will be data from server in this scope) (must be done here after await as incase multiple clicks on button if clear before await it may clear all data for the 3 clicks while first await not completed yet thats why it will keep concate the rows or repeat rows, but now after await when data come from server clear any previous data and start display so no matter 9999 clicks in same time each time will wait response hide the previous and start display new, instead of hide previous and await for response) other solution if need keep hide before await hide button of search and display it after search but this more logical
           $(`.searching_card${addon}`).each( (s, searchingCard)=>{
               /* this is how hide any bs4 (d-flex, row) with jquery effect css + callback in clearn search before server start set speed to 1 as it addiotonal clean*/
               $(searchingCard).hide(1, easing, ()=>{
@@ -230,8 +232,6 @@ function searchComponent(speed='slow',easing='swing', cp=function(){return true;
                 }
               });
           });
-          
-          const searchResponse = await postData('/search', {column: searchColumn, value: searchValue, table: table, parent_id: parent_id});
           if (searchResponse && searchResponse.code == 200 && Array.isArray(searchResponse.data)){
             const serverData = searchResponse.data;
             const targetTableBody = $(`#table_display${addon} tbody`);
@@ -670,6 +670,56 @@ function fillEditCategory(){
 }
 
 
+function fillEditForm(triggerSelector='', formSelector='', modalSelector='', dataAttrs={}, inputIds={}){
+  // check run one time only when page loaded
+  if (
+    typeof(dataAttrs) === 'object' && typeof(inputIds) === 'object' && 
+    Object.keys(dataAttrs).length === Object.keys(inputIds).length &&
+    formSelector && $(formSelector).length && 
+    modalSelector && $(modalSelector).length &&
+    triggerSelector
+    ){
+      
+    // dynamic check make sure each prop on (dataAttr which main will used props) from exist on input id (this will end function setup on page will not add the event also and this loop run one time only on first load page)
+    for (let prop in dataAttrs){
+      if (!inputIds.hasOwnProperty(prop) || !String(dataAttrs[prop]).trim() || !String(inputIds[prop]).trim() || !$(inputIds[prop]).length){
+        return false;
+      }
+    }
+    
+
+    $(triggerSelector).on('click', (event)=>{
+      if ($(event.currentTarget).length && $(event.currentTarget).attr('data-url')){
+        // dynamic check exsting of data-attr and it's input
+        for (let prop in dataAttrs){
+          if (!$(event.currentTarget).attr(dataAttrs[prop])){
+            console.log(`Must define all provide dataAttr on target elm, undefined:${prop} -> ${dataAttrs[prop]}`);
+            return false;
+          }
+        }
+        // start clear the actions
+        for (let prop in dataAttrs){
+          console.log($(event.currentTarget).attr(dataAttrs[prop]).trim());
+          $(inputIds[prop]).val($(event.currentTarget).attr(dataAttrs[prop]).trim());
+          console.log($(inputIds[prop]));
+        }
+        $(formSelector).attr('action', $(event.currentTarget).attr('data-url'));
+      } else {
+        console.log("can not get target or missing data-url");
+      }
+    });
+  
+    $(modalSelector).on('hidden.bs.modal', () => {
+      for (let prop in dataAttrs){
+        $(inputIds[prop]).val('');
+      }
+      $(formSelector).attr('action', '');
+    });
+  } else {
+    console.log("fillEditForm not started length of data attributes must be equal to length of input that will updated");
+  }
+}
+
 /* integerted with search throw 1 event cancel search, and visible elements (searchComponent use display none for process search result) */
 function multipleSelectComponent(checkboxSelector='', dataLabel='', actionModals=[], selectAllSelector='', openModalCB=null, closeModalCB=null){
   let checkedCheckBoxes = [];
@@ -999,6 +1049,160 @@ function limitPerPageComponent(){
   }
 }
 
+
+/* shadow component that apply order by table headers for any table in the page with class arrangable (it work separately without effect any events that's why it like shadow can used in any app ) also note this able to add the sort to more than one table in same page */
+function orderByColumnsComponent() {
+  const orderOrignal = {};
+  let orderedBefore = false;
+  // function used to return sorted DOM array 
+  const sorter = (domArr = [], index=0, asc = true) => {
+      // note domArr is jquery object not Array it have slice, sort but not have reverse so convert jquery Object to array then after complete convert array back to jquery object
+      const copyArr = Array.from(domArr).slice();
+      copyArr.sort((a, b) => {
+          const aTD = $(a).find('td').eq(index);
+          const bTD = $(b).find('td').eq(index);
+          // make sure given index are vaild else throw exception and stop all remaning sort process
+          if (aTD.length && bTD.length){
+            const aString = $(aTD).text().trim();
+            const bString = $(bTD).text().trim();
+
+            /* small dynamic check without write data attrs (as string diffrent from numbers when sort if both a and b are float (float accept both integers and float) so convert to integers) */
+            const floatA = parseFloat(aString);
+            const floatB = parseFloat(bString);
+            if (!isNaN(floatA) && !isNaN(floatB)) {
+              return (floatA < floatB) ? -1 : (floatA > floatB) ? 1 : 0;
+            } else {
+              return (aString < bString) ? -1 : (aString > bString) ? 1 : 0;
+            }
+          } else {
+            throw 'Sort could not sort invaild index.';
+          }
+      });
+      return (asc == true) ? $(copyArr) : $(copyArr.reverse());
+  };
+  
+  
+  // function to apply the shadow sort that not effect events other way would .html('') (newArr must be jquery object)
+  const orderHTMLByArr = (newArr, targetTable) => {
+      let previousElm = null;
+      $(newArr).each((_i, currentElm) => {
+          if (previousElm) {
+              // here there are previous elm so insert after this previous elm
+              $(currentElm).insertAfter(previousElm);
+              previousElm = $(currentElm);
+          } else {
+              const firstElm = $(targetTable).find('tbody tr:first-of-type');
+              if (firstElm.length) {
+                  // here this is first elm of order so insert before any elm
+                  $(currentElm).insertBefore(firstElm);
+                  previousElm = $(currentElm);
+              }
+          }
+      });
+  };
+
+  // this function called every time before any order action to make sure order done by one column only and back all things to default (it only back the target table not all tables)
+  const backToOriginal = (theTable, tableId) => {
+      $(theTable).find("th").attr('data-state', 'none');
+      // remove any old class
+      const arrowClasses = ['fa-arrow-up', 'fa-arrow-down', 'fa-arrow-right'];
+      arrowClasses.forEach((classToRemove) => {
+          $(theTable).find('th i.arrange_state').removeClass(classToRemove);
+      });
+      $(theTable).find('th i.arrange_state').addClass('fa-arrow-right');
+  
+      // (runs only if table ordered before for performance) to avoid order by two columns and not contain the function and give unknown result back the rows to default order before any new order (incase one column only clicked this not show effect and may more performance but incase user clicked multiple columns this will do the target final result the order method knows exatly what returned result not random)
+      if (orderedBefore && orderOrignal.hasOwnProperty(tableId)) {
+          console.log("I called");
+          orderHTMLByArr(orderOrignal[tableId], theTable);
+      }
+  };
+  
+  // event listener function that handle the order based on target table only so it not effect any other tables use that component
+  const orderColumns = (e) => {
+      if ($(e.currentTarget).length) {
+          const dataState = $(e.currentTarget).attr('data-state');
+          const stateIcon = $(e.currentTarget).find('i.arrange_state').eq(0);
+          const targetTable = $(e.currentTarget).closest("table.arrangable");
+          const tableId = targetTable.attr("id");
+          const indexOfColumn = $(e.currentTarget).index();
+          // for performance incase no rows not make any actions
+          const tableRows = $(targetTable).find('tbody tr');
+  
+          if (dataState && stateIcon.length && tableRows.length && targetTable.length && tableId) {
+
+              // take backup one time from table 
+              if (!orderOrignal.hasOwnProperty(tableId)) {
+                  orderOrignal[tableId] = Array.from(targetTable.find('tbody tr'));
+              }
+  
+              console.log(dataState, stateIcon[0], targetTable[0], tableId);
+  
+              
+              // start order
+              if (dataState == 'none') {
+                  backToOriginal(targetTable, tableId);
+                  // order asc
+                  $(targetTable).find('th')
+                  $(e.currentTarget).attr('data-state', 'asc');
+                  stateIcon.addClass('fa-arrow-up');
+
+                  const sortedDomArr = sorter(tableRows, indexOfColumn, true);
+                  // apply shadow order
+                  orderHTMLByArr(sortedDomArr, targetTable);
+                  console.log(sortedDomArr, sortedDomArr[0], sortedDomArr[1]);
+                  // back data to original incase no other orders (Complex)
+              } else if (dataState == 'asc') {
+                  backToOriginal(targetTable, tableId);
+                  // order desc
+                  $(e.currentTarget).attr('data-state', 'desc');
+                  stateIcon.addClass('fa-arrow-down');
+                  const sortedDomArr = sorter(tableRows, indexOfColumn, false);
+                  orderHTMLByArr(sortedDomArr, targetTable);
+                  console.log(sortedDomArr, sortedDomArr[0], sortedDomArr[1]);
+              } else {
+                  // back to default
+                  backToOriginal(targetTable, tableId);
+              }
+              orderedBefore = true;
+  
+          }
+      }
+  };
+  
+  // setup the component requirments
+  $('.arrangable').each((i, arrangeTable) => {
+  
+      // handle dynamic ignore indexes of tables
+      const dataIgnore = $(arrangeTable).attr('data-ignore');
+      let headersToIgnore = [];
+      if (dataIgnore) {
+          headersToIgnore = dataIgnore.split(',').map((itemNum) => {
+              let item = parseInt(itemNum);
+              if (!isNaN(item)) {
+                  return item;
+              } else {
+                  return false;
+              }
+          }).filter((mappedItem) => {
+              return mappedItem !== false;
+          });
+      }
+  
+  
+      const tableHeaders = $(arrangeTable).find("th");
+      tableHeaders.each((h, tableHeader) => {
+          if (!headersToIgnore.includes(h)) {
+              $(tableHeader).append(`<i class="fa fa-arrow-right font_13px arrange_state"></i>`);
+              $(tableHeader).attr('data-state', 'none');
+              $(tableHeader).addClass('cursor-pointer');
+              tableHeader.addEventListener('click', orderColumns);
+          }
+      });
+  });
+
+}
+
 // simple function to move group of buttons based on user screen view eg if large screen and this is form if user on bottom of page put buttons at bottom else at top
 function toggleContentUpDown(contentSelector='', upSelector='', downSelector=''){
   if (contentSelector && $(contentSelector).length && upSelector && $(upSelector).length && downSelector && $(downSelector).length){
@@ -1010,6 +1214,39 @@ function toggleContentUpDown(contentSelector='', upSelector='', downSelector='')
            // default up (also in smallest screen default which no scroll default is up)
            $(upSelector).append($(contentSelector));
        }
+    });
+  }
+}
+
+function generateBarcodeActions(elmSelector='', dataSelector=''){
+  if (elmSelector && $(elmSelector).length && dataSelector && $(dataSelector).length){
+
+    const targetSelect = $(elmSelector);
+    const getSelectedVals = ()=>{
+      const values = [];
+      const selectedValues = targetSelect.val();
+      if (selectedValues){
+        selectedValues.forEach((colkey)=>{
+          const dataColVal = targetSelect.attr(`data-${colkey}`);
+          if (typeof(dataColVal) !== undefined && dataColVal !== false){
+            values.push(dataColVal);
+          }
+        });
+      }
+      return values;
+    };
+
+    $(elmSelector).on('change', ()=>{
+      
+      const values = getSelectedVals(targetSelect);
+      console.log(values);
+      $(dataSelector).val(values.join(','));
+       /*
+      const dataColVal = target.attr(`data-${target.val()}`);
+     
+      if (dataColVal){
+        alert(dataColVal);
+      }*/
     });
   }
 }

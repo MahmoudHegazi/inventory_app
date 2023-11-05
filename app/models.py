@@ -29,6 +29,7 @@ class Dashboard(db.Model):
     platforms = db.relationship("Platform", backref="dashboard", cascade="all, delete", passive_deletes=True)
     locations = db.relationship("WarehouseLocations", backref="dashboard", cascade="all, delete", passive_deletes=True)
     categories = db.relationship("Category", backref="dashboard", cascade="all, delete", passive_deletes=True)
+    conditions = db.relationship("Condition", backref="dashboard", cascade="all, delete", passive_deletes=True)
     user = db.relationship("User", backref="dashboard", cascade="all, delete", passive_deletes=True, uselist=False)
 
 
@@ -321,9 +322,7 @@ class Category(db.Model):
 
 ################################ ---------- Tables for Dashboard Catagories (End) ---------------- #########################
 
-# sku, product_name, product_description, product_name, product_description, brand, category_code, price, sale_price, quantity, product_model,
-# condition, upc, location, product_image, 
-# uselist=False make the one-to-one not return list of classes 
+# uselist=False make the one-to-one not return list of classes
 class Catalogue(db.Model): # catelouge
     __tablename__ = 'catalogue'
     id = db.Column(db.Integer, primary_key=True, nullable=False)
@@ -333,19 +332,21 @@ class Catalogue(db.Model): # catelouge
     brand = db.Column(db.String(255), nullable=True)
     price = db.Column(db.DECIMAL(precision=10, scale=2, asdecimal=True), nullable=True, default=0.00)
     sale_price = db.Column(db.DECIMAL(precision=10, scale=2, asdecimal=True), nullable=True, default=0.00)
-    quantity = db.Column(db.Integer, nullable=True)
+    quantity = db.Column(db.Integer, nullable=True, default=0)
     product_model = db.Column(db.String(255), nullable=True)
-    condition = db.Column(db.String(255), nullable=True)
     upc = db.Column(db.String(255), nullable=True)
+    reference_type = db.Column(db.String(50), nullable=True, default=None)
     product_image = db.Column(db.String(45), nullable=True, default='default_product.png')
+    barcode = db.Column(db.String(100), nullable=True, default=None)
     created_date = db.Column(DateTime, nullable=False, default=datetime.datetime.utcnow)
     updated_date = db.Column(DateTime, nullable=True, default=None, onupdate=datetime.datetime.utcnow)
     category_id = db.Column(db.Integer, db.ForeignKey('category.id', ondelete="SET NULL", onupdate="CASCADE"), nullable=True, default=None)
     user_id = db.Column(db.Integer, db.ForeignKey('user.id', ondelete="CASCADE", onupdate="CASCADE"), nullable=False)
+    condition_id = db.Column(db.Integer, db.ForeignKey('condition.id', ondelete="SET NULL", onupdate="CASCADE"), nullable=True, default=None)
     listings = db.relationship("Listing", backref="catalogue", cascade="all, delete", passive_deletes=True, order_by='Listing.platform_id.asc()')
     locations = db.relationship("CatalogueLocations", backref='catalogue', cascade="all, delete", passive_deletes=True)
 
-    def __init__(self, sku, user_id, product_name=None, product_description=None, brand=None, category_id=None, price=0.00, sale_price=0.00, quantity=None, product_model=None, condition=None, upc=None):
+    def __init__(self, sku, user_id, product_name=None, product_description=None, brand=None, category_id=None, price=0.00, sale_price=0.00, quantity=0, product_model=None, upc=None, condition_id=None, reference_type=None, barcode=None):
         self.sku = sku
         self.product_name = product_name
         self.user_id = user_id
@@ -356,8 +357,10 @@ class Catalogue(db.Model): # catelouge
         self.sale_price = sale_price
         self.quantity = quantity
         self.product_model = product_model
-        self.condition = condition
         self.upc = upc
+        self.condition_id = condition_id
+        self.barcode = barcode
+        self.reference_type = reference_type
 
     def insert(self):
         db.session.add(self)
@@ -384,7 +387,6 @@ class Catalogue(db.Model): # catelouge
         'sale_price': str(self.sale_price),
         'quantity': self.quantity,
         'product_model': self.product_model,
-        'condition': self.condition,
         'product_image': self.product_image,
         'upc': self.upc,
         'location': ",".join([loc.warehouse_location.name for loc in self.locations]),
@@ -538,7 +540,7 @@ class Listing(db.Model):
         'sale_price': str(self.sale_price),
         'quantity': self.quantity,
         'image': self.image,
-        'platform': self.catalogue.platform.name,
+        'platform': self.platform.name,
         'location': ",".join(listing_location_strings),
         'locations': listing_locations,
         'bin': ",".join(listing_bins_arr),
@@ -771,6 +773,46 @@ class Platform(db.Model):
         }
 
 ################################ ---------- Tables for Dashboard Plateforms (End) ---------------- #########################
+
+################################ ---------- Tables for Dashboard Conditions (Start) ---------------- #########################
+class Condition(db.Model):
+    __tablename__ = 'condition'
+    id = db.Column(db.Integer, primary_key=True, nullable=False)
+    name = db.Column(db.String(100), nullable=False)
+    dashboard_id = db.Column(db.Integer, db.ForeignKey('dashboard.id', ondelete="CASCADE", onupdate="CASCADE"), nullable=False)    
+    created_date = db.Column(DateTime, nullable=False, default=datetime.datetime.utcnow)
+    updated_date = db.Column(DateTime, nullable=True, default=None, onupdate=datetime.datetime.utcnow)
+    catalogues = db.relationship("Catalogue", backref='condition')
+
+    def __init__(self, dashboard_id, name):
+        self.dashboard_id = dashboard_id
+        self.name = name
+
+
+    def insert(self):
+        db.session.add(self)
+        db.session.commit()
+
+    def update(self):
+        db.session.commit()
+
+    def delete(self):
+        db.session.delete(self)
+        db.session.commit()
+
+    def format(self):
+        return {
+        'id': self.id,
+        'dashboard_id': self.dashboard_id,
+        'name': self.name,
+        'created_date': self.created_date,
+        'updated_date': self.updated_date
+        }
+    
+    def __repr__(self):
+        return '{}: {}'.format(self.id, self.name)
+
+################################ ---------- Tables for Dashboard Conditions (End) ---------------- #########################
 
 ################################ ---------- Tables for Dashboard Warehouse Locations (Sart) ---------------- #########################
 class WarehouseLocations(db.Model):

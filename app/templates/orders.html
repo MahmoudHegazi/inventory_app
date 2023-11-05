@@ -135,7 +135,7 @@
     <div class="row" id="table_display">
       <!-- table display -->
       <div class="col-sm-12">         
-        <table class="table table-hover">
+        <table class="table table-hover arrangable" id="orders_table" data-ignore="0,10">
           <thead>
             <tr>
               <th>Icon</th>
@@ -308,7 +308,8 @@ function rowBuildCB(order){
 
 searchComponent('mid', 'swing', cp=function(){return true;}, addon='', condition='*=', rowBuildCB=rowBuildCB, table='order');
 
-
+// add order by component to arrange table rows using table headers
+orderByColumnsComponent();
 
 </script>
 {% endblock page_scripts %}

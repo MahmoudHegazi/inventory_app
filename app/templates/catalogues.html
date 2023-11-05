@@ -140,7 +140,7 @@
     <div class="row" id="table_display">
       <!-- table display -->
       <div class="col-sm-12">         
-        <table class="table table-hover">
+        <table class="table table-hover arrangable" id="catalogues_table" data-ignore="0,1,6">
           <thead>
             <tr>
               <th>#</th>
@@ -349,6 +349,8 @@ function rowBuildCB(catalogue){
 
 searchComponent('fast', 'swing', cp=function(){return true;}, addon='', condition='*=', rowBuildCB=rowBuildCB, table='catalogue');
 
+// add order by component to arrange table rows using table headers
+orderByColumnsComponent();
                   
 /* multiple Listings Callbacks */
 function multipleListingOpenCB(selectedValues, selectedLabels){

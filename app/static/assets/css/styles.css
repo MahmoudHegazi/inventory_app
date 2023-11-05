@@ -134,7 +134,9 @@ color_lightpink {
     max-height:650px !important;
     overflow: auto !important;
 }
-
+.font_13px {
+    font-size: 10px !important;
+}
 .border_darkgrey {
     border: 1px solid darkgrey !important;
 }

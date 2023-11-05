@@ -4,9 +4,10 @@ import os
 import requests
 import time
 import math
-from flask import Flask, Blueprint, session, redirect, url_for, flash, Response, request, render_template, jsonify, Request, Response, current_app
+from flask import Flask, app, Blueprint, session, redirect, url_for, flash, Response, request, render_template, jsonify, Request, Response, current_app
 from .models import *
-from .forms import CatalogueExcelForm, ExportDataForm, importCategoriesAPIForm, importOffersAPIForm, SetupBestbuyForm, importOrdersAPIForm
+from .forms import CatalogueExcelForm, ExportDataForm, importCategoriesAPIForm, importOffersAPIForm, SetupBestbuyForm, importOrdersAPIForm,\
+generateCatalogueBarcodeForm
 from . import vendor_permission, admin_permission, db, excel
 from .functions import get_mapped_catalogues_dicts, getTableColumns, getFilterBooleanClauseList, ExportSqlalchemyFilter,\
 get_export_data, get_charts, get_excel_rows, get_sheet_row_locations, chunks, apikey_or_none, upload_catalogues, calc_chunks_result, \
@@ -17,6 +18,9 @@ import flask_excel
 import pyexcel
 from sqlalchemy import or_, and_, func , asc, desc, text
 from datetime import datetime, timedelta
+from barcode import EAN13, Code128
+import barcode
+from barcode.writer import SVGWriter
 #from app import excel
 
 
@@ -79,6 +83,17 @@ def import_catalogues_excel():
                             db_row['category_id'] = selected_category.id
                     #################################################
 
+                    # condition
+                    condition_name = db_row['condition']
+                    del db_row['condition']
+                    # note condition not allow duplicate for same condition
+                    selected_condition = Condition.query.filter_by(dashboard_id=current_user.dashboard.id, name=condition_name).first()
+                    if selected_condition:
+                        db_row['condition_id'] = selected_condition.id
+                    else:
+                        new_condition = Condition(dashboard_id=current_user.dashboard.id, name=condition_name)
+                        new_condition.insert()
+                        db_row['condition_id'] = new_condition.id
 
                     row_info = "{}|{}".format(row_index+1, db_row['sku'])
                     if db_row['sku'] not in uploaded_skus:
@@ -770,9 +785,11 @@ def api_offers_import():
     except Exception as e:
         flash('System Error, Could not process your request right now', 'danger')
         print('System error in api_offers_import, info: {}'.format(sys.exc_info()))
+        raise e
 
     finally:
         return redirect(url_for('routes.listings'))
+
 
     
 @main.route('/import_orders_api', methods=['POST', 'GET'])
@@ -925,4 +942,51 @@ def api_import_orders():
         flash('System Error, Could not process your request right now', 'danger')
         print('System error in api_import_orders, info: {}'.format(sys.exc_info()))
 
-    return redirect(url_for('routes.orders'))
+    finally:
+        return redirect(url_for('routes.orders'))
+
+def generate_redirect(redirect_url):
+    try:
+        allowed_redirects = {
+            'view_catalogue': lambda catalogue_id : url_for('routes.view_catalogue', catalogue_id=catalogue_id)
+        }
+        if redirect_url and ',' in redirect_url:
+            redirect_parts = redirect_url.split(',')
+            if redirect_parts[0] in allowed_redirects and redirect_parts[1]:
+                safe_url = allowed_redirects[redirect_parts[0]](redirect_parts[1])
+        return safe_url
+    except:
+        return url_for('routes.index')
+
+
+# this end point for catalogue if diffrent class use diffrent endpoint
+@main.route('/generate_barcode/<int:catalogue_id>', methods=['POST', 'GET'])
+@login_required
+@vendor_permission.require()
+def generate_barcode(catalogue_id):
+    try:
+        form = generateCatalogueBarcodeForm()
+        if form.validate_on_submit():
+            selected_catalogue = Catalogue.query.filter_by(id=catalogue_id, user_id=current_user.id).one_or_none()
+            if selected_catalogue is not None:
+                barcode_name = 'catalogue_{}_{}.svg'.format(selected_catalogue.id, current_user.id)
+                barcode_path = os.path.join(current_app.root_path, 'static', 'uploads', 'barcodes', barcode_name)
+                with open(barcode_path, "wb") as f:
+                    Code128(u'{}'.format(form.data.data), writer=SVGWriter()).write(f)
+                selected_catalogue.barcode = barcode_name
+                selected_catalogue.update()
+                flash('Successfully created barcode', 'success')
+            else:
+                flash('Unable to create barcode, catalogue not found', 'danger')
+        else:
+            for field, errors in form.errors:
+                if field == 'csrf_token':
+                    flash('Unable to create barcode please refresh page and try again', 'warning')
+                else:
+                    flash('{}:{}'.format(field, ','.join(errors)), 'danger')
+    except Exception as e:
+        flash('Unknown error Unable to create barcode', 'danger')
+    finally:
+        return redirect(url_for('routes.view_catalogue', catalogue_id=catalogue_id))
+
+

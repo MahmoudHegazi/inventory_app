@@ -148,7 +148,7 @@
     <div class="row" id="table_display">
       <!-- table display -->
       <div class="col-sm-12">         
-        <table class="table table-hover">
+        <table class="table table-hover arrangable" data-ignore="0,1,10" id="listings_table">
           <thead>
             <tr>
               <th>#</th>
@@ -314,10 +314,12 @@ function rowBuildCB(listing){
 
   let rowHTML = '';
   if (listing && listing.id !== undefined && listing.sku !== undefined && listing.product_name !== undefined && listing.price !== undefined && listing.platform !== undefined && listing.listing_image_url !== undefined && listing.location !== undefined && listing.bin !== undefined && listing.view_listing !== undefined && listing.edit_listing !== undefined && Array.isArray(listing.locations) ){
-    rowHTML += `<tr class="searching_card search_all_card" data-search-id="${listing.id}" data-search-category="${listing.category}" data-search-sku="${listing.sku}"
+    rowHTML += `<tr class="searching_card search_all_card" data-search-id="${listing.id}" data-search-category="${listing.category}" 
+              data-search-sku="${listing.sku}"
               data-search-product_name="${listing.product_name}" data-search-price="${listing.price}" 
               data-search-sale_price="${listing.sale_price}" data-search-quantity="${listing.quantity}" data-search-platform="${listing.platform}"
-              data-search-location="${listing.location}" data-search-bin="${listing.bin}" style="background: gainsboro!important;" title="This Row not belong to this page it returned from search all">
+              data-search-location="${listing.location}" data-search-bin="${listing.bin}" style="background: gainsboro!important;"
+              title="This Row not belong to this page it returned from search all">
               <td>
                 <p class="overflow_within"><input type="checkbox" data-check-listing="${listing.product_name}" 
                   class="select_listings form-control" name="select_listings" value="${listing.id}" ${delete_change_event}/></p>
@@ -386,6 +388,10 @@ function rowBuildCB(listing){
 
 /* add search component to the page */
 searchComponent('mid', 'swing', cp=function(){return true;}, addon='', condition='*=', rowBuildCB=rowBuildCB, table='listing');
+
+
+// add order by component to arrange table rows using table headers
+orderByColumnsComponent();
 
 </script>
 {% endblock page_scripts %}

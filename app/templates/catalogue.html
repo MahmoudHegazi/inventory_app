@@ -86,10 +86,17 @@
               </div>
             </div> 
             <div class="col-sm-12">
-              <p class="overflow_within"><span class="badge badge-info">UPC: </span><span class="p-1 shadow"> {{catalogue.upc}}</span></p>
+              <p class="overflow_within"><span class="badge badge-info">UPC: </span>
+                <span class="p-1 shadow"> {% if catalogue.upc %}{{catalogue.upc}}{% else %}N/A{% endif %}</span>
+              </p>
             </div>
             <div class="col-sm-12">
-                <p class="overflow_within"><span class="badge badge-dark">Condition: </span><span class="p-1 shadow"> {{catalogue.condition}}</span></p>
+              <p class="overflow_within"><span class="badge badge-info">Reference Type: </span>
+                <span class="p-1 shadow"> {% if catalogue.reference_type %}{{catalogue.reference_type}}{% else %}N/A{% endif %}</span>
+              </p>
+            </div>
+            <div class="col-sm-12">
+                <p class="overflow_within"><span class="badge badge-dark">Condition: </span><span class="p-1 shadow"> {{catalogue.condition.name}}</span></p>
             </div>
             <div class="col-sm-12">
               <p class="overflow_within"><span class="badge badge-info">Category Code: </span><span class="p-1 shadow">{% if catalogue.category %}{{catalogue.category.code}}{% endif %}</span></p>
@@ -103,9 +110,17 @@
             <div class="col-sm-12">
               <p class="overflow_within"><span class="badge badge-dark">Category Parent Code: </span><span class="p-1 shadow">{% if catalogue.category %}{{catalogue.category.parent_code}}{% endif %}</span></p>
             </div>
+            {% if catalogue.barcode %}
+            <div class="col-sm-12">
+              <p>
+                <span class="badge badge-info">Barcode: </span><br />
+                <img class="mt-1 w-100" src="{{url_for('static', filename='uploads/barcodes/'~catalogue.barcode)}}"/>
+              </p>
+            </div>
+            {% endif %}
             <div class="col-sm-12">
               <p class="overflow_within" style="max-height:180px !important;overflow: auto;">
-                <span class="badge badge-info">Locations: </span>
+                <span class="badge badge-dark">Locations: </span>
                 {% for catalogue_location in catalogue.locations %}
                 <div class="border border-secondary shadow p-1">
                   <h6 title="this is the location {{catalogue_location.warehouse_location.name}} and it's bins under it" class="badge shadow" style="display:block;">{{catalogue_location.warehouse_location.name}}</h6>
@@ -119,18 +134,19 @@
               </p>
             </div>
             <div class="col-sm-12">
-              <div class="overflow_within"><span class="badge badge-dark">Created At: </span>
+              <div class="overflow_within"><span class="badge badge-info">Created At: </span>
                 <p class="p-1 shadow"> {{catalogue.created_date}}</p>
               </div>
             </div>
             <div class="col-sm-12">
-              <div class="overflow_within"><p><span class="badge badge-info">Updated At: </span>
+              <div class="overflow_within"><p><span class="badge badge-dark">Updated At: </span>
                 <p class="p-1 shadow"> {% if catalogue.updated_date %}{{catalogue.updated_date}}{% endif %}</p>
               </div>
               </p>
             </div>
             <div class="col-sm-12 row">
               <div class="col-sm-6">
+                <button data-toggle="modal" data-target="#barcodeCatalogueModal" class="btn btn-success btn-block">Generate Barcode</button>
                 <button data-url="{{url_for('routes.delete_catalogue', catalogue_id=catalogue.id)}}" data-toggle="modal" 
                   data-target="#deleteCatalogueModal" data-catalogue-id="{{catalogue.id}}" onclick="toggleLoadingCircle(true, 'block')" 
                   class="wtform_modal_deletebtn btn btn-danger btn-block">Delete
@@ -160,8 +176,7 @@
   </div>
 </div>
 {% from 'forms.html' import catalogue_forms %}
-{{ catalogue_forms(deleteform=deleteform) }}
-
+{{ catalogue_forms(deleteform=deleteform,generate_barcode_form=generate_barcode_form,generate_redirect=generate_redirect) }}
 {% endblock body %}
 
 
@@ -173,5 +188,7 @@ $('#deleteCatalogueModal').on('shown.bs.modal', ()=>{toggleLoadingCircle(false, 
 deleteWtformsModalProccess(dataAttId='data-catalogue-id', formId='remove_catalogue', idInputId='catalogue_id', modalId='deleteCatalogueModal');
 
 toggleSettingsToast();
+
+generateBarcodeActions('select#columns','textarea#data');
 </script>
 {% endblock page_scripts %}

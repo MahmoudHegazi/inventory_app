@@ -2,7 +2,7 @@
 {% block title %}Listing: {% if listing %}: {{listing.product_name}}{% endif %}{% endblock %}
 {% block page_description %}this is Listing page, can view/edit/delete listing and view/add/edit it's Purchases and Orders {% endblock %}
 {% block body %}
-<div class="container border rounded p-3">
+<div class="container-fluid border rounded p-3">
   {% include 'messages.html' %}
   <img src="{{url_for('static', filename='assets/images/loading_circle.gif')}}" class="loading_circle" style="display:none;" />
 

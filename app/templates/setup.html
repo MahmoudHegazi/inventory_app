@@ -4,7 +4,7 @@
 {% block head_data %}
 {% endblock head_data %}
 {% block body %}
-<div class="container border rounded p-3">
+<div class="container-fluid border rounded p-3">
   {% include 'messages.html' %}
   <img src="{{url_for('static', filename='assets/images/loading_circle.gif')}}" class="loading_circle" style="display:none;" />    
   <div class="container-fluid content_container">
@@ -13,7 +13,7 @@
     <!--  Main -->
     <div class="container-fluid">
         <!-- Platforms Start -->
-        <div class="container">
+        <div class="container-fluid">
             {% if dashboard is defined and dashboard.platforms is defined %}
             <div class="div border shadow rounded p-2">
               <h5 class="mt-2 mb-3"><span>Platforms: </span> 
@@ -42,7 +42,7 @@
         </div>
         <!-- Platforms End -->
         <!-- Locations start --> 
-        <div class="container mt-3 mb-5">
+        <div class="container-fluid mt-3 mb-5">
             <div class="div border shadow rounded p-2">
                 {% if dashboard is defined and dashboard.locations is defined %}
                 <h5 class="mt-2 mb-3"><span>Locations: </span>
@@ -93,7 +93,7 @@
         </div>
         <!-- Locations end -->
         <!-- Conditions Start -->
-        <div class="container mb-5">
+        <div class="container-fluid mb-5">
           {% if dashboard is defined and dashboard.conditions is defined %}
           <div class="div border shadow rounded p-2">
             <h5 class="mt-2 mb-3"><span>Conditions: </span> 
@@ -119,10 +119,10 @@
         </div>
         <!-- Conditions End -->
         <!-- Categories start -->
-        <div class="container mb-2">
+        <div class="container-fluid mb-5">
           {% if dashboard is defined and dashboard.categories is defined %}
           <div class="div border shadow rounded p-2">
-            <h5 class="mt-2 mb-3"><span>Categories: </span>
+            <h5 class="mt-2 mb-3"><span>Categories ({{[1]|length}}): </span>
             <div style="float:right;max-width:fit-content;" class="d-flex justify-content-around align-items-center">
               {% if bestbuy_installed %}
               <button type="button" data-toggle="modal" data-target="#importCategoriesModal" class="btn btn-info btn-sm mr-1">Import from API</button>
@@ -205,6 +205,9 @@ fillEditPlatForm();
 fillEditLocation();
 fillEditBin();
 fillEditCategory();
+
+// save key temp
+bbLocalSaverComponent(key='bbk', checkboxSelector='#importCategoriesModal #cat_key_saver', valueSelector="#importCategoriesModal #api_key");
 
 // the dynamic version for fill any edit bs form data (this would used for all new edits)
 fillEditForm(triggerSelector='.edit_condition', formSelector='#edit_condition_form', modalSelector='#editConditionModal', dataAttrs={

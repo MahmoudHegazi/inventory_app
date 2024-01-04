@@ -1,5 +1,5 @@
 import os
-from flask import Flask, render_template
+from flask import Flask, render_template, redirect, url_for
 from flask_sqlalchemy import SQLAlchemy
 from flask_login import LoginManager, current_user
 from flask_bcrypt import Bcrypt
@@ -20,16 +20,22 @@ app.config['AUTH_ALLOWED_FILES'] = {'png', 'jpg', 'jpeg', 'gif'}
 # configure backend-session
 app.config['SESSION_PERMANENT'] = False
 app.config["SESSION_TYPE"] = "filesystem"
+app.config['SESSION_FILE_DIR'] = os.path.join(app.root_path, '../flask_session')
 #app.config['SESSION_FILE_DIR'] = '/home/ubuntu/inventory_app/flask_session'
-
+#print(app.root_path)
 # here setup global variables for remaning requests per user and max request
 app.config['BESTBUY_RAMAINING'] = 100
 app.config['BESTBUY_MAX'] = 100
+# here global variable for our API default max (OURAPI_REQUESTS_LIMIT how many requests can sent by user, this is default number for all users, still can edit from db to speacfic user, OURAPI_KEYS_MAX-> how many keys can user have also this is default and can changed by db for speacfic user)
+app.config['OURAPI_REQUESTS_LIMIT'] = 100
+app.config['OURAPI_KEYS_MAX'] = 10
+
 #app.config['SALAT'] = os.environ.get('SALAT')
 db = SQLAlchemy(app)
-# if not used remove
+# if not used remove (pass encryptor unseen and no info for it)
 bcrypt = Bcrypt(app)
 principals = Principal(app)
+
 #admin = Admin(app, name='Inventory Admin')
 # openssl 22.0.0, cryptography 41.0.3
 
@@ -50,18 +56,22 @@ excel.init_excel(app)
 from .routes import routes
 from .auth import auth
 from .main import main
+from .api import api
 # from .admin import admin_routes
 crud = app.register_blueprint(routes)
 authincation = app.register_blueprint(auth)
 systemActions = app.register_blueprint(main)
+apiEndpoints = app.register_blueprint(api)
+
 
 admin = Admin(app, name='Inventory', template_mode='bootstrap4')
 
-from .admin_models import InventoryModelView, userModalView, roleModalView, userRolesModalView, dashboardModalView, listingModalView, cataloguedModalView, purchaseModalView, orderModalView, supplierModalView, backlink
+from .admin_models import InventoryModelView, userModalView, roleModalView, userRolesModalView, userMetaModalView, dashboardModalView, listingModalView, cataloguedModalView, purchaseModalView, orderModalView, supplierModalView, backlink
 from flask_admin.contrib.fileadmin import FileAdmin
 admin.add_view(userModalView)
 admin.add_view(roleModalView)
 admin.add_view(userRolesModalView)
+admin.add_view(userMetaModalView)
 admin.add_view(dashboardModalView)
 admin.add_view(listingModalView)
 admin.add_view(cataloguedModalView)
@@ -74,10 +84,18 @@ admin.add_view(FileAdmin(static_path, '/static/', 'Files Manager'))
 admin.add_link(backlink)
 
 # display errors page for all app based on all given errors
+""" (some times work with cookies and flask secuirty, user will see old cached page if click any message will get forbiden error as he not logged in, remove this will not get the error page and redirect to login)
 @app.errorhandler(403)
 def handle_forbidden(e):
     return render_template('errors/error_403.html') 
     # return render_template('errors/error_403.html')
+"""
+"""
+@app.errorhandler(403)
+def handle_forbidden(e):
+    # forbidden here when some issue with session and flask login so it logged out so loghim out full and let logout redirect him to login page
+    return redirect(url_for('auth.logout'))
+"""
 
 @app.errorhandler(404)
 def handle_not_found(e):

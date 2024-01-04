@@ -1,20 +1,57 @@
 {% if charts_data is defined %}
+{% set label_indexes = [] %}
+{% set data_indexes = [] %}
 <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/2.7.3/Chart.min.js"></script>
-<div class="p-3 row">
+<div class="row fancyscroll_main">
   {% for chart in charts_data %}
     {% if chart.col is defined %}
       {% set col_sm = chart.col %}
     {% else %}
       {% if charts_data|length == 1  %}{% set col_sm = '12' %}{% else %}{% set col_sm = '6' %}{% endif %}
     {% endif %}
-                 
-    <div class="border border-light shadow-lg rounded text-center p-3 col-sm-{{col_sm}}">
-      <div class="p-5 bg-dark text-white">
+    
+    {% set charttype = chart.type if chart.type is defined else '' %}
+    <div class="border border-light shadow-lg rounded text-center col-sm-{{col_sm}} fancyscroll_cont my-2 chart_row" data-type="{{charttype}}">
+      {% set colors = ('bg-light', 'text-dark') if chart.type is defined and chart.type == 'html' else ('bg-dark', 'text-white') %}
+      <div class="{{colors[0]}} {{colors[1]}} text-white">
         <!-- display only valid charts this work good with js too -->
-        {% if chart.id is defined and chart.data is defined and chart.labels is defined and chart.label is defined %}
-        <canvas id="{{chart.id}}"></canvas>
-        <div id="addons_{{chart.id}}">
+        {% if chart.type is defined and chart.type == 'html' and chart.id is defined and chart.data is defined and chart.labels is defined and chart.label is defined %}
+        <div class="d-flex justify-content-center p-0 border border-secondary rounded" style="width:95%;">
+          <div class="row" id="htmlchart_{{chart.id}}">
+            <div class="col-sm-12 text-white text-center mb-1">
+              <div class="badge badge-secondary p-3 mt-2" style="width:98%;">{{chart.label}}</div>
+            </div>
+            <div class="col-sm-12 row m-0 w-100">
+                <!-- Data Label text -->
+                <div class="col-sm-9 p-2" style="border-right:1px solid lightgray;">                  
+                  
+                  {% for label in chart.labels %}
+                    {% if label_indexes.append(loop.index) %}{%endif%}
+                    <div id="label_{{label_indexes|length}}" data-target="#data_{{label_indexes|length}}" class="w-100 p-2 shadow mb-2 border border-secondary rounded mx-auto hover_light html_chart_text">
+                      {{label}}
+                    </div>
+                  {% endfor %}
+                </div>
+                <!-- Data Number -->
+                <div class="col-sm-3 p-2">
+                  {% for data_num in chart.data %}
+                    {% if data_indexes.append(loop.index) %}{%endif%}
+                    <div id="data_{{data_indexes|length}}" data-target="#label_{{data_indexes|length}}" class="w-100 p-2 shadow mb-2 border border-secondary rounded mx-auto hover_light html_chart_text" id="data_{{loop.index}}" style="font-size:1.2rem;">
+                      {{data_num}}
+                    </div>
+                  {% endfor %}
+                </div>
+            </div>
+          </div>
+        </div>
 
+        {% elif chart.id is defined and chart.data is defined and chart.labels is defined and chart.label is defined and chart.type is defined and chart.type != 'html' %}
+        <div data-type="{{chart.type}}">
+          
+          <canvas id="{{chart.id}}"></canvas>
+          <div id="addons_{{chart.id}}">
+  
+          </div>
         </div>
         {% else %}
           <div class="alert alert-danger text-center h">Unable to Display chart right now.</div>
@@ -24,10 +61,28 @@
   {% endfor %}
 </div>
 <script>
+    function removeHover(){
+      // clear old classes
+      $(".js_hover").removeClass('js_hover');
+    }
+    function hoverCopier(e){
+      removeHover();
+      if (e && $(e.target).length && $(e.target).attr('data-target')){
+        const targetElm = $($(e.target).attr('data-target'));
+        if (targetElm.length){
+          targetElm.addClass('js_hover');
+        }
+      }
+      
+    }
+    $(".html_chart_text").on('mouseover', hoverCopier);
+    $(".html_chart_text").on('mouseleave', removeHover);
+
     var chartsData = {{charts_data|tojson|safe}};
 
     addEventListener("DOMContentLoaded", (event) => {
       const charts = {};
+      const htmlCharts = {};
       const options = {
             scales: {
               y: {
@@ -35,75 +90,274 @@
               }
             },
       };
-      backGroundColors = undefined;
-      borderColors = undefined;
-      
-      chartsData.forEach( (chartData)=>{
-        if (chartData && chartData.id && chartData.type && chartData.data && chartData.labels && chartData.label && document.querySelector(`canvas#${chartData.id}`) && Array.isArray(chartData.data) && Array.isArray(chartData.labels) && chartData.data.length == chartData.labels.length){
-          
-          const ctx = document.querySelector(`canvas#${chartData.id}`);
-    
-          /* add the description and the ajax year select or any other config addons */
-          const addonsElm = document.querySelector(`#addons_${chartData.id}`);
-          let addonsHTML = '<p>';
-          if (addonsElm){
-    
-            if (chartData.description){
-              addonsHTML += `<span>${chartData.description} </span>`;
-            }
-            /* custom ajax html select box added dynamic by server (filter_year_component) */
-            if (chartData.year_picker_ajax && Array.isArray(chartData.year_picker_ajax.years)){
-    
-              let selectOptions = '';
-              chartData.year_picker_ajax.years.forEach( (yearOption)=>{
-                selectOptions += `<option value="${yearOption}">${yearOption}</option>`;
-              });
-              addonsHTML += `<select data-chart='${chartData.id}'>${selectOptions}</select>`;
-            }
-            addonsElm.innerHTML = `${addonsHTML}</p>`; 
-          }
-          
-          
-          /* optional set background colors and labels if provided from server */
-          if ( chartData.background_colors && Array.isArray(chartData.background_colors) ){
-            backGroundColors =  chartData.background_colors;
-          }
-          if ( chartData.border_colors && Array.isArray(chartData.border_colors) ){
-            borderColors =  chartData.border_colors;
-          }
+      let backGroundColors = ['lightblue', 'lightgreen', 'lightgray', 'lightred', 'lightsteelblue'];
+      let borderColors = ['lightblue', 'lightgreen', 'lightgray', 'lightred', 'lightsteelblue'];
 
-          // fix chart.js long text
-          let currentLabels = chartData.labels;
-          if (chartData.type.trim() == 'bar'){
-            currentLabels = chartJsLabelsFix(currentLabels);
-          }
-          
-          var data = {
-            labels: currentLabels,
-            datasets: [{
-              label: chartData.label,
-              data: chartData.data,
-              backgroundColor: backGroundColors,
-              borderColor: borderColors,
-              borderWidth: 1,
-              description: 'white'
-            }]
-          };
+      chartsData.forEach( (chartData, chartI)=>{
+        if (chartData && chartData.id && chartData.type && chartData.data && chartData.labels && chartData.label && document.querySelector(`canvas#${chartData.id}`) && Array.isArray(chartData.data) && Array.isArray(chartData.labels) && chartData.data.length == chartData.labels.length){
+              /* canvas js charts */
+              const ctx = document.querySelector(`canvas#${chartData.id}`);
     
-          const config = {
-            type: chartData.type,
-            data: data,
-            options: options,
-          };
-          Chart.defaults.global.defaultFontColor = "#fff";
-          const newChart = new Chart(ctx, config);
-          charts[chartData.id] = newChart;
+              /* add the description and the ajax year select or any other config addons */
+              const addonsElm = document.querySelector(`#addons_${chartData.id}`);
+              let addonsHTML = '<p>';
+              if (addonsElm){
+          
+                if (chartData.description){
+                  addonsHTML += `<span>${chartData.description} </span>`;
+                }
+                /* custom ajax html select box added dynamic by server (filter_year_component) */
+                if (chartData.year_picker_ajax && Array.isArray(chartData.year_picker_ajax.years)){
+          
+                  let selectOptions = '';
+                  chartData.year_picker_ajax.years.forEach( (yearOption)=>{
+                    selectOptions += `<option value="${yearOption}">${yearOption}</option>`;
+                  });
+                  addonsHTML += `<select data-chart='${chartData.id}'>${selectOptions}</select>`;
+                }
+                addonsElm.innerHTML = `${addonsHTML}</p>`; 
+              }
+              
+              
+              /* optional set background colors and labels if provided from server */
+              if ( chartData.background_colors && Array.isArray(chartData.background_colors) ){
+                backGroundColors =  chartData.background_colors;
+              }
+              if ( chartData.border_colors && Array.isArray(chartData.border_colors) ){
+                borderColors =  chartData.border_colors;
+              }
+          
+              // fix chart.js long text
+              let currentLabels = chartData.labels;
+              if (chartData.type.trim() == 'bar'){
+                currentLabels = chartJsLabelsFix(currentLabels);
+              }
+              
+              var data = {
+                labels: currentLabels,
+                datasets: [{
+                  label: chartData.label,
+                  data: chartData.data,
+                  backgroundColor: backGroundColors,
+                  borderColor: borderColors,
+                  borderWidth: 1,
+                  description: 'white'
+                }]
+              };
+          
+              const config = {
+                type: chartData.type,
+                data: data,
+                options: options,
+              };
+              Chart.defaults.global.defaultFontColor = "#fff";
+              const newChart = new Chart(ctx, config);
+              charts[chartData.id] = newChart;
+
+        } else if (chartData && chartData.id && chartData.type && chartData.type == 'html' && chartData.data && chartData.labels && chartData.label && Array.isArray(chartData.data) && Array.isArray(chartData.labels) && chartData.data.length == chartData.labels.length) {
+          htmlCharts[chartData.id] = {selector: `htmlchart_${chartData.id}`, index: chartI};
         } else {
           console.log('Invalid Chart object found, ignored.');
         }
       });
     
     });
+
+/* scroll smoth faster to charts */
+/*
+function enterFancyScrollListener(){
+  $(window).on("scroll.fancyscroll_main", (e)=>{
+        const fancyScrollMain = $(".fancyscroll_main").get(0);
+        const rect = fancyScrollMain.getBoundingClientRect();
+        const elmTop = rect.top;
+        const elmBottom = rect.bottom;
+
+        const heightDownest = $(".fancyscroll_main").height() * (22/100);
+
+        const condition = (elmTop >= 0 && elmTop <= 150) || (elmTop <= 150 && elmBottom > heightDownest);
+        if (fancyScrollMain && condition){
+            console.log(elmTop, window.scrollY, 'hi');
+            // temp close main scroll to enter second scroll effect that have rules to out like first scroll on first item so on back the check and stop second secrol
+            $(window).off("scroll.fancyscroll_main");
+            // listen for leave scrolling area
+            leaveFanceScrollListener();
+            // trigger onEnterScrollerMar
+            enterFancyScroll();
+        }
+  });
+}
+
+function leaveFanceScrollListener(){
+  $(window).on("scroll.fancyscroll_leave", (e)=>{
+        const fancyScrollMain = $(".fancyscroll_main").get(0);
+        const rect = fancyScrollMain.getBoundingClientRect();
+        const elmTop = rect.top;
+        const elmBottom = rect.bottom;
+
+        const heightDownest = $(".fancyscroll_main").height() * (22/100);
+
+        const condition = (elmBottom < heightDownest) || (elmTop > 150);
+        if (fancyScrollMain && condition){
+          console.log("leave", condition, elmBottom, (rect.height - 300));
+            // here within that block listing stoped as we found target
+            $(window).off("scroll.fancyscroll_leave");
+            // trigger leave scroll event
+            leaveFancyScroll();
+            // listen for enter scrolling area
+            enterFancyScrollListener();
+        }
+  });
+}
+function sitckyEffect(prec){
+    const isBiggerThanPrec =  (($(window).scrollTop()/$(window).height())*100)>prec;
+    if (isBiggerThanPrec) {
+          $(".fancyscroll_scroller").addClass('fixed_sticky');
+
+    } else {
+        $(".fancyscroll_scroller").removeClass('fixed_sticky');
+    }
+}
+
+function getActiveGridRow(data) {
+    let activeElm = null;
+    for (let i = 0; i < data.length; i++) {
+        if (data[i].elm && data[i].elm.length) {
+            const elm = data[i].elm[0];
+            const rect = elm.getBoundingClientRect();
+            if (rect.top >= 20) {
+                activeElm = data[i].elm;
+                break;
+            }
+        }
+    }
+    return activeElm;
+}
+
+
+function getUniqueGridRows(){
+    const uniqueTopRows = [];
+    const uniqueGridRows = [];
+    
+    $(".fancyscroll_main .fancyscroll_cont").each((_i, elm)=>{
+      const currentTop = $(elm).offset().top;
+      if (!uniqueTopRows.includes(currentTop)){          
+        uniqueTopRows.push(currentTop);
+        uniqueGridRows.push({
+          elm: $(elm),
+          currentTop: currentTop,
+          class: '',
+          index: -1,
+          isFirst: false,
+          isLast: false,
+          scrollElm: null,
+          set_isFirst: function(){
+            if (this.index === 0) {
+              this.isFirst = true
+            }
+            return this.isFirst;
+          },
+          set_isLast: function(uniqueGridRows){
+            if (this.index === (uniqueGridRows.length-1)) {
+              this.isLast = true
+            }
+            return this.isLast;
+          },
+          set_scrollElm: function(uniqueGridRows){
+            if ($(".fancyscroll_scroller").length){
+              const newElm = document.createElement("div");
+              newElm.classList.add("fancyscroll_step");
+              $(".fancyscroll_scroller")[0].appendChild(newElm);
+              
+              // set width dynamic of bar steps and handle if more than 100 step
+              const initalWidth = $(window).width()/uniqueGridRows.length;
+              let elmWidth = `${initalWidth}px`;
+              if (uniqueGridRows.length <= 100){
+                // handle case there more than 100 grid rows
+                elmWidth = ((100/uniqueGridRows.length));
+              }
+              newElm.style.width = `${elmWidth}%`;
+              
+              this.scrollElm = $(newElm);
+            }
+          }
+        });
+      }
+    });
+    return uniqueGridRows;
+}
+
+function setupSmoothScroller(){
+  if ($(".fancyscroll_main").length){
+    $(".fancyscroll_scroller").remove();
+    $(".fancyscroll_main").append('<div class="fancyscroll_scroller"></div>');
+    // remove any padding from main cont if not made by html to get valid height and position instead of calc padding
+    $(".fancyscroll_main").removeClass('p-1 p-2 p-3 p-4 p-5 p-6');
+    const firstTowRows = getUniqueGridRows();
+    firstTowRows.forEach((elmObj, index, arr)=>{
+      arr[index]['index'] = index;
+      arr[index].set_isFirst();
+      arr[index].set_isLast(arr);
+      arr[index].set_scrollElm(arr);
+      $(arr[index]['elm']).addClass('fancyscroll_active');
+    });
+    $(".fancyscroll_main").addClass('active_effect');
+
+    $(window).on("scroll.fancyscroll_sticky", ()=>{
+      sitckyEffect(60);
+    });
+
+    return firstTowRows;
+  }
+  return [];
+}
+
+function scrollActive(data){
+    const activeRow = getActiveGridRow(data);
+    if (activeRow){
+      // get all previous fancyScroller active steps
+      const totalActive = data.slice(0, activeRow.index()+1).length;
+      const remaningRows = data.slice(activeRow.index()+1).length;
+      setTimeout(()=>{
+        displayActiveProggress(totalActive, ()=>{
+          activeRow[0].scrollIntoView({behavior: 'smooth'});
+        });
+      }, 100);
+      return true;
+    }
+    return false;
+}
+
+function displayActiveProggress(x, cb){
+  const targetActive = Array.from($(".fancyscroll_step")).slice(0, x);
+  const targetInactive = Array.from($(".fancyscroll_step")).slice(x);
+  $(targetInactive).removeClass('active_step');
+  $(targetActive).addClass('active_step');
+}
+function enterFancyScroll(){
+  const chartMain = $('.fancyscroll_main');
+
+  if (chartMain){
+    const data = setupSmoothScroller();
+    // final get active row or the first elem of grid row if more than one item
+    scrollActive(data);
+    $(window).on("scroll.fancyscroll_action", ()=>{
+      scrollActive(data);
+    });
+
+  }
+  return false;
+}
+function leaveFancyScroll(){
+  $(".fancyscroll_scroller").remove();
+  $(".fancyscroll_main").removeClass('active_effect');
+}
+
+window.addEventListener("DOMContentLoaded", () => {
+  enterFancyScrollListener();
+});
+
+*/
+/* scroller effect ends */
 
 
 /* fix for long texts in bar charts */

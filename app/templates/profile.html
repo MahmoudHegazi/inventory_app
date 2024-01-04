@@ -1,0 +1,350 @@
+{% extends 'base.html' %}
+{% block title %}Profile{% if current_user and current_user.is_authenticated %}: {{current_user.name}}{% endif %}{% endblock %}
+{% block page_description %}this is Profile page, can be used to manage your profile and API settings.{% endblock %}
+{% block body %}
+<div class="container-fluid border rounded p-3">
+    {% include 'messages.html' %}
+    <img src="{{url_for('static', filename='assets/images/loading_circle.gif')}}" class="loading_circle" style="display:none;" />
+  
+    <div class="container-fluid content_container">
+      {% if current_user and current_user.is_authenticated %}
+      <div class="d-flex justify-content-end align-items-center flex-wrap">
+        <!-- links -->
+      </div>
+      <div class="row mt-2">
+        <div class="border_darkgrey rounded col-sm-3 p-3 d-flex justify-content-center align-items-start cursor-pointer text-decoration-none text-dark media_small_width_100">
+          <div class="row m-0 w-100 p-2">
+            <div id="user_details" class="col-sm-12 border border-secondary rounded shadow p-3 break_word mb-2 hover_darkcyan active_darkcyan switcher_link" data-target="#details_component">User Details</div>
+            <div id="user_credentials" class="col-sm-12 border border-secondary rounded shadow p-3 break_word mb-2 hover_darkcyan switcher_link" data-target="#credentials_component">User Credentials</div>
+            <div id="api" class="col-sm-12 border border-secondary rounded shadow p-3 break_word mb-2 hover_darkcyan switcher_link" data-target="#api_component">API</div>
+          </div>
+        </div>
+        <div class="col-sm-9 p-3 row rounded mx-auto d-flex justify-content-center align-items-center media_small_width_100 shadow border_darkgrey">
+            
+          
+            <!-- User Details -->
+            <div class="container effect_components" id="details_component">
+              <div class="container">
+                <div class="mt-1 mb-2 d-flex justify-content-between align-items-center">
+                  <h4>User Details</h4>
+                  <div>
+                    <!-- Important buttons and links -->
+                  </div>
+                </div>
+              </div>
+
+              <!-- user update forms -->
+              <div class="w-100 p-2 mt-2 border_darkgrey">
+                <div>
+                  <h5 class="text-center">Update Details</h5>
+                </div>
+                <div class="row m-0">
+                  <!-- update details form start -->
+                  <div class="col-sm-12 border mb-2 p-2">
+                      {% if udate_name %}
+                      <form id="update_name_form" method="post" action="{{url_for('main.update_name')}}">
+                          {{udate_name.csrf_token(id='csrf_token_updatename')}}
+                          <div class="form-group">
+                            {{udate_name.name.label}}
+                            {{udate_name.name(class='form-control', placeholder='Update Name')}}
+                          </div>
+                          {{udate_name.update(class='btn btn-success btn-block btn-sm')}}
+                      </form>
+                      {% else %}
+                      <div class="alert alert-danger">Unable to Display Update Details form right now.</div>
+                      {% endif %}
+                  </div>
+
+                  <!-- update Email form start -->
+                  <div class="col-sm-12 border mb-2 p-2">
+                    {% if update_email %}
+                    <form id="update_email_form" method="post" action="{{url_for('main.update_email')}}">
+                        {{update_email.csrf_token(id='csrf_token_updateemail')}}
+                        <div class="form-group">
+                          {{update_email.email.label}}
+                          {{update_email.email(class='form-control', placeholder='Update Email')}}
+                        </div>
+                        {{update_email.update(class='btn btn-success btn-block btn-sm')}}
+                    </form>
+                    {% else %}
+                    <div class="alert alert-danger">Unable to Display Update Email form right now.</div>
+                    {% endif %}
+                  </div>
+                </div>
+              </div>
+              <!-- user update forms end -->
+            </div>
+            <!-- User Details end -->
+
+
+            <!-- User Information -->
+            <div class="container effect_components" id="credentials_component" style="display:none;">
+              <div class="container">
+                <div class="mt-1 mb-2 d-flex justify-content-between align-items-center">
+                  <h4>User Credentials</h4>
+                  <div>
+                    <!-- Important buttons and links -->
+                  </div>
+                </div>
+              </div>
+              <!-- user update forms -->
+              <div class="w-100 p-2 mt-2 border_darkgrey">
+                <div>
+                  <h5 class="text-center">Update credentials</h5>
+                </div>
+                <div class="row m-0">
+
+                  <!-- update username form start -->
+                  <div class="col-sm-12 border mb-2 p-2">
+                      {% if update_username %}
+                      <form id="update_username_form" method="post" action="{{url_for('main.update_username')}}">
+                          {{update_username.csrf_token(id='csrf_token_updateusername')}}          
+                          <div class="form-group">
+                            {{update_username.username.label}}
+                            {{update_username.username(class='form-control', placeholder='Update Username')}}
+                          </div>
+                          {{update_username.update(class='btn btn-success btn-block btn-sm')}}
+                      </form>
+                      {% else %}
+                      <div class="alert alert-danger">Unable to Display Update Username form right now.</div>
+                      {% endif %}
+                  </div>
+                  <!-- update username form end -->
+                  <!-- update password form start -->
+                  <div class="col-sm-12 mb-2">
+                    {% if update_password %}
+                    <form id="update_password_form" method="post" action="{{url_for('main.update_password')}}">
+                        {{update_password.csrf_token(id='csrf_token_updatepass')}}
+                        {{update_password.username_hidden()}}
+                        <div class="form-group">
+                          {{update_password.current_pwd.label}}
+                          {{update_password.current_pwd(class='form-control', placeholder='Current Password', autocomplete='current-password')}}
+                        </div>
+                        <div class="form-group">
+                          {{update_password.pwd.label}}
+                          {{update_password.pwd(class='form-control', placeholder='New Password', autocomplete='new-password')}}
+                        </div>
+                        <div class="form-group">
+                          {{update_password.pwd_confirm.label}}
+                          {{update_password.pwd_confirm(class='form-control', placeholder='Confirm Password', autocomplete='new-password')}}
+                        </div>
+                        {{update_password.update(class='btn btn-success btn-block btn-sm')}}
+                    </form>
+                    {% else %}
+                    <div class="alert alert-danger">Unable to Display Update Password form right now.</div>
+                    {% endif %}
+                  </div>
+                  <!-- update password form end -->
+
+                </div>
+
+              </div>
+              <!-- user update form end -->
+            </div>
+            <!-- User Information End -->
+
+            <!-- API-->
+            <div class="container effect_components" id="api_component" style="display:none;">
+              {% if ourapi_requests_limit and ourapi_keys_max %}
+                  <div class="container">
+                      <div class="mt-1 mb-2 d-flex justify-content-between align-items-center">
+                        <h4>API</h4>
+                        <div>
+                          <button class="btn btn-outline-success" data-toggle="modal" data-target="#AddKeyFormModal">Add Key</button>
+                        </div>
+                      </div>
+                  </div>
+                  <!-- API Keys -->
+                  <div class="w-100 p-2 mt-2">
+                      <div>
+                          <h5 class="text-center">API Keys ({{current_user.api_keys|length}})</h5>
+                      </div>
+                      <div class="d-flex justify-content-between align-items-center my-2">
+                        <div><span>Requests Limit: </span><span>{% if ourapi_requests_limit %}{{ourapi_requests_limit.value}}{% else %}-{% endif %}</span></div>
+                        <div><span>Maximum keys: </span><span>{{user_keys_max}}</span></div>
+                      </div>
+                      {% for key in current_user.api_keys %}
+                          <!--  key cont -->
+                          <div class="key_cont w-100 border border-dark rounded p-1">
+                              <div class="row m-0 w-100">
+                                  <div class="col-4 goodbg p-2 border_right_white">API Key:</div>
+                                  <div class="col-8 bg-dark text-white break_word p-2">{{key.key}}</div>
+                              </div>
+                              <div class="row m-0 w-100" title="This number reflects the maximum number of API calls that can be made using this key, you can set it while creating the key, and you can update it using the Update Key button.">
+                                <div class="col-4 goodbg p-2 border_top_black border_right_white">Key requests limit:</div>
+                                <div class="col-8 bg-dark text-white break_word p-2 border_top_white">{{key.key_limit}}</div>
+                              </div>
+                              <div class="row m-0 w-100" title="This number reflects the total requests made using this key, and is updated daily ahead of API requests made using this key.">
+                                <div class="col-4 goodbg p-2 border_top_black border_right_white">Total requests:</div>
+                                <div class="col-8 bg-dark text-white break_word p-2 border_top_white">{{key.total_requests}}</div>
+                              </div>
+                              <div class="row m-0 w-100">
+                                  <div class="col-4 goodbg p-2 border_top_black border_right_white">Actions:</div>
+                                  <div class="col-8 bg-dark text-white break_word p-2 border_top_white">
+                                      <button class="btn btn-outline-warning btn-sm update_ourapi_key" data-url="{{url_for('main.update_key', id=key.id)}}" data-key-id="{{key.id}}" data-key-limit="{{key.key_limit}}" data-target="#UpdateKeyFormModal" data-toggle="modal">Update Key</button>
+                                      <button class="btn btn-outline-danger btn-sm wtform_modal_deletebtn" data-key-id="{{key.id}}" data-url="{{url_for('main.remove_key', id=key.id)}}" data-target="#RemoveKeyFormModal" data-toggle="modal">Remove Key</button>
+                                      <button class="btn btn-outline-info btn-sm" onclick="copyOurAPIKey(event, '{{key.key}}')">Copy Key</button>
+                                      <span style="min-width: 29px;float:right;" class="badge badge-warning"><span>ID: </span><span>{{key.id}}</span></span>
+                                  </div>
+                              </div>                              
+                          </div>
+                      {% endfor %}
+                  </div>
+                  <!-- API Keys end -->
+              {% else %}
+                  <div class="container">
+                    <div class="mt-1 mb-2 d-flex justify-content-between align-items-center">
+                      <h4>API</h4>
+                      <div>
+                        {% if setup_api and setup_api.setup is defined %}
+                          <form action="{{url_for('main.setup_ourapi')}}" method="POST">
+                            {{setup_api.hidden_tag()}}
+                            {{setup_api.setup(class='btn btn-outline-success')}}
+                          </form>
+                        {% else %}
+                          <div class="alert alert-danger">Unable to Display Setup API form right now.</div>
+                        {% endif %}
+                      </div>
+                    </div>
+                  </div>
+                  <div class="container text-center">
+                    <img src="{{url_for('static', filename='assets/images/opps.png')}}" id="api_unsetup" />
+                    <p class="top_mins_40">API not setup yet, please click on setup button.</p>
+                  </div>
+              {% endif %}
+            </div>
+            <!-- API end -->
+        </div>      
+      </div>
+      {% else %}
+      <div class="alert alert-danger">Unable to Display Profile right now.</div>
+      {% endif %}
+    </div>
+  </div>
+  {% from 'forms.html' import profile_forms %}
+  {{ profile_forms(add_key=add_key, delete_key=delete_key, update_key=update_key) }}
+
+{% endblock %}
+{% block page_scripts %}
+<script>
+// noEffects = true;
+//$('#deleteCatalogueModal').on('shown.bs.modal', ()=>{toggleLoadingCircle(false, 'block');});
+
+deleteWtformsModalProccess(dataAttId='data-key-id', formId='remove_key_form', idInputId='remove_key_id', modalId='RemoveKeyFormModal');
+
+fillEditForm(triggerSelector = '.update_ourapi_key', formSelector = '#update_key_form', modalSelector = '#UpdateKeyFormModal', {
+    id: 'data-key-id',
+    name: 'data-key-limit'
+}, inputIds = {
+    id: '#update_key_id',
+    name: '#update_key_limit'
+});
+
+const componentsMap = {
+    user_details: {
+        link_elm: '#user_details',
+        data_target: '#details_component'
+    },
+    user_credentials: {
+        link_elm: '#user_credentials',
+        data_target: '#credentials_component'
+    },
+    api: {
+        link_elm: '#api',
+        data_target: '#api_component'
+    }
+};
+
+function getMoveToComponentParams(){
+  
+  const moveToComponent = getQueryParm('movetocomponent');
+  if (
+    typeof(moveToComponent) === 'string' && moveToComponent && componentsMap.hasOwnProperty(moveToComponent) &&
+    typeof(componentsMap[moveToComponent]['link_elm']) === 'string' && typeof(componentsMap[moveToComponent]['data_target']) === 'string' &&
+    componentsMap[moveToComponent]['link_elm'] && componentsMap[moveToComponent]['data_target']
+    ){
+       return  {
+        e:null, 
+        link_elm:componentsMap[moveToComponent]['link_elm'],
+        data_target:componentsMap[moveToComponent]['data_target']
+      };
+  }
+  return null;
+}
+
+function componentsSwitcherComponent(){
+  if ($(".switcher_link").length){
+    const moveToComponent = function(e=null, link_elm=null, data_target=null){
+      if ( (e === null && data_target && link_elm) || (e && $(e.target).length && $(e.target).attr('data-target') && $($(e.target).attr('data-target')).length)){
+        // called coniditional based nested if shortcut (performance)
+        const dataTarget = (e === null && data_target) ? data_target : $(e.target).attr('data-target');
+        const linkElm = (e === null && link_elm) ? $(link_elm) : $(e.target);
+
+        const newActive = $(dataTarget);
+        const newLink = linkElm;
+        // hide old draws (even if we click on same so it better ux)
+        $(".active_darkcyan").removeClass("active_darkcyan");
+        $(".effect_components").hide();
+        newActive.show('fast', null, ()=>{
+            newLink.addClass("active_darkcyan");
+        });
+
+      }
+    };
+    $(".switcher_link").on('click', moveToComponent);
+    return moveToComponent;
+  }
+}
+// start componentsSwitcherComponent and get the event callable private function
+const moveToComponentPublic = componentsSwitcherComponent();
+// 
+if (typeof(moveToComponentPublic) === 'function'){
+  // get valid params for function moveToComponent/moveToComponentPublic based on value of url query paramter [movetocomponent].
+  const params = getMoveToComponentParams();
+  if (params !== null){
+    // call move function to apply query paramter requested action eg: movetocomponent=api, movetocomponent=user_details, movetocomponent=user_credentials
+    moveToComponentPublic(null, params.link_elm, params.data_target);
+  }
+}
+
+// copy jinja2 key
+let copyTitleTimeout = null;
+function copyOurAPIKey(e, key){
+  //data-toggle="tooltip" title="Hooray!"
+  if (typeof(key) === 'string' && key && $(e.target).length){
+      // Copy the text inside the text field (no select needed or for mobile etc)
+      navigator.clipboard.writeText(key);
+
+      // clear any previous action
+      if ($(".popovering").length){
+          $(".popovering").removeAttr('data-toggle');
+          $(".popovering").removeAttr('data-content');
+          $(".popovering").popover('hide');
+          $(".popovering").popover('disable');
+      }
+
+      const targetElm = $(e.target);
+      targetElm.attr('data-toggle', 'popover');
+      targetElm.attr('data-content', 'Copied!');
+      targetElm.popover('enable');
+      targetElm.popover('show');
+      targetElm.addClass('popovering');
+
+      if (copyTitleTimeout){
+        console.log('hello');
+        clearTimeout(copyTitleTimeout);
+      }
+      copyTitleTimeout = setTimeout(function(){
+        // after period of time clear action
+        if ($(".popovering").length){
+          $(".popovering").removeAttr('data-toggle');
+          $(".popovering").removeAttr('data-content');
+          $(".popovering").popover('hide');
+          $(".popovering").popover('disable');
+        }
+      }, 650);
+  }
+}
+
+</script>
+{% endblock page_scripts %}

@@ -393,3 +393,48 @@ class ExportDataForm(FlaskForm):
 class SetupBestbuyForm(FlaskForm):
     redirect = StringField('', render_kw={'style': 'display:none;'})
     setup = SubmitField('Setup API')
+
+###############################  Profile Forms ###############################################
+class UpdateNameForm(FlaskForm):
+    name = StringField('Name', validators=[InputRequired(), Length(min=1, max=45)])
+    update = SubmitField('Update Name', id="update_name")
+
+class UpdateEmailForm(FlaskForm):
+    email = StringField('Email', validators=[InputRequired(), Length(min=1, max=255)])
+    update = SubmitField('Update Email', id="update_email")
+
+class UpdateUsernameForm(FlaskForm):
+    username = StringField('Username', id='username_update', validators=[InputRequired(), Length(min=1, max=45)])
+    update = SubmitField('Update Username', id="update_username")
+
+
+class UpdatePasswordForm(FlaskForm):
+    username_hidden = StringField(validators=[optional()], id='username', name='username', render_kw={'autocomplete': 'username', 'hidden': 'hidden', 'style': 'display:none!important;'})
+    current_pwd = PasswordField('Current Password', 
+                                validators=[InputRequired()], name='password')
+    
+    pwd = PasswordField('Password',
+                                validators=[InputRequired(),
+                                            validators.EqualTo('pwd_confirm', message='Passwords must match'),
+                                            Length(min=8, max=255)])
+
+    pwd_confirm = PasswordField('Password Confirm', 
+                                validators=[InputRequired(), 
+                                            Length(min=8, max=255)])
+    update = SubmitField('Update Password', id="update_password")
+
+class setupAPIForm(FlaskForm):
+    setup = SubmitField('Setup', id="setup_api")
+
+class addKeyForm(FlaskForm):
+    key_limit = IntegerField('Key limit', validators=[InputRequired()], default=0)
+    add = SubmitField('Add', id="add_api_key")
+
+class removeKeyForm(FlaskForm):
+    remove_key_id = HiddenField(validators=[InputRequired()])
+    remove_key = SubmitField('Remove Key')
+
+class updateKeyForm(FlaskForm):
+    update_key_id = HiddenField(validators=[InputRequired()])
+    update_key_limit = IntegerField('Key limit', validators=[InputRequired()])
+    update_key = SubmitField('Update Key')

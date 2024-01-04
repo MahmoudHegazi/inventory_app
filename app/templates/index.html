@@ -2,7 +2,7 @@
 {% block title %}{% if dashboard %}{{dashboard.title}}{% endif %}{% endblock %}
 {% block page_description %}this is Dashboard page, can view/edit/delete dashboard and view/add/edit it's listings {% endblock %}
 {% block body %}
-<div class="container border rounded p-3">
+<div class="container-fluid border rounded p-3">
   {% include 'messages.html' %}
   <img src="{{url_for('static', filename='assets/images/loading_circle.gif')}}" class="loading_circle" style="display:none;" />
 
@@ -34,8 +34,8 @@
       </div>
       <div id="main_part" class="col-sm-12 p-3 row border rounded">
         <!-- Charts Start -->
-        <div class="container">
-          <div class="mt-5 border container shadow p-3">
+        <div class="container-fluid">
+          <div class="mt-5 border container-fluid shadow p-3">
               {% include 'particles/charts_component.html' %}
           </div>
         </div>

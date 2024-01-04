@@ -7,12 +7,13 @@ import math
 from flask import Flask, app, Blueprint, session, redirect, url_for, flash, Response, request, render_template, jsonify, Request, Response, current_app
 from .models import *
 from .forms import CatalogueExcelForm, ExportDataForm, importCategoriesAPIForm, importOffersAPIForm, SetupBestbuyForm, importOrdersAPIForm,\
-generateCatalogueBarcodeForm
-from . import vendor_permission, admin_permission, db, excel
+generateCatalogueBarcodeForm, UpdateUsernameForm, UpdatePasswordForm, UpdateNameForm, UpdateEmailForm, setupAPIForm, addKeyForm, removeKeyForm,\
+updateKeyForm
+from . import vendor_permission, admin_permission, db, excel, bcrypt
 from .functions import get_mapped_catalogues_dicts, getTableColumns, getFilterBooleanClauseList, ExportSqlalchemyFilter,\
 get_export_data, get_charts, get_excel_rows, get_sheet_row_locations, chunks, apikey_or_none, upload_catalogues, calc_chunks_result, \
 bestbuy_ready, get_remaining_requests, get_requests_before_1minute, upload_orders, calc_orders_result, updateDashboardListings,\
-updateDashboardOrders, import_orders, order_ids_chunks
+updateDashboardOrders, import_orders, order_ids_chunks, download_order_image, get_errors_message, generate_ourapi_key
 from flask_login import login_required, current_user
 import flask_excel
 import pyexcel
@@ -278,6 +279,7 @@ def reports_export():
             message = 'Invalid Data'
             success = False
     except Exception as e:
+        # raise e
         print('System Error reports_export: {}'.format(sys.exc_info()))
         message = message if message != '' else 'Unknown Error Found While process your request'
         success = False
@@ -288,6 +290,7 @@ def reports_export():
         else:
             flash(message, 'danger')
             return redirect(url_for('main.reports'))
+
 
 # this search function works with js search component dynamic for all app searchs
 @main.route('/search', methods=['GET', 'POST'])
@@ -785,11 +788,46 @@ def api_offers_import():
     except Exception as e:
         flash('System Error, Could not process your request right now', 'danger')
         print('System error in api_offers_import, info: {}'.format(sys.exc_info()))
-        raise e
 
+    
     finally:
         return redirect(url_for('routes.listings'))
 
+###
+
+
+@main.route('/test', methods=['POST', 'GET'])
+@login_required
+@vendor_permission.require()
+def test():
+    """
+    # Order.query.all()
+
+    #r = requests.get('https://marketplace.bestbuy.ca/api/orders/documents/download?order_ids=216549197-A,216585560-A,216590959-A,216597478-A,216599230-A', headers={'Authorization': 'a750a16c-054e-407c-9825-3da7d4b2a9c1', 'Accept': 'application/octet-stream'})
+    
+
+    data = download_order_image(
+        image_name='helloworld', 
+        image_url='https://marketplace.bestbuy.ca/media/product/image/a363e27f-d2a4-4acb-97b4-3e657ce62aa8',
+        static_folder=main.static_folder)
+    return str(data)
+    """
+    """
+    return jsonify(json.loads(json.dumps(getattr(r, 'headers'), indent=4, default=str)))
+    #return r.headers.get('Content-Type', None) if r.headers
+    data_obj = vars(r)
+    del data_obj['_content']
+    data_json = json.dumps(dict(data_obj), indent=4, default=str)
+    return data_json
+     
+    #return str(p)
+    with open(p, mode='wb') as f:
+        f.write(r.content)
+    """
+    
+    return str(f)
+
+###
 
     
 @main.route('/import_orders_api', methods=['POST', 'GET'])
@@ -798,7 +836,6 @@ def api_offers_import():
 def api_import_orders():
     results = []
     try:
-        
         tomorrow_str = (datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0) + timedelta(hours=24)).strftime('%Y-%m-%d')
         form = importOrdersAPIForm()
         if form.validate_on_submit():
@@ -837,7 +874,8 @@ def api_import_orders():
                                 except:
                                     print("API not sending total_count, or sending invalid int")
                                     pass
-    
+
+                                
                                 # if total_count of required requests to imported less or equal to user_remaining_requests allow else make him send only requests with count of his reamning not block all
                                 total_requests = total_count if total_count is not None and user_remaining_requests >= total_count else user_remaining_requests
                                 current_upload_result0 = upload_orders(json.loads(r.content)['orders'], current_user, db)
@@ -887,7 +925,7 @@ def api_import_orders():
     
                                 # update dashboard orders totals after all inserts
                                 updateDashboardOrders(db, current_user.dashboard)
-    
+                                
                                 # handle ignored values
                                 #if len(result['invalid_quantity']) > 0 or len(result['missing_listing']) > 0 or len(result['errors']) > 0:
                                 session['import_orders_report'] = 'Report of ignored data, you may need this ids to able to get the same data later from API, invalid quantity ids: [{}], missing listing ids: [{}], errors ids: [{}]'.format(','.join(result['invalid_quantity']), ','.join(result['missing_listing']), ','.join(result['errors']))
@@ -938,6 +976,7 @@ def api_import_orders():
                     flash("Error can not import orders Please restart page and try again", "danger")
                     continue
                 flash('Error in {} : {}'.format(field, ','.join(errors)), 'danger')
+
     except Exception as e:
         flash('System Error, Could not process your request right now', 'danger')
         print('System error in api_import_orders, info: {}'.format(sys.exc_info()))
@@ -945,6 +984,9 @@ def api_import_orders():
     finally:
         return redirect(url_for('routes.orders'))
 
+
+
+"""
 def generate_redirect(redirect_url):
     try:
         allowed_redirects = {
@@ -957,6 +999,7 @@ def generate_redirect(redirect_url):
         return safe_url
     except:
         return url_for('routes.index')
+"""
 
 
 # this end point for catalogue if diffrent class use diffrent endpoint
@@ -988,5 +1031,309 @@ def generate_barcode(catalogue_id):
         flash('Unknown error Unable to create barcode', 'danger')
     finally:
         return redirect(url_for('routes.view_catalogue', catalogue_id=catalogue_id))
+    
+################################### Profile ######################################
+@main.route('/profile', methods=['GET'])
+@login_required
+@vendor_permission.require()
+def profile():
+    try:
+        update_username = UpdateUsernameForm(username=current_user.uname)
+        update_password = UpdatePasswordForm()
+        udate_name = UpdateNameForm(name=current_user.name)
+        update_email = UpdateEmailForm(email=current_user.email)
+        setup_api = setupAPIForm()
+        add_key = addKeyForm()
+        delete_key = removeKeyForm()
+        update_key = updateKeyForm()
+        ourapi_requests_limit = UserMeta.query.filter_by(user_id=current_user.id, key='ourapi_requests_limit').first()
+        ourapi_keys_max = UserMeta.query.filter_by(user_id=current_user.id, key='ourapi_keys_max').first()
+        # dynamic get valid number of user keys if any, else look for init else set default number 10
+        user_keys_max = ourapi_keys_max.value if ourapi_keys_max else current_app.config.get('OURAPI_KEYS_MAX', 10)
 
+        return render_template(
+            'profile.html', update_username=update_username,
+            update_password=update_password, udate_name=udate_name, update_email=update_email, setup_api=setup_api, add_key=add_key,
+            delete_key=delete_key, update_key=update_key,
+            ourapi_requests_limit=ourapi_requests_limit, ourapi_keys_max=ourapi_keys_max, user_keys_max=user_keys_max)
+    except:
+        flash('unable to display profile page', 'danger')
+        return redirect(url_for('routes.index'))
+
+@main.route('/update_name', methods=['POST'])
+@login_required
+@vendor_permission.require()
+def update_name():
+    try:
+        form = UpdateNameForm()
+        if form.validate_on_submit():
+            if current_user.name != form.name.data:
+                current_user.name = form.name.data
+                current_user.update()
+                flash('Successfully updated the name.', 'success')
+            else:
+                flash('No changes detected.', 'success')
+        else:
+            flash(get_errors_message(form), 'danger')
+    except Exception as e:
+        flash('unable to update the name right now.', 'danger')
+        print('system error {}'.format(sys.exc_info()))
+    finally:
+        return redirect(url_for('main.profile', movetocomponent='user_details'))
+
+@main.route('/update_email', methods=['POST'])
+@login_required
+@vendor_permission.require()
+def update_email():
+    try:
+        form = UpdateEmailForm()
+        if form.validate_on_submit():
+            if current_user.email != form.email.data:
+                exist_email = User.query.filter_by(email=form.email.data).first()
+                if not exist_email:
+                    current_user.email = form.email.data
+                    current_user.update()
+                    flash('Successfully updated the email', 'success')
+                else:
+                    flash('Email is taken', 'danger')
+            else:
+                flash('No changes detected.', 'success')
+        else:
+            flash(get_errors_message(form), 'danger')
+    except Exception as e:
+        flash('unable to update the email right now.', 'danger')
+        print('system error {}'.format(sys.exc_info()))
+    finally:
+        return redirect(url_for('main.profile', movetocomponent='user_details'))
+
+@main.route('/update_username', methods=['POST'])
+@login_required
+@vendor_permission.require()
+def update_username():
+    try:
+        form = UpdateUsernameForm()
+        if form.validate_on_submit():
+            if current_user.uname != form.username.data:
+                exist_username = User.query.filter_by(uname=form.username.data).first()
+                if not exist_username:
+                    current_user.uname = form.username.data
+                    current_user.update()
+                    flash('Successfully updated the username', 'success')
+                else:
+                    flash('Username is taken', 'danger')
+            else:
+                flash('No changes detected.', 'success')
+        else:
+            flash(get_errors_message(form), 'danger')
+    except Exception as e:
+        flash('unable to update the username right now.', 'danger')
+        print('system error {}'.format(sys.exc_info()))
+    finally:
+        return redirect(url_for('main.profile', movetocomponent='user_credentials'))
+
+@main.route('/update_password', methods=['POST'])
+@login_required
+@vendor_permission.require()
+def update_password():
+    try:
+        form = UpdatePasswordForm()
+        if form.validate_on_submit():
+            if form.current_pwd.data != form.pwd.data:
+                valid_pass = bcrypt.check_password_hash(current_user.upass, form.current_pwd.data)
+                if valid_pass == True:
+                    hashed_pass = bcrypt.generate_password_hash(form.pwd.data)
+                    current_user.upass = hashed_pass
+                    current_user.update()
+                    flash('Successfully updated the password', 'success')
+                else:
+                    flash('Invalid password', 'danger')
+            else:
+                flash('No changes detected.', 'success')
+        else:
+            flash(get_errors_message(form), 'danger')
+    except Exception as e:
+        flash('unable to update the password right now.', 'danger')
+        print('system error {}'.format(sys.exc_info()))
+    finally:
+        return redirect(url_for('main.profile', movetocomponent='user_credentials'))
+
+###### ----- Profile API Keys ----- ######
+@main.route('/setup_ourapi', methods=['POST'])
+@login_required
+@vendor_permission.require()
+def setup_ourapi():
+    try:
+        actions = 0
+        form = setupAPIForm()
+        if form.validate_on_submit():
+            # technique called this variable will exist at end
+            ourapi_requests_limit = UserMeta.query.filter_by(user_id=current_user.id, key='ourapi_requests_limit').first()
+            if not ourapi_requests_limit:
+                actions += 1
+                default_limit = current_app.config.get('OURAPI_REQUESTS_LIMIT', 100)
+                ourapi_requests_limit = UserMeta(user_id=current_user.id, key='ourapi_requests_limit', value=default_limit)
+                ourapi_requests_limit.insert()
+            
+            ourapi_keys_max = UserMeta.query.filter_by(user_id=current_user.id, key='ourapi_keys_max').first()
+            if not ourapi_keys_max:
+                actions += 1
+                default_max_keys = current_app.config.get('OURAPI_KEYS_MAX', 10)
+                ourapi_keys_max = UserMeta(user_id=current_user.id, key='ourapi_keys_max', value=default_max_keys)
+                ourapi_keys_max.insert()
+
+            if actions > 0:
+                flash('The API has been set up successfully.', 'success')
+            else:
+                flash('No changed detected.', 'info')
+        else:
+            flash('The form has expired, please try again.', 'danger')
+    except Exception as e:
+        flash('unable to setup the API right now.', 'danger')
+        print('system error {}'.format(sys.exc_info()))
+    finally:
+        return redirect(url_for('main.profile', movetocomponent='api'))
+
+@main.route('/add_key', methods=['POST', 'GET'])
+@login_required
+@vendor_permission.require()
+def add_key():
+    try:
+        form = addKeyForm()
+        if form.validate_on_submit():
+            ourapi_requests_limit = UserMeta.query.filter_by(user_id=current_user.id, key='ourapi_requests_limit').first()
+            ourapi_keys_max = UserMeta.query.filter_by(user_id=current_user.id, key='ourapi_keys_max').first()
+            # numbers can be 0 so must check if is not None
+            if ourapi_requests_limit is not None and ourapi_keys_max is not None:
+                requests_limit = int(ourapi_requests_limit.value)
+                keys_max = int(ourapi_keys_max.value)
+                current_keys = int(db.session.query(func.count(OurApiKeys.id)).filter(OurApiKeys.user_id==current_user.id).scalar())
+                if current_keys < keys_max:
+                    submited_limit = int(form.key_limit.data)
+                    #if submited_limit <= 
+                    # faster get count of keys
+                    
+                    # get sum of all keys limit for that user, eg key1 limit, 10, key2 limit 20 so sum he have 30 requests mapped, and remaning is 70
+                    keys_requests_sum = 0
+                    if current_keys > 0:
+                        keys_requests_sum = int(db.session.query(func.sum(OurApiKeys.key_limit)).filter(OurApiKeys.user_id==current_user.id).scalar())
+                    
+                    
+                    remaning_requests = 0
+                    # check if sum is lower or equal to user limit and the new key limit submited_limit is less than the remaning requests to be mapped
+                    valid_limit = False
+                    if (submited_limit <= requests_limit) and (keys_requests_sum <= requests_limit) and (int(requests_limit - keys_requests_sum) >= submited_limit):
+                        valid_limit = True
+
+                    if keys_requests_sum <= requests_limit:
+                        # avoid get unexcpted nagtive value if declared this var outside if and used in if, it valid result at end but better know every possible value
+                        remaning_requests = int(requests_limit - keys_requests_sum)
+                        
+                    if valid_limit:
+                        # save loop with fixed trials to try get unique usally never this value should returned same, as u can see time and secure salat and uuid, but if done which 0.00000048848484848484884848% option i think 10 trials for that is more than good
+                        target_key = ''
+                        for i in range(10):
+                            target_key = generate_ourapi_key(bcrypt)
+                            if target_key:
+                                # note the key like multiple user id so must be unique
+                                key_exist = OurApiKeys.query.filter_by(key=target_key).first()
+                                if not key_exist:
+                                    # key is unique now
+                                    break
+                                else:
+                                    continue
+                            else:
+                                break
+                        if target_key:
+                            new_key = OurApiKeys(user_id=current_user.id, key=target_key, key_limit=submited_limit)
+                            new_key.insert()
+                            flash('Successfully added new key.', 'success')
+                        else:
+                            flash("Unable to generate a valid key now, please try again.", 'danger')
+                    else:
+                        flash('Invalid key limit sent, maximum number of new key requests allowed is {}.'.format(remaning_requests), 'danger')
+                else:
+                    flash("Can\'t add a new key, you have exceeded your limit", 'danger')
+            else:
+                flash('The API is not set up yet, please set it up first and then try adding a new key.', 'danger')
+        else:
+            flash('The form has expired, please try again.', 'danger')
+    except Exception as e:
+        flash('unable to add new key right now.', 'danger')
+        print('system error {}'.format(sys.exc_info()))
+    finally:
+        return redirect(url_for('main.profile', movetocomponent='api'))
+
+
+@main.route('/remove_key/<int:id>', methods=['POST'])
+@login_required
+@vendor_permission.require()
+def remove_key(id):
+    try:
+        form = removeKeyForm()
+        if form.validate_on_submit():
+            # both secuirty confirm and check if key exist
+            key_exist = OurApiKeys.query.filter_by(id=id, user_id=current_user.id).one_or_none()
+            if key_exist is not None:
+                key_exist.delete()
+                flash('Successfully deleted key with id:{}.'.format(id), 'success')
+            else:
+                flash('Key not found', 'danger')
+        else:
+            flash('The form has expired, please try again.', 'danger')
+    except Exception as e:
+        flash('unable to delete key right now.', 'danger')
+        print('system error {}'.format(sys.exc_info()))
+    finally:
+        return redirect(url_for('main.profile', movetocomponent='api'))
+    
+@main.route('/update_key/<int:id>', methods=['POST'])
+@login_required
+@vendor_permission.require()
+def update_key(id):
+    try:
+        form = updateKeyForm()
+        if form.validate_on_submit():
+            submited_limit = int(form.update_key_limit.data)
+            selected_key = OurApiKeys.query.filter_by(id=id, user_id=current_user.id).one_or_none()
+            if selected_key is not None:
+                if int(selected_key.key_limit) != submited_limit:
+                    ourapi_requests_limit = UserMeta.query.filter_by(user_id=current_user.id, key='ourapi_requests_limit').first()
+                    if ourapi_requests_limit:
+                        requests_limit = int(ourapi_requests_limit.value)
+
+                        # sum of all except the key will updated now that do alot of calc fix
+                        keys_requests_sum = db.session.query(func.sum(OurApiKeys.key_limit)).filter(OurApiKeys.user_id==current_user.id, OurApiKeys.id != id).scalar()
+                        if keys_requests_sum is None:
+                            keys_requests_sum = 0
+                        else:
+                            keys_requests_sum = int(keys_requests_sum)
+
+                        remaning_requests = 0
+                        valid_limit = False
+                        if (submited_limit <= requests_limit) and (keys_requests_sum <= requests_limit) and (int(requests_limit-keys_requests_sum) >= submited_limit):
+                            valid_limit = True
+
+                        if keys_requests_sum <= requests_limit:
+                            remaning_requests = int(requests_limit-keys_requests_sum)
+
+                        if valid_limit:
+                            selected_key.key_limit = submited_limit
+                            selected_key.update()
+                            flash('Successfully updated key with id:{}.'.format(id), 'success')
+                        else:
+                            flash('Invalid key limit sent, maximum number of key requests allowed is {}.'.format(remaning_requests), 'danger')
+                    else:
+                        flash('API not setup, please re-setup it.', 'danger')
+                else:
+                    flash('No changed detected.', 'info')
+            else:
+                flash('Key not found', 'danger')
+        else:
+            flash('The form has expired, please try again.', 'danger')
+    except Exception as e:
+        flash('unable to update key right now.', 'danger')
+        print('system error {}'.format(sys.exc_info()))
+
+    finally:
+        return redirect(url_for('main.profile', movetocomponent='api'))
 

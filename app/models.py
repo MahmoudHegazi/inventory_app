@@ -12,7 +12,6 @@ from app import db
 from flask_login import UserMixin
 from sqlalchemy.orm.attributes import get_history
 ################################ ---------- Tables for Authentication (Start) ---------------- #########################
-
 Base = declarative_base()
 
 
@@ -76,10 +75,12 @@ class User(UserMixin, db.Model):
     created_date = db.Column(db.DateTime, nullable=False, default=datetime.datetime.utcnow)
     updated_date = db.Column(db.DateTime, nullable=True, default=None, onupdate=datetime.datetime.utcnow)    
     dashboard_id = db.Column(db.Integer, db.ForeignKey('dashboard.id', ondelete="CASCADE", onupdate="CASCADE"), nullable=False, unique=True)
+    api_keys = db.relationship("OurApiKeys", backref="user", cascade="all, delete", passive_deletes=True)
     suppliers = db.relationship("Supplier", backref="user", cascade="all, delete", passive_deletes=True)
     roles = db.relationship("UserRoles", backref="user", cascade="all, delete", passive_deletes=True)
     meta = db.relationship("UserMeta", back_populates='user', cascade="all, delete", passive_deletes=True)
     catalogues = db.relationship('Catalogue', backref='user', cascade="all, delete", lazy='dynamic', passive_deletes=True)
+    keys_logs = db.relationship("ApiKeysLogs", backref="user", cascade="all, delete", passive_deletes=True)
 
     def __init__(self, dashboard_id, name, uname, email, upass, image='default_user.png', approved=True):
         self.dashboard_id = dashboard_id
@@ -693,7 +694,8 @@ class Order(db.Model):
         'product_sku': self.product_sku,
         'order_state': self.order_state,
         'created_date': self.created_date,
-        'updated_date': self.updated_date
+        'updated_date': self.updated_date,
+        'taxes': [ordertax.format() for ordertax in self.taxes]
         }
     
 
@@ -729,13 +731,12 @@ class OrderTaxes(db.Model):
         return {
         'id': self.id,
         'order_id': self.order_id,
-        'amount': self.amount,
+        'amount': str(self.amount),
         'code': self.code,
         'type': self.type,
         'created_date': self.created_date,
         'updated_date': self.updated_date
         }
-    
 
 ################################ ---------- Tables for Dashboard Plateforms (Start) ---------------- #########################
 class Platform(db.Model):
@@ -848,7 +849,9 @@ class WarehouseLocations(db.Model):
         'name': self.name,
         'dashboard_id': self.dashboard_id,
         'created_date': self.created_date,
-        'updated_date': self.updated_date
+        'updated_date': self.updated_date,
+        'bins': [locbin.format() for locbin in self.bins],
+        'catalogue_locations': [catalogue_location.format() for catalogue_location in self.catalogues_locations]
         }
 
 class LocationBins(db.Model):
@@ -896,8 +899,6 @@ class CatalogueLocations(db.Model):
     updated_date = db.Column(DateTime, nullable=True, default=None, onupdate=datetime.datetime.utcnow)
     bins = db.relationship("CatalogueLocationsBins", backref="catalogue_locations", cascade="all, delete", passive_deletes=True)
 
-
-
     def insert(self):
         db.session.add(self)
         db.session.commit()
@@ -914,8 +915,10 @@ class CatalogueLocations(db.Model):
         'id': self.id,
         'catalogue_id': self.catalogue_id,
         'location_id': self.location_id,
+        'location': self.warehouse_location.name,
         'created_date': self.created_date,
-        'updated_date': self.updated_date
+        'updated_date': self.updated_date,
+        'bins': [catalogue_locations_bin.format() for catalogue_locations_bin in self.bins]
         }
 
 class CatalogueLocationsBins(db.Model):
@@ -946,8 +949,89 @@ class CatalogueLocationsBins(db.Model):
         'updated_date': self.updated_date
         }
 
-################################ ---------- Tables for Dashboard Warehouse Locations (End) ---------------- #########################
+################################ ---------- Tables for Dashboard Warehouse Locations (End) ---------------- #########################   
 
+################################ ---------- Tables for OUR API (Start) ---------------- #########################
+class OurApiKeys(db.Model):
+    __tablename__ = 'our_api_keys'
+    id = db.Column(db.Integer, primary_key=True, nullable=False)
+    key = db.Column(db.String(255), nullable=False)
+    total_requests = db.Column(db.Integer, nullable=False, default=0)
+    key_limit = db.Column(db.Integer, nullable=False, default=0)
+    key_update_date = db.Column(db.Date, nullable=True, default=None)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id', ondelete="CASCADE", onupdate="CASCADE"), nullable=False)
+    created_date = db.Column(DateTime, nullable=False, default=datetime.datetime.utcnow)
+    updated_date = db.Column(DateTime, nullable=True, default=None, onupdate=datetime.datetime.utcnow)
+    logs = db.relationship("ApiKeysLogs", backref="key", cascade="all, delete", passive_deletes=True)
+
+    def __init__(self, user_id, key, key_limit=0, key_update_date=None):
+        self.user_id = user_id
+        self.key = key
+        self.key_limit = key_limit
+        # this allow set that start of using the API, ex set last update to day after 7 days from now, so it will not allow update until this 7 also total requests to limit of keys
+        self.key_update_date = key_update_date
+
+    def insert(self):
+        db.session.add(self)
+        db.session.commit()
+
+    def update(self):
+        db.session.commit()
+
+    def delete(self):
+        db.session.delete(self)
+        db.session.commit()
+
+    def format(self):
+        return {
+            'id': self.id,
+            'user_id': self.user_id,
+            'key': self.key,
+            'total_requests': self.total_requests,
+            'key_limit': self.key_limit,
+            'created_date': self.created_date,
+            'updated_date': self.updated_date
+        }
+
+class ApiKeysLogs(db.Model):
+    __tablename__ = 'api_keys_logs'
+    id = db.Column(db.Integer, primary_key=True, nullable=False)
+    status = db.Column(db.String(45), nullable=True, default=None)
+    endpoint = db.Column(db.String(45), nullable=True, default=None)
+    key_id = db.Column(db.Integer, db.ForeignKey('our_api_keys.id', ondelete="CASCADE", onupdate="CASCADE"), nullable=False)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id', ondelete="CASCADE", onupdate="CASCADE"), nullable=False)
+    created_date = db.Column(DateTime, nullable=False, default=datetime.datetime.utcnow)
+    updated_date = db.Column(DateTime, nullable=True, default=None, onupdate=datetime.datetime.utcnow)
+
+    def __init__(self, user_id, key_id, status=None, endpoint=None):
+        self.user_id = user_id
+        self.key_id = key_id
+        self.status = status
+        self.endpoint = endpoint
+
+    def insert(self):
+        db.session.add(self)
+        db.session.commit()
+
+    def update(self):
+        db.session.commit()
+
+    def delete(self):
+        db.session.delete(self)
+        db.session.commit()
+
+    def format(self):
+        return {
+            'id': self.id,
+            'user_id': self.user_id,
+            'key_id': self.key_id,
+            'status': self.status,
+            'endpoint': self.endpoint,
+            'created_date': self.created_date,
+            'updated_date': self.updated_date
+        }
+
+################################ ---------- Tables for OUR API (End) ---------------- #########################
 
 ################################ ---------- Tables for Inventory (End) ---------------- #########################
 # some functions for automation

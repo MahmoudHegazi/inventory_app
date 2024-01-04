@@ -1,4 +1,5 @@
 import sys
+import os
 import re
 import datetime
 import math
@@ -6,17 +7,19 @@ import time
 import requests
 import json
 import re
+import secrets
+import validators
 from dateutil import parser
 from urllib.parse import urlparse, urljoin
 from flask import request, current_app, url_for
 from flask_login import current_user
 from sqlalchemy import func
 from .models import Supplier, Dashboard, Listing, Catalogue, Purchase, Order, Platform, CatalogueLocations, CatalogueLocationsBins,\
-    WarehouseLocations, LocationBins, Category, UserMeta, OrderTaxes, Condition
+    WarehouseLocations, LocationBins, Category, UserMeta, OrderTaxes, Condition, OurApiKeys, ApiKeysLogs
 from sqlalchemy.sql import extract
 from sqlalchemy import or_, and_, func , asc, desc
 from datetime import datetime, timedelta
-import barcode
+from uuid import uuid4
 
 
 def is_safe_redirect_url(target):
@@ -249,7 +252,6 @@ def secureRedirect(redirect_url):
     return '/home'
 
 """  Filter Class and its function (this class access direct functions deacleard in functions.py) (this can used for both act as API to export system data with any dynamic column name as query paramter or as main export csv both code already done) """
-
 class ExportSqlalchemyFilter():
     # user sqlalchemy to create secure sqlalchemy filters arugments list (controlled easy)
     supplier_columns = []
@@ -552,11 +554,27 @@ def get_export_data(db, flask_excel, current_user_id, table_name, columns, opera
         if response['data']:
             export_data = []
 
-            response['column_names'] = ['id', 'sku', 'product_name', 'product_description', 'brand', 'category_code', 'category', 'price', 'sale_price', 'quantity', 'condition', 'product_model',  'upc' ,'created_date', 'updated_date', 'dashboard_id', 'catalogue_id', 'platform']
+            response['column_names'] = [
+                'id', 'sku', 'product_name', 'product_description',
+                'brand', 'category_code', 'category', 'price', 'sale_price',
+                'quantity', 'condition', 'product_model',  'upc' ,'created_date',
+                'updated_date', 'dashboard_id', 'catalogue_id', 'platform'
+                ]
             export_data.append(response['column_names'])
-            
             for item in response['data']:
-                export_data.append([item.id, item.sku, item.product_name, item.product_description, item.brand, item.category_code, item.category_label, item.price, item.sale_price, item.quantity, item.catalogue.condition.name, item.catalogue.product_model, item.catalogue.upc, item.created_date, item.updated_date, item.dashboard_id, item.catalogue_id, item.platform.name])
+                # if deleted condition, all condition.catalogues will have condition None (on delete set Null) so condition not always exist
+                item_condition = item.catalogue.condition.name if item.catalogue.condition else ''
+                export_data.append(
+                    [
+                        item.id, item.sku, item.product_name,
+                        item.product_description, item.brand,
+                        item.category_code, item.category_label,
+                        item.price, item.sale_price, item.quantity,
+                        item_condition,
+                        item.catalogue.product_model, item.catalogue.upc,
+                        item.created_date, item.updated_date,
+                        item.dashboard_id, item.catalogue_id, item.platform.name
+                        ])
             
             response['data'] = export_data
             if usejson == False:
@@ -660,7 +678,7 @@ def get_charts(db, current_user, charts_ids=[]):
                     chartdata = getChartData(chart_query, label_i=0, data_i=1)
                     chart_data = {
                         'id': 'top_ordered_products',
-                        'type': 'bar',
+                        'type': 'html',
                         'data': chartdata['data'],
                         'labels': chartdata['labels'],
                         'label': 'Top Ordered Products',
@@ -688,7 +706,7 @@ def get_charts(db, current_user, charts_ids=[]):
                     chartdata = getChartData(chart_query, label_i=0, data_i=1)
                     chart_data = {
                         'id': 'less_ordered_products',
-                        'type': 'pie',
+                        'type': 'html',
                         'data': chartdata['data'],
                         'labels': chartdata['labels'],
                         'label': 'least demanded products',
@@ -716,10 +734,11 @@ def get_charts(db, current_user, charts_ids=[]):
                     chartdata = getChartData(chart_query, label_i=0, data_i=1)
                     chart_data = {
                         'id': 'most_purchased_products',
-                        'type': 'doughnut',
+                        'type': 'html',
                         'data': chartdata['data'],
                         'labels': chartdata['labels'],
                         'label': 'Most purchased products',
+                        'background_colors': [ 'rgba(255, 99, 132, 0.2)', 'rgba(255, 159, 64, 0.2)', 'rgba(255, 205, 86, 0.2)', 'rgba(75, 192, 192, 0.2)', 'rgba(54, 162, 235, 0.2)', 'rgba(153, 102, 255, 0.2)', 'rgba(201, 203, 207, 0.2)'],
                         'description': 'Products with the largest number of purchases',
                         'col': 12
                     }
@@ -881,6 +900,7 @@ def get_charts(db, current_user, charts_ids=[]):
                     result[chart_id] = True
                     result_array.append(chart_data)
                     continue
+
                 else:
                     # id provided not exist
                     result[chart_id] = False
@@ -1547,7 +1567,7 @@ def get_remaining_requests()->int:
     remaining_requests = 0
     try:
         now_dt = datetime.utcnow()
-        
+        # two days today need be yasterday instead
         today = now_dt.replace(hour=0, minute=0, second=0, microsecond=0).strftime('%Y-%m-%d %H:%M:%S')
         now = now_dt.strftime('%Y-%m-%d %H:%M:%S')
         
@@ -1632,6 +1652,32 @@ def get_ordered_dicts(keys=[], *lists):
         print("unknown error in get_ordered_dicts, {}".format(sys.exc_info()))
         raise e
 
+def download_order_image(image_name='', image_url='', static_folder=''):
+    # simple function to download image by url with name secure
+    data = {'content_type': None, 'ext': None, 'filename': ''}
+    if image_name and image_url:
+        image_name = image_name.strip().lower()
+        image_url = image_url.strip()
+        r = requests.get(image_url, headers={'Authorization': 'a750a16c-054e-407c-9825-3da7d4b2a9c1'})
+        content = r.content
+        data['content_type'] = r.headers.get('Content-Type', None) if getattr(r, 'headers') else None
+        content_type_splited = data['content_type'].split('/')
+        allowed_exts = ['png', 'jpg', 'jpeg', 'gif', 'webp']
+        data['ext'] = str(content_type_splited[-1]).strip().lower() if (len(content_type_splited) >= 2) and (content_type_splited[-1] in allowed_exts) else None
+
+        if data['ext']:
+            data['filename'] = '{}.{}'.format(image_name, data['ext'])
+            p = os.path.join(static_folder, 'downloads', 'order_images', data['filename'])
+            data
+            with open(p, mode='wb') as f:
+                f.write(r.content)
+        else:
+            data = None
+    else:
+        data = None
+
+    return data
+
 # import orders
 def order_ids_chunks(lst, n):
     result = []
@@ -1641,7 +1687,7 @@ def order_ids_chunks(lst, n):
         return result
     except Exception as e:
         raise e
-
+# new
 def import_orders(db, apikey='', order_ids=[], bestbuy_request_max=0, user_remaining_requests=0, tomorrow_str=''):
     results = []
     chunks_errors = []
@@ -1674,7 +1720,8 @@ def import_orders(db, apikey='', order_ids=[], bestbuy_request_max=0, user_remai
                 except:
                     print("API not sending total_count, or sending invalid int")
                     pass
-    
+
+
                 # if total_count of required requests to imported less or equal to user_remaining_requests allow else make him send only requests with count of his reamning not block all
                 total_requests = total_count if total_count is not None and user_remaining_requests >= total_count else user_remaining_requests
                 current_upload_result0 = upload_orders(json.loads(r.content)['orders'], current_user, db)
@@ -1876,3 +1923,86 @@ def fill_generate_barcode(form, table_class, itemid, excluded=[], relations={}, 
 
         form.columns.choices = new_choices
         form.columns.render_kw = data_attrs
+
+# profile functions
+def get_errors_message(form):
+    error = ''
+    errorsl = []
+    for field, errors in form.errors.items():
+        if field == 'csrf_token':
+            errorsl.append('Form expired please try again')
+        else:
+            errorsl.append('{}:{}'.format(field, ','.join(errors)))
+    error = '|'.join(errorsl)
+    return error
+
+def generate_ourapi_key(bcrypt):
+    secure_salat = secrets.token_hex(7)
+    unique_key = hash(bcrypt.generate_password_hash(str(datetime.now().strftime('%Y%m%d%H%M%S-') + secure_salat + str(uuid4()))).decode('utf-8'))
+    if unique_key < 0:
+        unique_key = str(unique_key).replace('-', 'n')
+    else:
+        unique_key = 'p{}'.format(unique_key)
+    return str(unique_key)
+
+
+###################### api endpoints functions
+
+def limit_resetter(db_apikey):
+    now_day = datetime.utcnow().date()
+    if db_apikey.key_update_date < now_day:
+        # update only the key we work with, performance, ux, and do what needed
+        db_apikey.total_requests = 0
+        db_apikey.key_update_date = now_day
+        # clear logs optional when rest
+        for log in db_apikey.logs:
+            log.delete()
+            
+        db_apikey.update()
+        return True
+    else:
+        return False
+    
+def valid_ourapi_key(db_apikey, db):
+    valid = False
+    try:
+        key_user_id = db_apikey.user.id
+        if key_user_id:
+            # check if user api meta already set or it deleted? or not exist!!
+            ourapi_requests_limit = UserMeta.query.filter_by(key='ourapi_requests_limit', user_id=key_user_id).first()
+            ourapi_keys_max = UserMeta.query.filter_by(key='ourapi_keys_max', user_id=key_user_id).first()
+            if ourapi_requests_limit and ourapi_keys_max:
+                # check if need reset limit and do it
+                limit_resetter(db_apikey)
+
+                # requests_limit is total requests available for this user as all keys
+                requests_limit = int(ourapi_requests_limit.value)
+
+                # current keys requests made and limit per today
+                key_total_requests = int(db_apikey.total_requests)
+                key_requests_limit = int(db_apikey.key_limit)
+
+                sum_totals = int(db.session.query(func.sum(OurApiKeys.total_requests)).filter(OurApiKeys.user_id==key_user_id).scalar())
+                if (sum_totals < requests_limit) and (key_total_requests < key_requests_limit):
+                    valid = True
+    except Exception as e:
+        print('error in valid_ourapi_key {}'.format(sys.exc_info()))
+
+    return valid
+
+def get_filter_params(filters):
+    sqlalchemy_filters = []
+    for key, val in filters.items():
+        if filters[key] is not None:
+            sqlalchemy_filters.append(filters[key])
+    return sqlalchemy_filters
+
+
+# (ISO time used in both db.created_date and pass_api_request, small delay for performance, and block largest ddos, anti scraper bots if u bot u will not get more than 25 responses and blocked forever, if u human will wait very small seconds usally if u not send 25 requests within 2 min
+def pass_api_request(apikey_id, db):
+    db_today = datetime.utcnow()
+    before_2m = db_today - timedelta(hours=0, minutes=2)
+    today_formated = db_today.strftime("%Y-%m-%d %H:%M:%S")
+    before_2m_formated = before_2m.strftime("%Y-%m-%d %H:%M:%S")
+    total_within_2_min = db.session.query(func.count(ApiKeysLogs.id)).filter(ApiKeysLogs.key_id==apikey_id, ApiKeysLogs.created_date >= before_2m_formated, ApiKeysLogs.created_date <= today_formated).scalar()
+    return True if isinstance(total_within_2_min, int) and (total_within_2_min < 25) else False

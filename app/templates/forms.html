@@ -163,6 +163,11 @@
           <div class="form-group">
             {{import_offers.api_key.label}}
             {{import_offers.api_key(class='form-control')}}
+            <div class="form-check" title="For privacy and security, we do not save your key in our system, it is saved locally in your web browser and the data will be deleted after you close the browser.">
+              <label class="form-check-label">
+                <input type="checkbox" class="form-check-input" value="" id="offers_key_saver" >Save the key temporarily
+              </label>
+            </div>
           </div>
           {{import_offers.import_data(class='btn btn-success')}}
         </form>
@@ -790,9 +795,14 @@
         {% if import_orders %}
         <form id="import_orders_form" method="post" action="{{url_for('main.api_import_orders')}}">
           {{import_orders.hidden_tag()}}
-          <div class="form-group">
+          <div class="form-group mb-2">
             {{import_orders.api_key.label}}
             {{import_orders.api_key(class='form-control')}}
+            <div class="form-check" title="For privacy and security, we do not save your key in our system, it is saved locally in your web browser and the data will be deleted after you close the browser.">
+              <label class="form-check-label">
+                <input type="checkbox" class="form-check-input" value="" id="orders_key_saver" >Save the key temporarily
+              </label>
+            </div>
           </div>
           <div class="form-group">
             {{import_orders.date_from.label}}
@@ -1375,6 +1385,12 @@
           <div class="form-group">
             {{import_categories.api_key.label}}
             {{import_categories.api_key(class='form-control')}}
+            <!-- best buy 1 key temp saver -->
+            <div class="form-check" title="For privacy and security, we do not save your key in our system, it is saved locally in your web browser and the data will be deleted after you close the browser.">
+              <label class="form-check-label">
+                <input type="checkbox" class="form-check-input" value="" id="cat_key_saver" >Save the key temporarily
+              </label>
+            </div>
           </div>
           {{import_categories.import_data(class='btn btn-success')}}
         </form>
@@ -1419,6 +1435,100 @@
       <!-- Modal footer -->
       <div class="modal-footer">
         <button type="button" class="btn btn-danger" data-dismiss="modal">Close</button>
+      </div>
+    </div>
+  </div>
+</div>
+{% endmacro %}
+
+{% macro profile_forms(add_key, delete_key, update_key) %}
+<div class="modal fade" id="AddKeyFormModal">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <!-- Modal Header -->
+      <div class="modal-header">
+        <h4 class="modal-title">Add New API Key</h4>
+        <button type="button" class="close" data-dismiss="modal">&times;</button>
+      </div>
+      <!-- Modal body -->
+      <div class="modal-body">
+        {% if add_key %}
+        <form id="add_key_form" method="post" action="{{url_for('main.add_key')}}">
+          {{add_key.csrf_token(id='csrf_token_addkey')}}
+          <div class="form-group">
+            {{add_key.key_limit.label}}
+            {{add_key.key_limit(class='form-control', placeholder='enter Limit of this key', title='enter Limit of this key')}}
+          </div>
+          {{add_key.add(class='btn btn-success btn-block')}}
+        </form>
+        {% else %}
+        <div class="alert alert-danger">Unable to Display Add key form right now.</div>
+        {% endif %}
+      </div>
+      <!-- Modal footer -->
+      <div class="modal-footer">
+        <button type="button" class="btn btn-danger" data-dismiss="modal">Close</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="RemoveKeyFormModal">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <!-- Modal Header -->
+      <div class="modal-header">
+        <h4 class="modal-title">Remove Key</h4>
+        <button type="button" class="close" data-dismiss="modal">&times;</button>
+      </div>
+      <!-- Modal body -->
+      <div class="modal-body">
+        {% if delete_key and delete_key is defined %}
+        <p>Are you sure want delete that key ?</p>
+        <form id="remove_key_form" method="post" action="">
+          {{delete_key.csrf_token(id='csrf_token_removekey')}}
+          {{delete_key.remove_key_id()}}
+          {{delete_key.remove_key(class='btn btn-danger btn-block')}}
+        </form>
+        {% else %}
+          <div class="alert alert-danger">Unable to Display Add key form right now.</div>
+        {% endif %}
+      </div>
+      <!-- Modal footer -->
+      <div class="modal-footer">
+        <button type="button" class="btn btn-primary" data-dismiss="modal">Cancel</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="UpdateKeyFormModal">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <!-- Modal Header -->
+      <div class="modal-header">
+        <h4 class="modal-title">Update Key</h4>
+        <button type="button" class="close" data-dismiss="modal">&times;</button>
+      </div>
+      <!-- Modal body -->
+      <div class="modal-body">
+        {% if update_key and update_key is defined %}
+        <form id="update_key_form" method="post" action="">
+          {{update_key.csrf_token(id='csrf_token_updatekey')}}
+          {{update_key.update_key_id()}}
+          <div class="form-group">
+            {{update_key.update_key_limit.label}}
+            {{update_key.update_key_limit(class='form-control')}}
+          </div>
+          {{update_key.update_key(class='btn btn-success btn-block')}}
+        </form>
+        {% else %}
+          <div class="alert alert-danger">Unable to Display Update key form right now.</div>
+        {% endif %}
+      </div>
+      <!-- Modal footer -->
+      <div class="modal-footer">
+        <button type="button" class="btn btn-primary" data-dismiss="modal">Cancel</button>
       </div>
     </div>
   </div>

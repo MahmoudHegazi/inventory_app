@@ -16,12 +16,15 @@ addLocationForm, editLocationForm, removeLocationForm, addBinForm, editBinForm, 
 addCategoryForm, editCategoryForm, removeCategoryForm, importCategoriesAPIForm, importOffersAPIForm, SetupBestbuyForm, \
 importOrdersAPIForm, addConditionForm, editConditionForm, removeConditionForm, generateCatalogueBarcodeForm
 from . import vendor_permission, db
-from .functions import get_safe_redirect, updateDashboardListings, updateDashboardOrders, updateDashboardPurchasesSum, secureRedirect, get_charts, \
+from .functions import updateDashboardListings, updateDashboardOrders, updateDashboardPurchasesSum, secureRedirect, get_charts, \
 bestbuy_ready, get_ordered_dicts, float_or_none, float_or_zero, update_order_taxes, get_orders_and_shippings, get_separate_order_taxes, fill_generate_barcode
 from sqlalchemy.exc import IntegrityError
 from flask_login import login_required, current_user
 from flask import request as flask_request
 from sqlalchemy import or_, and_, asc
+
+
+from .functions import get_remaining_requests
 
 routes = Blueprint('routes', __name__, template_folder='templates', static_folder='static')
 
@@ -72,6 +75,7 @@ def makePagination(page=1, query_obj=None, callback=(), limit_parm=10):
 @login_required
 @vendor_permission.require(http_exception=403)
 def index():
+    #return str(get_remaining_requests())
     try:
         charts_data = get_charts(db, current_user,
             charts_ids=[
@@ -202,7 +206,6 @@ def view_catalogue(catalogue_id):
             flash('Catalouge Not found or deleted', 'danger')
             return redirect(url_for('routes.catalogues'))
     except Exception as e:
-        raise e
         print('System Error: {}'.format(sys.exc_info()))
         flash('unable to display catalogues page', 'danger')
         return redirect(url_for('routes.catalogues'))

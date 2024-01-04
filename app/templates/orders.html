@@ -2,11 +2,11 @@
 {% block title %}Orders{% endblock %}
 {% block page_description %}this is orders page, can view/edit all of your orders.{% endblock %}
 {% block body %}
-<div class="container border rounded p-3">
+<div class="container-fluid border rounded p-3">
   {% include 'messages.html' %}
   <img src="{{url_for('static', filename='assets/images/loading_circle.gif')}}" class="loading_circle" style="display:none;" />
 
-  <div class="container-fluid content_container">
+  <div class="container-fluid content_container" id="main_cont">
     <!-- settings menu-->
     <div id="settings_toast_cont">
       <button type="button" class="btn btn-outline-primary mb-1" id="open_settings">Settings</button>
@@ -311,5 +311,13 @@ searchComponent('mid', 'swing', cp=function(){return true;}, addon='', condition
 // add order by component to arrange table rows using table headers
 orderByColumnsComponent();
 
+// save key temp
+bbLocalSaverComponent(key='bbk', checkboxSelector='#importOrdersModal #orders_key_saver', valueSelector="#importOrdersModal #api_key");
+
+
+$(document).ready(function(){
+  // effect when import order is submited
+  longTimeFormComponent(formSelc="#import_orders_form", mainSelc="#main_cont", loadingSelc=".loading_circle", modalSelector="#importOrdersModal");
+});
 </script>
 {% endblock page_scripts %}

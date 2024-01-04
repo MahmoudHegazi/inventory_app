@@ -699,9 +699,9 @@ function fillEditForm(triggerSelector='', formSelector='', modalSelector='', dat
         }
         // start clear the actions
         for (let prop in dataAttrs){
-          console.log($(event.currentTarget).attr(dataAttrs[prop]).trim());
+          //console.log($(event.currentTarget).attr(dataAttrs[prop]).trim());
           $(inputIds[prop]).val($(event.currentTarget).attr(dataAttrs[prop]).trim());
-          console.log($(inputIds[prop]));
+          //console.log($(inputIds[prop]));
         }
         $(formSelector).attr('action', $(event.currentTarget).attr('data-url'));
       } else {
@@ -1250,6 +1250,165 @@ function generateBarcodeActions(elmSelector='', dataSelector=''){
     });
   }
 }
+
+function setKeyTemp(key='', val='', rewrite=true, remove=false){
+  let success = false;
+  try {      
+  
+    if (remove){
+      // remove localstorage var if exist
+      if (getKeyTemp(key) !== null){
+          localStorage.removeItem(key);
+          success = null;
+      }
+    } else if (rewrite){
+      // Set Item, update exsting item
+      localStorage.setItem(key, val);
+      success = true;
+    } else {
+      // set only if not exist
+      if (getKeyTemp(key) === null){
+          localStorage.setItem(key, val);
+          success = true;
+      }
+    }
+  } catch (e) {
+    console.log("setKeyTemp error", e);
+    success = false;
+  }
+  return success;
+}
+
+function getKeyTemp(key){
+  let keyTemp = null;
+  try {
+    // Set Item
+    keyTemp = localStorage.getItem(key);      
+    //document.getElementById("demo").innerHTML = localStorage.getItem("lastname");
+  } catch (e) {
+    console.log("getKeyTemp error", e);
+  }
+  return keyTemp;
+}
+
+function getQueryParm(queryParm){
+  let value = null;
+  try {
+    const urlParams = new URLSearchParams(window.location.search);
+    value = urlParams.get(queryParm);
+  } catch (error){
+    console.log('error can not get query param', error);
+  }
+  return value;
+}
+
+
+function bbLocalSaverComponent(key='bbk', checkboxSelector='#importOrdersModal #orders_key_saver', valueSelector="#importOrdersModal #api_key"){
+  // that secuirty client side technique all variables methods not accessed from console
+  if ((checkboxSelector && $(checkboxSelector).length) && (valueSelector && $(valueSelector).length)){
+    
+    const effect = function(time=100, repeat=3, cp=function(){}){
+      let timeout = null;
+      let effectIndex = 0;
+
+      if (repeat > 0){
+        function repeater(callback=cp){
+            if (timeout){
+              clearTimeout(timeout);
+            }
+            effectIndex += 1;
+            if (effectIndex > 0 && effectIndex <= repeat){
+              callback();
+              timeout = setTimeout(repeater,time);
+            } else {
+              return false;
+            }
+        }
+      }
+      repeater();
+    }
+
+    let save = true;
+    let effectClean = null;
+    const toggleSave = function(){
+      let status = false;
+      if ((checkboxSelector && $(checkboxSelector).length) && (valueSelector && $(valueSelector).length)){
+        if ($(checkboxSelector).is(':checked')){
+          // only work with not empty value
+          if ($(valueSelector).val()){
+              // set key and value
+              if (save){
+                status = setKeyTemp(key, $(valueSelector).val());            
+              } else {
+                // for performance not write the variable if already set in begning  page script runs from
+                status = setKeyTemp(key, $(valueSelector).val(), false);
+                save = true;
+              }
+          } else {
+            $(checkboxSelector).prop('checked', false);
+
+            // here this DC repeater for any effect method, 1- time in milisecond, 2- count of loops, 3- DC callback function repeated (usally use cb the start and clean after it for DC technqiue) 
+            effect(200, 2, ()=>{
+                if (effectClean){
+                  clearTimeout(effectClean);
+                }
+                if ($(valueSelector).length){
+                  $(valueSelector).addClass("alert_timeout");
+                }
+                effectClean = setTimeout(()=>{
+                  if ($(valueSelector).length){
+                    $(valueSelector).removeClass("alert_timeout");
+                  }
+                }, 100);
+            });
+          }
+
+        } else {
+          // clear old saved
+          status = setKeyTemp(key, null, null, remove=true);
+        }
+      }
+      console.log(status);
+    };
+
+    $(checkboxSelector).on('change', toggleSave);
+
+    $(valueSelector).on('change', function(){
+      // not trigger the change event to not call toggleSave
+      $(checkboxSelector).prop('checked', false);
+      $(checkboxSelector).trigger("change");
+    });
+
+    // when this script first runs check status first
+    if (getKeyTemp(key) !== null){
+      save = false;
+      $(valueSelector).val(getKeyTemp(key));
+      $(checkboxSelector).prop('checked', true);
+      $(checkboxSelector).trigger("change");
+    }
+
+  } else {
+    console.warn('localStorageSaver not started missing required elements.');
+  }
+}
+
+function longTimeFormComponent(formSelc="", mainSelc="", loadingSelc="", modalSelector=""){
+  if ((formSelc && $(formSelc).length) && (mainSelc && $(mainSelc).length) && (loadingSelc && $(loadingSelc).length)){
+    $(formSelc).eq(0).on("submit", function(e){
+      
+      // option close modal if provided
+      if (modalSelector && $(modalSelector).length){
+        $(modalSelector).eq(0).modal('hide');
+      }
+
+      $(mainSelc).eq(0).hide('fast');
+      $(loadingSelc).eq(0).show('fast');
+    });
+  } else {
+    console.log("longTimeFormComponent error");
+  }
+}
+
 
 $(document).ready(async function(){
     applyHoverEffect();

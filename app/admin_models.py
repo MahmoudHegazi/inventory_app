@@ -1,4 +1,4 @@
-from .models import User, Role, UserRoles, Dashboard, Listing, Catalogue, Purchase, Order, Supplier
+from .models import User, Role, UserRoles, UserMeta, Dashboard, Listing, Catalogue, Purchase, Order, Supplier
 from flask_admin import BaseView, expose
 from flask_admin.contrib.sqla import ModelView
 from flask import redirect, url_for, request, flash
@@ -66,6 +66,13 @@ class RoleModalView(InventoryModelView):
     can_edit = False
     can_delete = False
     form_excluded_columns = ['created_date', 'updated_date', 'users']
+
+
+class UserMetaModalView(InventoryModelView):
+    column_filters = ['created_date', 'updated_date', 'key', 'value', 'user']
+    column_searchable_list = ['user_id', 'key', 'value']
+
+    form_excluded_columns = ['created_date', 'updated_date']
 
 ######################## Authentication END #########################################
 
@@ -142,12 +149,15 @@ class MainIndexLink(MenuLink):
 userModalView = UserModalView(User, db.session, category='Authentication')
 roleModalView = RoleModalView(Role, db.session, category='Authentication')
 userRolesModalView = UserRolesModalView(UserRoles, db.session, category='Authentication')
+userMetaModalView = UserMetaModalView(UserMeta, db.session, category='Authentication')
 dashboardModalView = DashboardModalView(Dashboard, db.session, category='Vendor')
 listingModalView = ListingModalView(Listing, db.session, category='Vendor')
 cataloguedModalView = catalogueModalView(Catalogue, db.session, category='Vendor')
 purchaseModalView = PurchaseModalView(Purchase, db.session, category='Vendor')
 orderModalView = OrderModalView(Order, db.session, category='Vendor')
 supplierModalView = SupplierModalView(Supplier, db.session)
+
+
 
 backlink = MainIndexLink(name="Back to app")
 

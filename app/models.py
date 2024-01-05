@@ -958,7 +958,7 @@ class OurApiKeys(db.Model):
     key = db.Column(db.String(255), nullable=False)
     total_requests = db.Column(db.Integer, nullable=False, default=0)
     key_limit = db.Column(db.Integer, nullable=False, default=0)
-    key_update_date = db.Column(db.Date, nullable=True, default=None)
+    key_update_date = db.Column(db.Date, nullable=True, default=datetime.datetime.utcnow)
     user_id = db.Column(db.Integer, db.ForeignKey('user.id', ondelete="CASCADE", onupdate="CASCADE"), nullable=False)
     created_date = db.Column(DateTime, nullable=False, default=datetime.datetime.utcnow)
     updated_date = db.Column(DateTime, nullable=True, default=None, onupdate=datetime.datetime.utcnow)

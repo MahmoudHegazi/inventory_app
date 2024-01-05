@@ -8,7 +8,6 @@ import requests
 import json
 import re
 import secrets
-import validators
 from dateutil import parser
 from urllib.parse import urlparse, urljoin
 from flask import request, current_app, url_for
@@ -1950,7 +1949,12 @@ def generate_ourapi_key(bcrypt):
 
 def limit_resetter(db_apikey):
     now_day = datetime.utcnow().date()
-    if db_apikey.key_update_date < now_day:
+    if db_apikey.key_update_date is None:
+        db_apikey.key_update_date = now_day
+        db_apikey.update()
+        return True
+    
+    elif db_apikey.key_update_date < now_day:
         # update only the key we work with, performance, ux, and do what needed
         db_apikey.total_requests = 0
         db_apikey.key_update_date = now_day

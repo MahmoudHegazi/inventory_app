@@ -11,6 +11,7 @@ from sqlalchemy.ext.declarative import declarative_base
 from app import db
 from flask_login import UserMixin
 from sqlalchemy.orm.attributes import get_history
+from dateutil.relativedelta import *
 ################################ ---------- Tables for Authentication (Start) ---------------- #########################
 Base = declarative_base()
 
@@ -322,7 +323,6 @@ class Category(db.Model):
         }
 
 ################################ ---------- Tables for Dashboard Catagories (End) ---------------- #########################
-
 # uselist=False make the one-to-one not return list of classes
 class Catalogue(db.Model): # catelouge
     __tablename__ = 'catalogue'
@@ -950,6 +950,24 @@ class CatalogueLocationsBins(db.Model):
         }
 
 ################################ ---------- Tables for Dashboard Warehouse Locations (End) ---------------- #########################   
+def get_expiration_date(expiration_date):
+    valid_expiry = False
+    now = datetime.datetime.utcnow()
+
+    final_expiration_date = (now+relativedelta(months=+1)).strftime("%Y-%m-%dT%H:%M")
+    diff = now - now
+    # happend here as it db releated action to store value, not asked from user to calc seconds and utc date time he selected
+    try:
+        valid_expiry = True if expiration_date is not None and expiration_date <= (now+relativedelta(months=+6)) else False
+        if valid_expiry:
+            diff = expiration_date - now
+        else:
+            diff = (now+relativedelta(months=+1)) - now
+    except Exception as e:
+        valid_expiry = False
+        diff = now - now
+    
+    return {'final_expiration_date': final_expiration_date, 'diff': diff, 'valid_expiry': valid_expiry}
 
 ################################ ---------- Tables for OUR API (Start) ---------------- #########################
 class OurApiKeys(db.Model):
@@ -960,28 +978,166 @@ class OurApiKeys(db.Model):
     key_limit = db.Column(db.Integer, nullable=False, default=0)
     key_update_date = db.Column(db.Date, nullable=True, default=datetime.datetime.utcnow)
     user_id = db.Column(db.Integer, db.ForeignKey('user.id', ondelete="CASCADE", onupdate="CASCADE"), nullable=False)
+    white_ips = db.Column(db.String(5000), nullable=True, default='')
+    black_ips = db.Column(db.String(5000), nullable=True, default='')
+    # 8 should be max as it 6 month max but ok 11
+    expiration_seconds = db.Column(db.DECIMAL(precision=10, scale=2, asdecimal=True), nullable=False, default=0.00)
+    expiration_date = db.Column(DateTime, nullable=False, default=None)
     created_date = db.Column(DateTime, nullable=False, default=datetime.datetime.utcnow)
     updated_date = db.Column(DateTime, nullable=True, default=None, onupdate=datetime.datetime.utcnow)
     logs = db.relationship("ApiKeysLogs", backref="key", cascade="all, delete", passive_deletes=True)
 
-    def __init__(self, user_id, key, key_limit=0, key_update_date=None):
+    def __init__(self, user_id, key, key_limit=0, expiration_date=None, key_update_date=None, white_ips='', black_ips=''):
         self.user_id = user_id
         self.key = key
         self.key_limit = key_limit
         # this allow set that start of using the API, ex set last update to day after 7 days from now, so it will not allow update until this 7 also total requests to limit of keys
         self.key_update_date = key_update_date
+        self.white_ips = white_ips
+        self.black_ips = black_ips
+
+        # add valid expirey date + fix any backend covered by front gap added in form (also default if no expiery code or it broken)
+        expiration_date_data = get_expiration_date(expiration_date)
+
+        # no if u abused html attr and updated client max and added  1 hour will consider bigger date and will max insert 6 months
+        if expiration_date_data['valid_expiry']:
+            self.expiration_date = expiration_date
+        else:
+            self.expiration_date = expiration_date_data['final_expiration_date']
+
+        # why this, answer is logical, when renew , renew same period user selected, this high level of ux and also achive my goal not change desgin and 1 button for renwew, this also important to know how much user decide and save in db so get it fast
+        self.expiration_seconds = max(expiration_date_data['diff'].total_seconds(), 0)  # not allow nagtive
+
 
     def insert(self):
         db.session.add(self)
         db.session.commit()
 
     def update(self):
+        # make sure is valid update value , as well renew the seconds, fast db is not need change mysql, final we now know excatly how many seconds user selected for the expire, so when renew set same seconds, without that never able to know the estamited from form open time and the expiration date lol or if u magican u do
+
+        # add valid expirey date + fix any backend covered by front gap added in form (also default if no expiery code or it broken)
+        expiration_date_data = get_expiration_date(self.expiration_date)
+
+        # no if u abused html attr and updated client max and added  1 hour will consider bigger date and will max insert 6 months
+        if expiration_date_data['valid_expiry']:
+            self.expiration_date = self.expiration_date
+        else:
+            self.expiration_date = expiration_date_data['final_expiration_date']
+
+        # why this, answer is logical, when renew , renew same period user selected, this high level of ux and also achive my goal not change desgin and 1 button for renwew, this also important to know how much user decide and save in db so get it fast
+        self.expiration_seconds = max(expiration_date_data['diff'].total_seconds(), 0)  # not allow nagtive
+
         db.session.commit()
 
     def delete(self):
         db.session.delete(self)
         db.session.commit()
 
+    def get_white_ips(self):
+        white_ips_list = []
+        try:
+            if self.white_ips and isinstance(self.white_ips, str):
+                white_ips_list = list(set(list(filter(lambda x: True if str(x).strip() != '' else False ,self.white_ips.split(',')))))
+        except:
+            print('error in get_white_ips, {}'.format(sys.exc_info()))
+        return white_ips_list
+
+    def add_white_ips(self, ipaddresses=''):
+        try:
+            ipaddresses = ipaddresses.strip()
+            changes = 0
+            if self.white_ips and ipaddresses:
+                white_ips_list = list(set(list(filter(lambda x: True if str(x).strip() != '' else False ,self.white_ips.split(',')))))
+                # unique not empty new ip addresses list
+                ipaddresses_list = list(set(list(filter(lambda x: True if str(x).strip() != '' else False ,ipaddresses.split(',')))))
+                for ip_address in ipaddresses_list:
+                    ip_address = ip_address.strip()
+                    if ip_address and ip_address not in white_ips_list:
+                        changes += 1
+                        white_ips_list.append(ip_address.strip())
+                ipaddresses_result = ','.join(white_ips_list)
+
+                self.white_ips = ipaddresses_result
+                self.update()
+
+                if changes:
+                    return True
+                else:
+                    return False
+            else:
+                return False
+        except Exception as e:
+            print('error in add_white_ips: {}'.format(sys.exc_info()))
+            return None
+        
+    def remove_white_ip(self, ipaddresses=''):
+        try:
+            changes = 0
+            ipaddresses_list = list(set(list(filter(lambda x: True if str(x).strip() != '' else False ,ipaddresses.split(',')))))
+            current_ip_address = self.white_ips.split(',')
+            for ip_address in ipaddresses_list:
+                ip_address = ip_address.strip()
+                if ip_address and ip_address in self.white_ips:
+                    self.white_ips = self.white_ips.replace(ip_address, '')
+                    changes += 1
+
+            result_ips = list(set(list(filter(lambda x: True if str(x).strip() != '' else False ,self.white_ips.split(',')))))
+            self.white_ips = ','.join(result_ips)
+
+            if len(current_ip_address) != len(result_ips) or changes > 0:
+                self.update()
+                return True
+            else:
+                return False
+
+        except Exception as e:
+            print('error in remove_white_ip: {}'.format(sys.exc_info()))
+            return None
+
+
+    def is_expired(self):
+        try:
+            now = datetime.datetime.utcnow()
+            return True if self.expiration_date <= now else False
+        except:
+            print('error in is_expired, {}'.format(sys.exc_info()))
+            return True
+    
+    def get_expiration_days(self):
+        beganing = ''
+        expiration_days = 0
+        extension = 'days'
+        try:
+            time = self.expiration_seconds
+            zero = float(0.00)
+            # Calculate the number of full days in the given time duration.
+            days = time / (24 * 3600)
+            floored = int(days)
+            after_dot = days % 1
+
+            if time > zero:
+                if floored > 0:
+                    expiration_days = floored
+                    if after_dot > 0:
+                        beganing = 'bigger than '                    
+                else:
+                    if time > zero:
+                        expiration_days = 1
+                        beganing = 'less than '
+                    else:
+                        expiration_days = 0
+            else:
+                return 0
+            
+            if expiration_days == 1:
+                extension = 'day'
+        except:
+            print('error in get_expiration_seconds, {}'.format(sys.exc_info()))
+        finally:
+            return '{}{} {}'.format(beganing, expiration_days, extension)
+        
+    
     def format(self):
         return {
             'id': self.id,

@@ -145,13 +145,11 @@
               </p>
             </div>
             <div class="col-sm-12 row">
-              <div class="col-sm-6">
                 <button data-toggle="modal" data-target="#barcodeCatalogueModal" class="btn btn-success btn-block">Generate Barcode</button>
                 <button data-url="{{url_for('routes.delete_catalogue', catalogue_id=catalogue.id)}}" data-toggle="modal" 
                   data-target="#deleteCatalogueModal" data-catalogue-id="{{catalogue.id}}" onclick="toggleLoadingCircle(true, 'block')" 
                   class="wtform_modal_deletebtn btn btn-danger btn-block">Delete
                 </button>
-             </div>
             </div>
         </div>
       </div>
@@ -188,7 +186,7 @@ $('#deleteCatalogueModal').on('shown.bs.modal', ()=>{toggleLoadingCircle(false, 
 deleteWtformsModalProccess(dataAttId='data-catalogue-id', formId='remove_catalogue', idInputId='catalogue_id', modalId='deleteCatalogueModal');
 
 toggleSettingsToast();
-
-generateBarcodeActions('select#columns','textarea#data');
+// code128 48maxlength
+generateBarcodeActions('select#columns','textarea#data', 48);
 </script>
 {% endblock page_scripts %}

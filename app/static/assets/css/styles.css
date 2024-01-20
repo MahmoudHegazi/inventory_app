@@ -36,6 +36,10 @@
     background-color: #070718f7 !important;
     color: white !important;
 }
+.bg-gainsboro {
+    background-color: gainsboro !important;
+    color: black !important;
+}
 
 .d_relative {
     position: relative !important;
@@ -258,7 +262,14 @@ color_lightpink {
     cursor: pointer !important;
 }
 
-
+.active_component span {
+    background: cornflowerblue !important;
+    padding: 1px 10px !important;
+    color: white !important;
+}
+.bg_cornflowerblue {
+    background-color: cornflowerblue !important;
+}
 img#api_unsetup {
     object-fit: contain !important;
     max-width: 100% !important;
@@ -293,6 +304,45 @@ img#api_unsetup {
     overflow-y:auto !important;
     max-height:500px !important;
 }
+/* profile */
+.white_ips_rows {
+    max-height: 300px !important;
+    overflow: auto !important;
+    overflow-wrap: break-word !important;
+}
+.btn_smeller {
+    padding: 0.1px 10px !important;
+    font-size: .875rem !important;
+}
+.max_content {
+    width: max-content !important;
+}
+/* charts component */
+.font_11px {
+    font-size:11px !important;
+}
+.values_select {
+    max-width:100px !important;
+}
+.auto_overflow_200px{
+    max-height: 200px !important;
+    overflow: auto !important;
+}
+
+.activity_link:hover {
+    background: chartreuse !important;
+    color: black !important;
+}
+
+.activity_link {
+    background:  white !important;
+    color: black !important;
+    font-size: 0.825rem !important;
+    word-break: break-word !important;
+}
+
+
+
 /* scroll bar */
 /* width */
 ::-webkit-scrollbar {
@@ -316,7 +366,31 @@ img#api_unsetup {
     background: rgba(119, 136, 153, 0.863);  
     /*background: rgb(99, 180, 99);*/
   }
-  
+  /*According to Can I use, the user-select + -webkit-user-select for Safari is enough to achieve desired behavior in all major browsers.*/
+  .noselect {
+    -webkit-touch-callout: none; /* iOS Safari */
+      -webkit-user-select: none; /* Safari */
+       -khtml-user-select: none; /* Konqueror HTML */
+         -moz-user-select: none; /* Old versions of Firefox */
+          -ms-user-select: none; /* Internet Explorer/Edge */
+              user-select: none; /* Non-prefixed version, currently
+                                    supported by Chrome, Edge, Opera and Firefox */
+  }
+
+
+  .activity_date {
+    max-width:20px !important;
+  }
+
+  .html_chart_data {
+    font-size:1.2rem !important;
+  }
+
+  .width100_break {
+    max-width: 100%;
+    word-break: break-word;
+  }
+
 @media only screen and (max-width: 768px) {
     .media_small_width_100 {
         width: 100%  !important;
@@ -326,6 +400,11 @@ img#api_unsetup {
     #collapsibleNavbar li.ml-auto{
         margin-left: 0.5rem !important;
         margin-right: none !important;
+    }
+
+    .activity_date {
+        min-width: 80% !important;
+        max-width: 80%;
     }
 }
 

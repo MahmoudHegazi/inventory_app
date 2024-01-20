@@ -2,6 +2,10 @@
 {% set label_indexes = [] %}
 {% set data_indexes = [] %}
 <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/2.7.3/Chart.min.js"></script>
+<div id="default_loading">
+  <img id="loading_chart_circle" src="{{url_for('static', filename='assets/images/loading_circle.gif')}}" style="display:none;max-height: 100% !important;" class="w-75 mx-auto">
+</div>
+
 <div class="row fancyscroll_main">
   {% for chart in charts_data %}
     {% if chart.col is defined %}
@@ -9,48 +13,95 @@
     {% else %}
       {% if charts_data|length == 1  %}{% set col_sm = '12' %}{% else %}{% set col_sm = '6' %}{% endif %}
     {% endif %}
-    
+
     {% set charttype = chart.type if chart.type is defined else '' %}
-    <div class="border border-light shadow-lg rounded text-center col-sm-{{col_sm}} fancyscroll_cont my-2 chart_row" data-type="{{charttype}}">
+    <div class="border border-light shadow-lg rounded text-center col-sm-{{col_sm}} fancyscroll_cont my-2 chart_row" id="chartrow_{{chart.id}}" data-type="{{charttype}}" data-chartid="{{chart.id}}">
       {% set colors = ('bg-light', 'text-dark') if chart.type is defined and chart.type == 'html' else ('bg-dark', 'text-white') %}
-      <div class="{{colors[0]}} {{colors[1]}} text-white">
+      <div id="loading_cont_{{chart.id}}">
+      </div>
+      <div class="{{colors[0]}} {{colors[1]}} text-white" id="cont_content_{{chart.id}}">
         <!-- display only valid charts this work good with js too -->
         {% if chart.type is defined and chart.type == 'html' and chart.id is defined and chart.data is defined and chart.labels is defined and chart.label is defined %}
-        <div class="d-flex justify-content-center p-0 border border-secondary rounded" style="width:95%;">
-          <div class="row" id="htmlchart_{{chart.id}}">
-            <div class="col-sm-12 text-white text-center mb-1">
-              <div class="badge badge-secondary p-3 mt-2" style="width:98%;">{{chart.label}}</div>
+        <div class="d-flex justify-content-center flex-column p-0 border border-secondary rounded" id="{{chart.id}}" style="width:95%;">
+          <div class="row m-0">
+            <!-- messages -->
+            <div class="col-sm-12 mx-auto text-center" id="chart_msg_{{chart.id}}"></div>
+            
+            <!-- activity -->
+            <div class="col-sm bg-light padding-2 border" id="activity_parent_{{chart.id}}" style="display:none;">
+              <div class="text-dark text-center mb-2">Activity</div>
+              <div class="d-flex flex-column activity_cont p-3" id="activity_{{chart.id}}" data-url="{{url_for('main.proccess_chart_activity', chart_id=chart.id)}}">
+              </div>
             </div>
-            <div class="col-sm-12 row m-0 w-100">
-                <!-- Data Label text -->
-                <div class="col-sm-9 p-2" style="border-right:1px solid lightgray;">                  
-                  
-                  {% for label in chart.labels %}
-                    {% if label_indexes.append(loop.index) %}{%endif%}
-                    <div id="label_{{label_indexes|length}}" data-target="#data_{{label_indexes|length}}" class="w-100 p-2 shadow mb-2 border border-secondary rounded mx-auto hover_light html_chart_text">
-                      {{label}}
-                    </div>
-                  {% endfor %}
-                </div>
-                <!-- Data Number -->
-                <div class="col-sm-3 p-2">
-                  {% for data_num in chart.data %}
-                    {% if data_indexes.append(loop.index) %}{%endif%}
-                    <div id="data_{{data_indexes|length}}" data-target="#label_{{data_indexes|length}}" class="w-100 p-2 shadow mb-2 border border-secondary rounded mx-auto hover_light html_chart_text" id="data_{{loop.index}}" style="font-size:1.2rem;">
-                      {{data_num}}
-                    </div>
-                  {% endfor %}
-                </div>
+            
+            <!-- Main Component -->
+            <div class="col-sm row" id="htmlchart_{{chart.id}}" style="min-width: 80%;">
+              <div class="col-sm-12 text-white text-center mb-1">
+                <div class="badge badge-secondary p-3 mt-2" style="width:98%;">{{chart.label}}</div>
+              </div>
+              <div class="col-sm-12 row m-0 w-100 html_content">
+                  <!-- Data Label text -->
+                  <div class="col-sm-9 p-2 chart_labels" style="border-right:1px solid lightgray;" data-chart="{{chart.id}}">            
+                    {% for label in chart.labels %}
+                      {% if label_indexes.append(loop.index) %}{%endif%}
+                      <div class="w-100 p-2 shadow mb-2 border border-secondary rounded mx-auto hover_light html_chart_label">
+                        {{label}}
+                      </div>
+                    {% endfor %}
+                  </div>
+                  <!-- Data Number -->
+                  <div class="col-sm-3 p-2 chart_data" data-chart="{{chart.id}}">
+                    {% for data_num in chart.data %}
+                      {% if data_indexes.append(loop.index) %}{%endif%}
+                      <div class="w-100 p-2 shadow mb-2 border border-secondary rounded mx-auto hover_light html_chart_data">
+                        {{data_num}}
+                      </div>
+                    {% endfor %}
+                  </div>
+              </div>
+            </div>
+            <div class="col-sm-12"><button class="btn btn-danger btn-block btn-sm w-75 mx-auto cancel_filter" data-chart="{{chart.id}}" onclick="cancelChartFilters(event)" style="display:none;">Cancel</button></div>
+            <!-- Addons -->
+            <div id="addons_{{chart.id}}" class="my-1 col-sm-12 my-2" data-url="{{url_for('main.proccess_chart_filters', chart_id=chart.id)}}">
+    
             </div>
           </div>
         </div>
 
         {% elif chart.id is defined and chart.data is defined and chart.labels is defined and chart.label is defined and chart.type is defined and chart.type != 'html' %}
-        <div data-type="{{chart.type}}">
-          
-          <canvas id="{{chart.id}}"></canvas>
-          <div id="addons_{{chart.id}}">
-  
+        <div class="row" data-type="{{chart.type}}" data-chartid="{{chart.id}}" id="chartrow_{{chart.id}}">
+
+ 
+
+          <div id="loading_cont_{{chart.id}}">
+          </div>
+
+
+          <div class="col-sm-12 row m-0" id="cont_content_{{chart.id}}">
+
+              <!-- messages -->
+              <div class="col-sm-12" id="chart_msg_{{chart.id}}"></div>
+
+
+              <!-- activity -->
+              <div class="col-sm bg-light text-dark padding-2 mb-2" id="activity_parent_{{chart.id}}" style="display:none;">
+                <div class="bg-light text-dark text-center">Activity</div>
+                <div class="d-flex flex-column activity_cont p-3" id="activity_{{chart.id}}" data-url="{{url_for('main.proccess_chart_activity', chart_id=chart.id)}}">
+                </div>
+              </div>
+
+              <!-- Canvas and Addons -->
+              <div class="col-sm" style="min-width:80%;">
+                <canvas id="{{chart.id}}" class="chartcanvas"></canvas>
+                <!-- cancel filter and acitivty button -->
+                <div class="col-sm-12"><button class="btn btn-danger btn-block btn-sm w-75 mx-auto cancel_filter" data-chart="{{chart.id}}" onclick="cancelChartFilters(event)" style="display:none;">Cancel</button></div>
+
+                <div id="addons_{{chart.id}}" class="my-1 bg-white text-dark" data-url="{{url_for('main.proccess_chart_filters', chart_id=chart.id)}}">
+    
+                </div>
+                <div class="catcher_alert" data-chart="{{chart.id}}"></div>
+              </div>
+
           </div>
         </div>
         {% else %}
@@ -61,6 +112,124 @@
   {% endfor %}
 </div>
 <script>
+    const chartsData = {{charts_data|tojson|safe}};
+    const charts = {};
+    const chartColumns = {};
+    const chartStorage = {};
+
+    async function asyncJQueryAJAXPost(url='', reqData={}){
+        try {
+            return await new Promise(function(res, rej){
+                $.ajax({
+                  type : 'POST',
+                  url : url,
+                  data : reqData,
+                  success: function(data) {
+                      res(data);
+                  },
+                  error: function(error){
+                      rej(error);
+                  }
+                });
+            });
+        } catch (error) {
+            console.log('error in asyncJQueryAJAXPost', error);
+        }
+    }
+
+    function getMessageAlert(message='', status='success'){
+      return `
+      <div class="alert alert-${status} alert-dismissible mt-2">
+          <button type="button" class="close" data-dismiss="alert">&times;</button>
+          ${message}
+      </div>
+      `
+    }
+    // full sync update to chart.js, allow update if charts old and new data same length, or if new data bigger than existing data, or if new data lower than existing data, and async with chartjs --
+    function updateChartData(chartId, labels=[], data=[]){
+      let success = false;
+      let newData = [];
+      let oldData = [];
+      try {
+          if (chartId && typeof(charts) === 'object' && charts.hasOwnProperty(chartId) && Array.isArray(data) && Array.isArray(labels) && labels.length === data.length){
+    
+              const labelLengths = charts[chartId].data.labels.length;
+              const dataLength = (charts[chartId].data.datasets.length > 0 && Array.isArray(charts[chartId].data.datasets[0].data)) ? charts[chartId].data.datasets[0].data.length : -1;
+              if (dataLength >= 0 && labelLengths === dataLength){
+    
+                  if (dataLength > data.length){
+                      const totalRemove = dataLength - data.length;
+                      charts[chartId].data.labels.splice(data.length, totalRemove);
+                      charts[chartId].data.datasets[0].data.splice(data.length, totalRemove);
+                      if (chartColumns.hasOwnProperty(chartId)){
+                        chartColumns[chartId] = chartColumns[chartId].splice(data.length, totalRemove);
+                      }
+                      charts[chartId].update();
+                  }
+                  
+                  
+                  let updateDone = false;
+                  const dataOfChart = charts[chartId].data.datasets[0].data;
+                  labels.forEach((label, i)=>{
+                       if (labelLengths > i){
+                           if (label != charts[chartId].data.labels[i]){
+                               if (chartColumns.hasOwnProperty(chartId) && chartColumns[chartId].length > i){
+                                 chartColumns[chartId][i] = label;
+                               }
+                               charts[chartId].data.labels[i] = fullTextOrPart(label, 11, '..');
+                               updateDone = true;
+                           }
+                       } else {
+                           charts[chartId].data.labels.push(fullTextOrPart(label, 11, '..'));
+                           updateDone = true;
+                       }
+
+                       // save new labels value if any change only for bars chart, while this func for all charts chartColumns.hasOwnProperty(chartId)
+                       if (chartColumns.hasOwnProperty(chartId) && chartColumns[chartId].length > i){
+                          chartColumns[chartId][i] = label;
+                       } else {
+                          if (Array.isArray(chartColumns[chartId])){
+                           chartColumns[chartId].push(label);
+                          } else {
+                           chartColumns[chartId] = [label];
+                          }
+                       }
+
+                       if (dataLength > i){
+                           if (data[i] != dataOfChart[i]){
+                               charts[chartId].data.datasets[0].data[i] = data[i];
+                               updateDone = true;
+                           }
+                       } else {                       
+                           charts[chartId].data.datasets[0].data.push(data[i]);
+                           updateDone = true;
+                       }
+                  });
+    
+                  if (labels.length == 0){
+                      charts[chartId].data.labels = [];
+                      charts[chartId].data.datasets[0].data = [];
+                      updateDone = true;
+                  }
+    
+                  if (updateDone){
+                      charts[chartId].update();
+                  }
+                  success = true;    
+              } else {
+                  console.log("updateChartData error invalid chart found ", chartId);
+              }
+              
+          } else {
+              console.warn("Invalid Size Error: Sizes Of existing or new data not equal.");
+          }
+      } catch( error ) {
+          throw error;
+          success = false;
+          console.log("error from updateChartData: ", error);
+      }
+    }
+
     function removeHover(){
       // clear old classes
       $(".js_hover").removeClass('js_hover');
@@ -75,13 +244,126 @@
       }
       
     }
-    $(".html_chart_text").on('mouseover', hoverCopier);
-    $(".html_chart_text").on('mouseleave', removeHover);
 
-    var chartsData = {{charts_data|tojson|safe}};
+    // function to solve chart js canvas small text in both popover and display
+
+    function dislayColTitle (labelString, chartid) {
+    		if (labelString && typeof(labelString) === 'string' && chartid && $(`.catcher_alert[data-chart="${chartid}"]`).length > 0) {
+    			$(`.catcher_alert[data-chart="${chartid}"]`).html(`<div class="alert alert-info alert-dismissible width100_break">
+      <button type="button" class="close" data-dismiss="alert">&times;</button>
+      <strong>Selected:!</strong><span>${String(labelString)}</span></div>`);
+    		}
+    };
+    function chartJSLongTxtFixer() {
+    	$("canvas.chartcanvas").on("click", (e) => {
+    		if (e && $(e.currentTarget).length && $(e.currentTarget).attr('id') && charts.hasOwnProperty($(e.currentTarget).attr('id'))) {
+    			const chartId = $(e.currentTarget).attr('id');
+    			const elm = charts[chartId].getElementAtEvent(e);
+    			if (
+            elm && elm.length > 0 && !isNaN(parseInt(elm[0]._index)) && chartColumns.hasOwnProperty(chartId) &&
+            Array.isArray(chartColumns[chartId]) && chartColumns[chartId].length > elm[0]._index &&
+            typeof(chartColumns[chartId][elm[0]._index]) === 'string'
+            ) {
+              
+            dislayColTitle(chartColumns[chartId][elm[0]._index], chartId);
+    			}
+    		}
+    	});
+    }
+
+
+    function fullTextOrPart(txt='', maxlength=0, sperator='..'){
+      if (typeof(txt) == 'string' && typeof(sperator) === 'string' && !isNaN(parseInt(maxlength)) && maxlength >= 0){
+          if (txt.length <= maxlength) {
+              return txt;
+          } else {
+              let oldSlice = txt.slice(0, (maxlength-sperator.length));
+              /* technique for check if before sperator space so better take char instead of it as speace no meaning char propeirty cs can be computer since and alot but css is known lang for style char can be important
+              if (oldSlice.endsWith(" ")){
+                  
+                  const sliceMax = (maxlength-sperator.length) + 1;
+                  oldSlice = txt.slice(0, sliceMax);
+                  let spaceI = sliceMax-2;
+                  if (spaceI >= 0 && oldSlice[spaceI] == ' '){
+                      oldSlice = oldSlice.slice(0,spaceI)+oldSlice.slice(spaceI+1);
+                  }
+              }*/
+              return `${oldSlice}${sperator}`;
+          }
+      } else {
+          
+          return txt;
+      }
+    }
+    let filtersI = 0;
+    let filters = {};
+    // return string for filter row, or recall to generate html and recrate the same repeated row (called onclick same arugs recall while create html all done in same step and same function)
+    function getFilterRowHTML(chartDataID, returnOnly=true){
+      if (chartDataID && typeof(filters) === 'object' && filters.hasOwnProperty(chartDataID) && filters[chartDataID].length){
+            filtersI += 1;
+            let colOptions = '';
+            const uniqueCols = [];
+            const chartFilters = filters[chartDataID];
+            chartFilters.forEach( (filter_col, i)=>{
+              if (
+                filter_col && filter_col.hasOwnProperty('key') && filter_col.hasOwnProperty('val') &&
+                filter_col.key && filter_col.val && !uniqueCols.includes(filter_col.val)
+                ){
+                if (i == 0){
+                  colOptions += `<option value="">Select Column</option>`;
+                }
+                colOptions += `<option value="${filter_col.val}">${filter_col.key}</option>`;
+                uniqueCols.push(filter_col.val);
+              } else {
+                console.log("here", filter_col , filter_col.hasOwnProperty('key') , filter_col.hasOwnProperty('val') ,
+                filter_col.key , filter_col.val , !uniqueCols.includes(filter_col.val));
+              }
+            });
+
+            const contId = `#addons_${chartDataID} .filter_cont`;
+
+            if (colOptions.length > 0) {
+                const htmlData = `
+                  <div class="p-1 mb-2 canvas_filter_row" data-chart='${chartDataID}'>
+                    <div class="form-group d-flex justify-content-around align-items-center filter_row" id="filter_${chartDataID}_${filtersI}" data-chart='${chartDataID}'>
+                        <select class="form-control font_11px cols_options_select">${colOptions}</select>
+                        <select class="form-control font_11px operators_select">
+                           <option value="">Select Operator</option>
+                           <option value="=">Equal</option>
+                           <option value="!=">Not Equal</option>
+                           <option value=">">Bigger Than</option>
+                           <option value="<">Less Than</option>
+                        </select>
+                        <input class="form-control font_11px values_select" placeholder="value" />
+                        <button class="btn btn-sm btn-danger" onclick="$(this).closest('.canvas_filter_row').remove();"><i class="fa fa-remove"></i></button>
+                    </div>
+                  </div>
+                `;
+                if (returnOnly==true){
+                  return htmlData;
+                } else if (returnOnly == false && contId && $(contId).length) {
+                  const parentCont = $(contId);
+                  parentCont.append(htmlData);
+
+                  return '';
+                } else {
+                  console.log('invalid getFilterRowHTML call ignored.');
+                  return '';
+                }
+            } else {
+              return '';
+            }
+      }
+      return '';
+    }
+    $(".html_chart_label").on('mouseover', hoverCopier);
+    $(".html_chart_label").on('mouseleave', removeHover);
+    $(".html_chart_data").on('mouseover', hoverCopier);
+    $(".html_chart_data").on('mouseleave', removeHover);
+
+
 
     addEventListener("DOMContentLoaded", (event) => {
-      const charts = {};
       const htmlCharts = {};
       const options = {
             scales: {
@@ -89,35 +371,153 @@
                 beginAtZero: true,
               }
             },
+            plugins: [{
+              id: 'click',
+              afterEvent(chart, args, pluginOptions) {
+                const event = args.event;
+                console.log('hi');
+                if (event.type === 'click') {
+                  console.log('click');
+                  // process the event
+                }}
+  }]
       };
       let backGroundColors = ['lightblue', 'lightgreen', 'lightgray', 'lightred', 'lightsteelblue'];
       let borderColors = ['lightblue', 'lightgreen', 'lightgray', 'lightred', 'lightsteelblue'];
 
       chartsData.forEach( (chartData, chartI)=>{
+
+        // optional addons for all types
+        if (chartData && chartData.id && chartData.type && chartData.filters && Array.isArray(chartData.filters)){
+            /* add the description and the ajax year select or any other config addons */
+            const addonsElm = document.querySelector(`#addons_${chartData.id}`);
+            let addonsHTML = '<div class="p-2">';
+            if (addonsElm){
+                if (chartData.description){
+                  addonsHTML += `<p>${chartData.description} </p>`;
+                }
+
+                /* optional filters */
+                if (chartData.filters && Array.isArray(chartData.filters) && addonsElm.getAttribute('data-url')){
+                    filters[chartData.id] = chartData.filters;
+                    const addonContId = `filter_cont_${chartData.id}`;
+                    const plusBtnId = `plus_${chartData.id}`;
+                    const filterRow = getFilterRowHTML(chartData.id, true);
+                    const applyBtnId = `apply_${chartData.id}`;
+                    const jinja2Url = addonsElm.getAttribute('data-url');
+                    if (filterRow){
+                      addonsHTML += `
+                      <hr class="text-secondary" />
+                      <div class="text-right mb-3">
+                            <div class="bg-primary rounded w-50 mx-auto d-flex justify-content-between" title="click on right arrow button to see and add filters">
+                                <div class="p-2">
+                                  <!-- ccollapse btn and togglers fastshort methods errors free -->
+                                  <span class="badge badge-warning rounded-circle cursor-pointer" onclick="
+                                     $(this).find('i').eq(0).toggleClass('fa-arrow-right fa-arrow-down');$('#${plusBtnId}').toggle();$('#${applyBtnId}').toggle();" 
+                                     data-toggle="collapse" data-target="#${addonContId}">
+                                    <i class="fa fa-arrow-right"></i>
+                                  </span>
+
+                                  <span class="text-light">Filters: </span>
+                                </div>
+                                <button onclick="getFilterRowHTML('${chartData.id}', false)"
+                                 class="btn btn-success btn-sm add_filter" id="${plusBtnId}" style="display:none;">
+                                 <i class="fa fa-plus"></i><span> Add</span>
+                                </button>
+                            </div>
+                            <button id="${applyBtnId}" onclick="applyChartFilters('${chartData.id}','${jinja2Url}')" class="w-75 mx-auto btn btn-success btn-sm btn-block my-1 apply_filter" type="button" style="display:none;">Apply</button>
+                            <div class="filter_cont my-2 p-2 auto_overflow_200px collapse" id="${addonContId}">
+                              ${filterRow}
+                            </div>
+                        </div>`;
+                    }
+                }
+                /* end of filters */
+                addonsElm.innerHTML = `${addonsHTML}</div>`;
+
+
+                /* (Activity) custom ajax html select box added dynamic by server (filter_year_component) */
+                const activityCont = document.querySelector(`#activity_${chartData.id}`);
+                const activityParent = document.querySelector(`#activity_parent_${chartData.id}`);
+
+                let addedOneAtLeast = false;
+                if (
+                  $(activityParent).length && $(activityCont).length && $(activityCont).attr('data-url') &&
+                  chartData.activity && Array.isArray(chartData.activity)
+                  ){
+                  let activtyBtns = '';
+                  const uniqueBtnsKeys = [];
+                  const uniqueBtnsValues = [];
+                  const jinja2ReqUrl = $(activityCont).attr('data-url');
+                  
+                  chartData.activity.forEach( (activityObj)=>{
+                    if (
+                      activityObj && typeof(activityObj) === 'object' && activityObj.hasOwnProperty('key') &&
+                      activityObj.hasOwnProperty('value') && 
+                      typeof(activityObj.key) == 'string' && 
+                      !uniqueBtnsKeys.includes(activityObj.key.toLowerCase()) &&
+                      !uniqueBtnsValues.includes(activityObj.value.trim().toLowerCase()) && 
+                      (typeof(activityObj.filter_by) === 'string' && activityObj.filter_by)
+                      ){
+
+                        const allowedHTMLTypes = {
+                          'date': 'date',
+                          'datetime-local': 'datetime-local',
+                          'text': 'text',
+                          'number': 'number',
+                          'range': 'range'
+                        }
+
+                        let type = activityObj.type.trim().toLowerCase();
+                        type = ((activityObj.hasOwnProperty('type') && typeof(activityObj.type) == 'string') && type && allowedHTMLTypes.hasOwnProperty(type)) ? allowedHTMLTypes[type] : 'text';
+                        const key = activityObj.key.trim().toLowerCase();
+                        const val = activityObj.value.trim().toLowerCase();
+                        const filterByTitle = (typeof(activityObj.filter_by_title) === 'string' && activityObj.filter_by_title) ? `title="${activityObj.filter_by_title}"` : '';
+                        maxDatesAttr = (activityObj.type === 'date' || activityObj.type === 'datetime-local') ? `max="${new Date().toISOString().split("T")[0]}"` : '';
+                        if (key == 'custom' || !val){
+                          activtyBtns += `<div class="d-flex justify-content-between align-items-center" id="actvity_custom_${chartData.id}" title="select ${activityObj.key}">
+                                <input onchange="selectCustomActivity(event)" type="${type}" ${maxDatesAttr} data-target="#activity_btn_${chartData.id}" data-text="#activity_txt_${chartData.id}" placeholder="${activityObj.key}" class="activity_date" title="select ${activityObj.key}" />
+                                <span class="badge badge-primary" style="font-size:12px;" id="activity_txt_${chartData.id}">${activityObj.key}</span>
+                                <button id="activity_btn_${chartData.id}" style="display:none;" onclick="sendActivityRequest(event)" data-type="${type}" data-url="${jinja2ReqUrl}"
+                                 data-chart="${chartData.id}" data-value="${activityObj.value}" data-filterby="${activityObj.filter_by}" ${filterByTitle}
+                                 class="cursor-pointer my-1 text-left p-1 border border-dark rounded btn btn-sm btn-primary">
+                                  <i class="fa fa fa-check"></i>
+                                </button>
+                            </div>`;
+                        } else {
+                          activtyBtns += `<button onclick="sendActivityRequest(event)" data-type="${type}" data-url="${jinja2ReqUrl}" 
+                          data-chart="${chartData.id}" data-value="${activityObj.value}" data-filterby="${activityObj.filter_by}" ${filterByTitle} class="activity_link cursor-pointer my-1 text-left p-1 border border-dark rounded btn">${activityObj.key}</button>`;
+                        }
+
+                        uniqueBtnsKeys.push(key);
+                        uniqueBtnsValues.push(val);                        
+                        if (!addedOneAtLeast){
+                          addedOneAtLeast = true;
+                        }
+                    } else {
+                        console.log("ignored invalid obj", activityObj , (typeof(activityObj.type) === 'string') ,
+                      activityObj.hasOwnProperty('type') ,
+                      !uniqueBtnsKeys.includes(activityObj.key.toLowerCase()) ,
+                      !uniqueBtnsValues.includes(activityObj.value.trim().toLowerCase()));
+                    }
+                  });
+                  if (addedOneAtLeast === true){
+                    $(activityCont).append(activtyBtns);
+                    $(activityParent).show('fast');
+                  } else {
+                    console.log("no activity options added")
+                  }
+
+                }
+
+                /* end activity */
+          }
+
+        }
+
         if (chartData && chartData.id && chartData.type && chartData.data && chartData.labels && chartData.label && document.querySelector(`canvas#${chartData.id}`) && Array.isArray(chartData.data) && Array.isArray(chartData.labels) && chartData.data.length == chartData.labels.length){
               /* canvas js charts */
               const ctx = document.querySelector(`canvas#${chartData.id}`);
-    
-              /* add the description and the ajax year select or any other config addons */
-              const addonsElm = document.querySelector(`#addons_${chartData.id}`);
-              let addonsHTML = '<p>';
-              if (addonsElm){
-          
-                if (chartData.description){
-                  addonsHTML += `<span>${chartData.description} </span>`;
-                }
-                /* custom ajax html select box added dynamic by server (filter_year_component) */
-                if (chartData.year_picker_ajax && Array.isArray(chartData.year_picker_ajax.years)){
-          
-                  let selectOptions = '';
-                  chartData.year_picker_ajax.years.forEach( (yearOption)=>{
-                    selectOptions += `<option value="${yearOption}">${yearOption}</option>`;
-                  });
-                  addonsHTML += `<select data-chart='${chartData.id}'>${selectOptions}</select>`;
-                }
-                addonsElm.innerHTML = `${addonsHTML}</p>`; 
-              }
-              
               
               /* optional set background colors and labels if provided from server */
               if ( chartData.background_colors && Array.isArray(chartData.background_colors) ){
@@ -130,8 +530,10 @@
               // fix chart.js long text
               let currentLabels = chartData.labels;
               if (chartData.type.trim() == 'bar'){
-                currentLabels = chartJsLabelsFix(currentLabels);
+                currentLabels = currentLabels.map( (labelTxt)=> fullTextOrPart(labelTxt, 11, '..') );
               }
+              // save and index the columns and thir titles
+              chartColumns[chartData.id] = chartData.labels;
               
               var data = {
                 labels: currentLabels,
@@ -160,9 +562,531 @@
           console.log('Invalid Chart object found, ignored.');
         }
       });
-    
-    });
 
+      // apply long text chartjs fixer
+      chartJSLongTxtFixer();
+      
+    });
+    const validDates = (datesValue, nowDate='')=>{
+          // not sometimes date value is one value when custom.
+          let prevDate = '';
+          let nowDateClient = '';
+          let valid = false;
+          try {
+                datesValue = datesValue.trim().split(',');
+                nowDate = nowDate.trim();
+                if (datesValue.length === 2 && datesValue[1]) {
+                  nowDateClient = datesValue[0];
+                  prevDate = datesValue[1];
+                } else if (datesValue.length === 1 && datesValue[0]) {
+                  prevDate = datesValue[0];
+                } else {
+                  prevDate = '';
+                }
+                 
+                if (prevDate && nowDate){
+                  const dateOne = new Date(prevDate);
+                  const dateTwo = new Date(nowDate);
+                  nowDateClient = (nowDateClient && (new Date(nowDateClient) instanceof Date)  && !isNaN(new Date(nowDateClient))) ? new Date(nowDateClient) : null;
+                  // validate also py date sent if exist
+                  if (
+                    ((dateOne instanceof Date) && (dateTwo instanceof Date) && !isNaN(dateOne) && !isNaN(dateTwo)) &&
+                    (dateTwo >= dateOne) && !(nowDateClient && nowDateClient > dateTwo) && !(nowDateClient && dateOne > nowDateClient)
+                    ){
+                      
+
+                    valid = true;
+                  }
+                }
+          } catch (error) {
+                console.log('error in validDates', error);
+                valid = false;
+          }
+          return valid;
+    };
+    async function sendActivityRequest(e){
+      
+      const nowDate = getFullDate('date');
+      if (
+      
+        e && $(e.currentTarget).length && $(e.currentTarget).attr('data-chart') &&
+        $(e.currentTarget).attr('data-value') &&
+        $(e.currentTarget).attr('data-type') &&
+        $(e.currentTarget).attr('data-url') &&
+        $(e.currentTarget).attr('data-filterby') &&
+        $(`#chart_msg_${$(e.currentTarget).attr('data-chart')}`).length &&
+        $(`#chartrow_${$(e.currentTarget).attr('data-chart')}`).length
+      ) {
+          // make sure value is valid, and have the right format to sent, also make sure date selected not bigger than now
+          const isValidPrevDate = validDates($(e.currentTarget).attr('data-value'), nowDate);
+          const msgElm = $(`#chart_msg_${$(e.currentTarget).attr('data-chart')}`);
+
+          const chartId = $(e.currentTarget).attr('data-chart');
+          const systemChart = getChartById(chartId, chartsData);
+
+          if (isValidPrevDate && systemChart && systemChart.type) {
+              const chartRow = $(`#chartrow_${$(e.currentTarget).attr('data-chart')}`);
+              const value = $(e.currentTarget).attr('data-value');
+              const url = $(e.currentTarget).attr('data-url');
+              const dataType = $(e.currentTarget).attr('data-type');
+              const serverEncryptedFilterBy = $(e.currentTarget).attr('data-filterby');
+              
+
+              let success = false;
+              let systemChartId = null;
+              let data = [];
+              let chartType = '';
+
+              toggleCanvasUntilAction(chartId, 'showLoading');
+
+              const res = await asyncJQueryAJAXPost(url, reqData={chartId:chartId, value:value, filterby: serverEncryptedFilterBy, data_type: dataType});
+              if (res && typeof(res) == 'object' && res.hasOwnProperty('code') && res.code == 200 && res.hasOwnProperty('data') && res.hasOwnProperty('labels') && res.hasOwnProperty('chart_id') && res.chart_id && (res.chart_id == chartId) && (Array.isArray(res.data) && res.data.length > 0)){
+                // validate returned data from backend exist in client js also validate the chart returned from backend not the const in js before send request
+                
+
+
+                chartType = systemChart.type;
+                systemChartId = res.chart_id;
+                data = res.data;
+                success = true;
+
+                // python have control on small details like need display success message to tell him dates or not display message on success
+                if (res.hasOwnProperty('message') && res.message) {
+                  msgElm.html(getMessageAlert(res.message, 'success'));
+                }
+                /* global update text after complete request actions, in other terms make update effect after display back the chart to user not while chart is hidden */
+                if (success && systemChartId && data && chartType) {
+                  // this to easy integerate activity with filters or vice versa
+                  systemChart.last_activity = {value: value, filterby: serverEncryptedFilterBy, data_type: dataType, chart_id: chartId};
+                  if (chartType === 'html') {
+                        updateHTMLChart(chartId, res.labels, res.data);
+                  } else {
+                        updateChartData(chartId, res.labels, res.data);
+                  }
+                  displayCancelFilters(chartId);
+                } else {
+                  systemChart.last_activity = {};
+                }
+
+                toggleCanvasUntilAction(chartId, 'hideLoading');
+                smoothScrollToChart(chartId);
+                
+
+              } else {
+                systemChart.last_activity = {};
+                const errorMsg = (typeof(res) == 'object' && res.hasOwnProperty('message') && res.message) ?  res.message : 'unknown error';
+                msgElm.html(getMessageAlert(errorMsg, 'danger'));
+                toggleCanvasUntilAction(chartId, 'hideLoading');
+              }
+
+          } else {
+              emptyLastActivity(e);
+              msgElm.html(getMessageAlert('Please Enter Valid Date', 'danger'));
+          }
+
+      } else {
+        emptyLastActivity(e);
+        // log message to user if possible
+        if (e && $(e.currentTarget).length && $(e.currentTarget).attr('data-chart')) {
+          const msgElm = $(`#chart_msg_${$(e.currentTarget).attr('data-chart')}`);
+          msgElm.html(getMessageAlert('The activity filter cannot be applied.', 'danger'));
+        }
+        console.log('unable to send sendActivityRequest');
+        // here HTML itself wrong, no message no action can done from user require dev to read console, usally this else for me when develop not need add custom handle
+      }
+    }
+
+    function emptyLastActivity(e){
+      if ($(e.currentTarget).length && $(e.currentTarget).attr('data-chart')){
+          let systemChartFix = getChartById($(e.currentTarget).attr('data-chart'), chartsData);
+          if (systemChartFix) {
+            systemChartFix.last_activity = {};
+            return true;
+          }
+      }
+    }
+
+    function selectCustomActivity(e){
+        if (e && $(e.currentTarget).length && $(e.currentTarget).attr('data-target') && $(e.currentTarget).attr('data-text') && $($(e.currentTarget).attr('data-target')).length && $($(e.currentTarget).attr('data-text')).length ){
+          const targetBtn = $($(e.currentTarget).attr('data-target'));
+          const targetTxt = $($(e.currentTarget).attr('data-text'));
+          if ($(e.currentTarget).val()){
+            const dataVal = $(e.currentTarget).val();
+            $(targetBtn).attr('data-value', dataVal);
+
+            targetTxt.hide('fast', null, ()=>{targetBtn.show('fast');});
+          } else {
+            targetBtn.hide('fast', null, ()=>{targetTxt.show('fast');});
+
+            $(targetBtn).attr('data-value', "");
+          }
+        }
+    }
+
+    function toggleCanvasUntilAction(chartId='', action='hideLoading'){
+      //loading_cont_top_ordered_products
+      const loadingImage = $("#loading_chart_circle");
+      const defaultLoading = $("#default_loading");
+      if (typeof(chartId) === 'string' && chartId && loadingImage.length && defaultLoading.length && loadingImage.attr('src')){
+        const targetContentCont = $(`#cont_content_${chartId}`);
+        const targetLoadingCont = $(`#loading_cont_${chartId}`);
+        const imageSrc = loadingImage.attr('src');
+
+        if (targetContentCont.length && targetLoadingCont.length){
+            if (action === 'showLoading') {
+              targetContentCont.hide();              
+              targetLoadingCont.append(loadingImage);                      
+              loadingImage.show();
+              loadingImage.attr('src', imageSrc);
+              
+            } else {
+              defaultLoading.append(loadingImage);
+              loadingImage.hide();
+              targetContentCont.show();
+            }
+        }
+      }
+    }
+    // if not number it direct update text with value no animation done
+    function fancyUpdateNumbers(max, dataElm, duration=1000, min=0){
+      let success = false;
+      try {
+          if (!isNaN(parseInt(max)) && !isNaN(parseInt(min)) && !isNaN(parseInt(duration)) && $(dataElm).length){
+            max = parseInt(max);
+            min = parseInt(min);
+            $({val: min}).animate({val: max}, {
+                duration: duration,
+                easing:'swing', // can be anything
+                step: function() { // called on every step
+                    // Update the element's text with rounded-up value:
+                    $(dataElm).text(Math.ceil(this.val));
+                }            
+            });
+            success = true;
+          } else {
+            if (max && $(dataElm).length) {
+              $(dataElm).text(max);
+              success = true;
+            }
+          }
+      } catch (error) {
+          console.log('error in fancyUpdateNumbers', error);
+      }
+      return success;
+    }
+
+    function getChartById(chartId='', chartsData){
+      targetChart = null;
+      try {
+        if (chartsData && chartId && typeof(chartId) === 'string') {
+            let target = null;
+            for (let i=0; i<chartsData.length; i++) {
+                const systemChartId = chartsData[i].id;
+                if (systemChartId === chartId) {
+                    target = chartsData[i];
+                    break;
+                } else {
+                    continue;
+                }
+            }
+            if (target) {
+                targetChart = target;
+            } else {
+                console.log('getChartById, invalid chart id');
+            }
+        }
+      } catch (error) {
+        console.log('error from getChartById', error);
+        targetChart = null;
+      }
+      return targetChart;
+    }
+
+    // update html chart
+    function addHTMLChartRows(chartid = '', labels = [], data = []) {
+        let success = false;
+        try {
+            if (
+              chartid && Array.isArray(data) && Array.isArray(labels) && data.length > 0 && data.length === labels.length &&
+              $(`.chart_labels[data-chart='${chartid}']`).length && $(`.chart_data[data-chart='${chartid}']`).length
+              ) {
+                const labelsCont = $(`.chart_labels[data-chart='${chartid}']`);
+                const dataCont = $(`.chart_data[data-chart='${chartid}']`);
+                labels.forEach((label, i) => {
+                    const labelElmTxt = `<div class="w-100 p-2 shadow mb-2 border border-secondary rounded mx-auto hover_light html_chart_label">
+                            ${label}
+                          </div>`;
+                    const dataElmTxt = `<div class="w-100 p-2 shadow mb-2 border border-secondary rounded mx-auto hover_light html_chart_data">
+                            ${data[i]}
+                          </div>`;
+                    const lAppended = labelsCont.append(labelElmTxt);
+                    const dAppended = dataCont.append(dataElmTxt);
+                    success = (lAppended.length && dAppended.length) ? true : false;
+                });
+                success = true;
+            } else {
+                console.log('error from addHTMLChartRows invalid data args');
+            }
+        } catch (error) {
+            console.log('error from addHTMLChartRows', error);
+            success = false;
+        }
+        return success;
+    }
+
+    function spliceHTMLChart(chartid='', totalRemove=0){
+        let success = false;
+        let spiliced = 0;
+        try {
+            if (chartid && !isNaN(parseInt(totalRemove)) && totalRemove > 0 && $(`.chart_labels[data-chart='${chartid}'] .html_chart_label`).length && $(`.chart_data[data-chart='${chartid}'] .html_chart_data`).length && $(`.chart_labels[data-chart='${chartid}'] .html_chart_label`).length >= totalRemove && $(`.chart_data[data-chart='${chartid}'] .html_chart_data`).length >= 0) {
+                const labels = Array.from($(`.chart_labels[data-chart='${chartid}'] .html_chart_label`));
+                const datas = Array.from($(`.chart_data[data-chart='${chartid}'] .html_chart_data`));
+                console.log('labels', labels);
+                console.log('datas', datas);
+    
+                success = $(labels.slice(labels.length-totalRemove)).remove();
+                success = $(datas.slice(datas.length-totalRemove)).remove();
+            } else {
+                console.log('error from spliceHTMLChart invalid data args');
+            }
+        } catch (error) {
+            console.log('error from spliceHTMLChart', error);
+            success = false;
+        }
+        return success;
+    }
+    function updateHTMLChart(chartId='', labels=[], data=[]){
+        let success = false;
+        try {
+            if (chartId && Array.isArray(data) && Array.isArray(labels) && ($(`.chart_labels[data-chart='${chartId}'] .html_chart_label`).length === $(`.chart_data[data-chart='${chartId}'] .html_chart_data`).length) && data.length === labels.length) {
+                const currentLabels = $(`.chart_labels[data-chart='${chartId}'] .html_chart_label`);
+                const currentDatas = $(`.chart_data[data-chart='${chartId}'] .html_chart_data`);
+                // remove additonal grid rows if found
+                if (currentLabels.length > labels.length){
+                    spliceHTMLChart(chartId, (currentLabels.length-labels.length));
+                }
+
+                let missingLabels = [];
+                let missingData = [];
+                labels.forEach((label, i)=>{
+                    if (currentLabels.length > i){
+                       if (currentLabels.eq(i).text() != label){
+                           currentLabels.eq(i).text(label);
+                       }
+                    } else {
+                        missingLabels.push(label);
+                    }
+
+                    if (currentDatas.length > i){
+                       if (currentDatas.eq(i).text() != data[i]){
+                           currentDatas.eq(i).text(data[i]);
+                       }
+                    } else {
+                        missingData.push(data[i]);
+                    }
+                });
+
+                // one time if needeed insert the new data
+                if (missingLabels.length > 0 && missingLabels.length == missingData.length){
+                    addHTMLChartRows(chartId, missingLabels, missingData);
+                }
+
+                $(`.chart_data[data-chart='${chartId}'] .html_chart_data`).each((_i, newData)=>{
+                   const dataTxt = $(newData).text();
+                   const dataNum = (!isNaN(parseInt(dataTxt))) ? parseInt(dataTxt) : 0;
+                   fancyUpdateNumbers(dataNum, newData, 1000);
+                })
+                
+
+                success = true;
+                
+            } else {
+                console.log('error from updateHTMLChart invalid data args');
+            }
+        } catch (error) {
+            console.log('error from updateHTMLChart', error);
+            success = false;
+        }
+        return success;
+  }
+  function getFiltersData(elmsList=[]){
+    let result = {cols: [], bys: [], values: []};
+    try {
+      if (elmsList && elmsList.length){
+        $(elmsList).each((i, elm)=>{
+          const col = $(elm).find('select.cols_options_select').eq(0);
+          const by = $(elm).find('select.operators_select').eq(0);
+          const valElm = $(elm).find('input.values_select').eq(0);
+          if (col.length && by.length && valElm.length && col.val() && by.val()){
+            result['cols'].push(col.val());
+            result['bys'].push(by.val());
+            result['values'].push(valElm.val());
+          }
+        });
+      }
+    } catch (error){
+      console.log('error from getFiltersData', error);
+    }
+    const equalResults = (result.cols.length === result.bys.length) && (result.bys.length === result.values.length);
+    if (!equalResults) {
+      result = {};
+    }
+    return result;
+  }
+  // apply chart filters
+  async function applyChartFilters(chartId = '', url = '') {
+    let success = false;
+    const msgElm = $(`#chart_msg_${chartId}`);
+    try {
+        if (chartId && url && msgElm.length) {
+            toggleCanvasUntilAction(chartId, 'showLoading');
+
+            const selectedFilters = $(`.filter_row[data-chart="${chartId}"]`);
+            const filtersData = getFiltersData(selectedFilters);
+            const systemChart = getChartById(chartId, chartsData);
+            if (systemChart && systemChart.type) {
+                if (selectedFilters.length > 0 && filtersData) {
+
+                    const res = await asyncJQueryAJAXPost(url, filtersData);
+                    if (res && res.code === 200 && res.hasOwnProperty('data') && res.hasOwnProperty('labels') && Array.isArray(res.data) && Array.isArray(res.labels)) {
+                        // clear any previous errors if any
+                        if (systemChart.type === 'html') {
+                            updateHTMLChart(chartId, res.labels, res.data);
+                        } else {
+                            updateChartData(chartId, res.labels, res.data);
+                        }
+                        // here when work on connection acitivty and filters and display old filters also if needed if saved
+                        systemChart.last_filters = filtersData;
+                        displayCancelFilters(chartId);
+                        msgElm.html('');                        
+                        success = true;
+                    } else {
+                        let errorMsg = (res && res.message) ? res.message : 'Unknown error.';
+                        msgElm.html(getMessageAlert(errorMsg, 'danger'));
+                    }
+
+                } else {
+                    msgElm.html(getMessageAlert('No Filters Selected', 'danger'));
+                }
+            } else {
+                msgElm.html(getMessageAlert('Unable to apply filters right now, please try again later.', 'danger'));
+            }
+
+            toggleCanvasUntilAction(chartId, 'hideLoading');
+            smoothScrollToChart(chartId);
+        } else {
+            msgElm.html(getMessageAlert('System error.', 'danger'));
+        }
+        //chartStorage
+        //asyncJQueryAJAXPost
+    } catch (error) {
+        console.log('error from applyChartFilters', error);
+        if (msgElm.length) {
+            msgElm.html(getMessageAlert('Unknown System error', 'danger'));
+        }
+        toggleCanvasUntilAction(chartId, 'hideLoading');
+        success = false;
+    }
+    return success;
+  }
+
+  function smoothScrollToChart(chartId) {
+    if (chartId && $(`#${chartId}`).length) {
+      const target = $(`#${chartId}`);
+      target.get(0).scrollIntoView({block: 'start', inline: 'start'});
+    }
+  }
+  function displayCancelFilters(chartId) {
+    let success = false;
+    if (chartId) {
+        const targetBtn = $(`.cancel_filter[data-chart="${chartId}"]`);
+        const currentChart = getChartById(chartId, chartsData);
+        if (currentChart && targetBtn.length) {
+            if (currentChart.hasOwnProperty('last_activity') || currentChart.hasOwnProperty('last_filters')) {
+                success = true;
+                targetBtn.show('fast');
+            } else {
+                console.log('no filters to display cancel');
+            }
+        } else {
+            console.log('chart or cancel button not found.');
+        }
+    } else {
+        console.log('error from displayCancelFilters invalid chartId.');
+    }
+    return success;
+  }
+
+  function saveHide(target){
+    if (target && $(target).length){
+      $(target).hide();
+    }
+  }
+  async function cancelChartFilters(e) {
+    let success = false;
+    let res = null;
+    let chartId = null;
+    let msgElm = null;
+    let targetBtn = null;
+    try {
+        if (e && $(e.currentTarget).length && $(e.currentTarget).attr('data-chart')) {
+            chartId = $(e.currentTarget).attr('data-chart');
+            msgElm = $(`#chart_msg_${chartId}`);
+            targetBtn = $(e.currentTarget);
+            const currentChart = getChartById(chartId, chartsData);
+            if (msgElm && currentChart && currentChart.type) {
+                toggleCanvasUntilAction(chartId, 'showLoading');
+                if (currentChart.last_activity || currentChart.last_filters) {
+                    success = true;
+                    res = await asyncJQueryAJAXPost('/cancel_chart', reqData={chart_id: chartId});
+                    if (res && res.code === 200 && Array.isArray(res.data) && Array.isArray(res.labels) && res.message){
+                      if (currentChart.type == 'html') {
+                        updateHTMLChart(chartId, res.labels, res.data);
+                      } else {
+                        updateChartData(chartId, res.labels, res.data);
+                      }
+                      delete currentChart.last_activity;
+                      delete currentChart.last_filters;
+                      msgElm.html(getMessageAlert(res.message, 'success'));                      
+                    } else {
+                      const msg = (res.message) ? res.message : 'unknown error page will restart.';
+                      msgElm.html(getMessageAlert(res.message, 'danger'));
+                      // ajax can not do, manual then.
+                      location.reload();
+                    }
+                } else {
+                    msgElm.html(getMessageAlert('no filters to cancel.', 'danger'));
+                }
+                saveHide(targetBtn);
+                toggleCanvasUntilAction(chartId, 'hideLoading');
+                smoothScrollToChart(chartId);
+            } else {
+                saveHide(targetBtn);
+                if (msgElm){
+                  msgElm.html(getMessageAlert('Unable to cancel right now.', 'danger'));
+                }
+            }
+        } else {
+            saveHide(targetBtn);
+            if (msgElm){
+              msgElm.html(getMessageAlert('Unable to cancel right now.', 'danger'));
+            }
+        }
+    } catch (error) {
+        saveHide(targetBtn);
+        // incase if netowrk connection error it may come here, also as user click cancel he not relized internet disconected so when refesh he will relize
+        console.log('unknown error from cancelChartFilters', error);
+        if (msgElm){
+            msgElm.html(getMessageAlert('Unknown error, page will restart.', 'danger'));
+        }
+        if (chartId) {
+          toggleCanvasUntilAction(chartId, 'hideLoading');
+        }
+        location.reload();
+        success = false;
+    }
+    return success;
+  }
 /* scroll smoth faster to charts */
 /*
 function enterFancyScrollListener(){

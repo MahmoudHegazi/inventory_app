@@ -5,7 +5,7 @@ from functools import wraps
 from .models import *
 from sqlalchemy import or_, and_, func , asc, desc, text, select
 from datetime import datetime, timedelta
-from .functions import valid_ourapi_key, get_filter_params, pass_api_request
+from .functions import valid_ourapi_key, get_filter_params, pass_api_request, getQueryLimit
 
 api = Blueprint('api', __name__)
 
@@ -19,22 +19,29 @@ def apikey_required(fn):
             if param_apikey is not None:
                 db_apikey = OurApiKeys.query.filter_by(key=param_apikey).one_or_none()
                 if db_apikey is not None and db_apikey.user and db_apikey.user.id:
-                    # simple advanced anti scraper, anti api abuse, anti bots (max delay 2 minutes always but with bots or not follow rules will blocked for ever no db recoreds added for block also block happend in inner before even any action done in db, all done is 2 sqlalchemy check, so if bot keep resend and block it not effect performance or db much )
-                    can_pass = pass_api_request(db_apikey.id, db)
-                    if can_pass:
-                        if valid_ourapi_key(db_apikey, db):
-                            # if everything valid, incerse the total requests of this key by 1 or if for any reason mistake it pass previous if and total >= limit it will set total to limit so next time after check blocked before reach here, if for any reason error happend it will not assign session var and will raise exception
-                            total_requests = int(db_apikey.total_requests)
-                            requests_limit = int(db_apikey.key_limit)
-                            db_apikey.total_requests = int(total_requests + 1) if (total_requests < requests_limit) else requests_limit
-                            db_apikey.update()
-                            session['ourapi_apikey_id'] = db_apikey.id
+                    #return str(request.remote_addr)
+                    # check if key expired or not
+                    if datetime.utcnow() < db_apikey.expiration_date:
+                        # to achive the target anti simple bot and block bot forever you need insert logs for invalid right now better for db, right now max 2 minutes as no new log created new requests will not calcauted
+                        # simple advanced anti scraper, anti api abuse, anti bots (max delay 2 minutes always but with bots or not follow rules will blocked for ever no db recoreds added for block also block happend in inner before even any action done in db, all done is 2 sqlalchemy check, so if bot keep resend and block it not effect performance or db much )
+                        can_pass = pass_api_request(db_apikey.id, db)
+                        if can_pass:
+                            if valid_ourapi_key(db_apikey, db):
+                                # if everything valid, incerse the total requests of this key by 1 or if for any reason mistake it pass previous if and total >= limit it will set total to limit so next time after check blocked before reach here, if for any reason error happend it will not assign session var and will raise exception
+                                total_requests = int(db_apikey.total_requests)
+                                requests_limit = int(db_apikey.key_limit)
+                                db_apikey.total_requests = int(total_requests + 1) if (total_requests < requests_limit) else requests_limit
+                                db_apikey.update()
+                                session['ourapi_apikey_id'] = db_apikey.id
 
-                            return fn(*args, **kwargs)
+                                return fn(*args, **kwargs)
+                            else:
+                                return jsonify({'code': 400, 'message': 'You exceeded the limit for that key try again tomorrow, or try another key.'}), 422
                         else:
-                            return jsonify({'code': 400, 'message': 'You exceeded the limit for that key try again tomorrow, or try another key.'}), 422
+                            return jsonify({'code': 422, 'message': 'Please wait a while between requests, you have been blocked for 2 minutes, continue refreshing will incerse the wait time.'}), 422
                     else:
-                        return jsonify({'code': 422, 'message': 'Please wait a while between requests, you have been blocked for 2 minutes, continue refreshing will incerse the wait time.'}), 422
+                        return jsonify({'code': 403, 'message': 'The key has expired, please renew it.'}), 403
+                
                 # not logged in user redirect to sign_in
         except:
             print('error in api_login_required {}'.format(sys.exc_info()))
@@ -52,6 +59,7 @@ def apikey_required(fn):
 def get_suppliers():
     data = {'code': 400, 'message': 'bad request'}
     status = 400
+    
     try:
         filters = {
             'id': Supplier.id==request.args.get('id') if request.args.get('id', None) else None,
@@ -68,6 +76,16 @@ def get_suppliers():
             filter_params = get_filter_params(filters)
             if filter_params:
                 query = query.filter(*filter_params)
+
+
+            # sqlalchemy limit
+            max = getQueryLimit(request)
+            if max is not None:
+                query = query.limit(max)
+            else:
+                # default limit then if user not speacfiy valid max, or 100 if not speacfied in init
+                query = query.limit(current_app.config.get('OURAPI_LIMIT', 100))
+            
             data = [supplier.format() for supplier in query.all()]
             status = 200
             # insert only log if have apikey and user not invalid apikey 
@@ -79,6 +97,7 @@ def get_suppliers():
     except:
         print('error in supplier_endpoint {}'.format(sys.exc_info()))
         status = 500
+
     finally:
         return jsonify(data), status
 
@@ -99,6 +118,8 @@ def get_categories():
             'parent_code': Category.parent_code==request.args.get('parent_code') if request.args.get('parent_code', None) else None,
             'created_date': Category.created_date==request.args.get('created_date') if request.args.get('created_date', None) else None
             }
+        
+
         ourapi_apikey_id = session.get('ourapi_apikey_id', None)
         db_apikey = OurApiKeys.query.filter_by(id=ourapi_apikey_id).one_or_none()
         if ourapi_apikey_id and db_apikey and db_apikey.user.id:
@@ -107,6 +128,14 @@ def get_categories():
             # if any params add only sqlalchemy binaryexpression objects
             if filter_params:
                 query = query.filter(*filter_params)
+
+            # sqlalchemy limit
+            max = getQueryLimit(request)
+            if max is not None:
+                query = query.limit(max)
+            else:
+                # default limit then if user not speacfiy valid max, or 100 if not speacfied in init
+                query = query.limit(current_app.config.get('OURAPI_LIMIT', 100))
 
             user_id = db_apikey.user.id
             data = [category.format() for category in query.all()]
@@ -154,6 +183,14 @@ def get_catalogues():
             if filter_params:
                 query = query.filter(*filter_params)
 
+            # sqlalchemy limit
+            max = getQueryLimit(request)
+            if max is not None:
+                query = query.limit(max)
+            else:
+                # default limit then if user not speacfiy valid max, or 100 if not speacfied in init
+                query = query.limit(current_app.config.get('OURAPI_LIMIT', 100))
+
             data = [catalogue.format() for catalogue in query.all()]
             status = 200
             # insert only log if have apikey and user not invalid apikey 
@@ -190,6 +227,14 @@ def get_listings():
             filter_params = get_filter_params(filters)
             if filter_params:
                 query = query.filter(*filter_params)
+
+            # sqlalchemy limit
+            max = getQueryLimit(request)
+            if max is not None:
+                query = query.limit(max)
+            else:
+                # default limit then if user not speacfiy valid max, or 100 if not speacfied in init
+                query = query.limit(current_app.config.get('OURAPI_LIMIT', 100))
 
             data = [catalogue.format() for catalogue in query.all()]
             status = 200
@@ -231,6 +276,14 @@ def get_purchases():
             filter_params = get_filter_params(filters)
             if filter_params:
                 query = query.filter(*filter_params)
+
+            # sqlalchemy limit
+            max = getQueryLimit(request)
+            if max is not None:
+                query = query.limit(max)
+            else:
+                # default limit then if user not speacfiy valid max, or 100 if not speacfied in init
+                query = query.limit(current_app.config.get('OURAPI_LIMIT', 100))
 
             data = [purchase.format() for purchase in query.all()]
             status = 200
@@ -290,6 +343,14 @@ def get_orders():
             if filter_params:
                 query = query.filter(*filter_params)
 
+            # sqlalchemy limit
+            max = getQueryLimit(request)
+            if max is not None:
+                query = query.limit(max)
+            else:
+                # default limit then if user not speacfiy valid max, or 100 if not speacfied in init
+                query = query.limit(current_app.config.get('OURAPI_LIMIT', 100))
+
             data = [order.format() for order in query.all()]
             status = 200
 
@@ -332,6 +393,14 @@ def get_ordertaxes():
             if filter_params:
                 query = query.filter(*filter_params)
 
+            # sqlalchemy limit
+            max = getQueryLimit(request)
+            if max is not None:
+                query = query.limit(max)
+            else:
+                # default limit then if user not speacfiy valid max, or 100 if not speacfied in init
+                query = query.limit(current_app.config.get('OURAPI_LIMIT', 100))
+
             data = [ordertax.format() for ordertax in query.all()]
             status = 200
 
@@ -368,6 +437,14 @@ def get_platform():
             if filter_params:
                 query = query.filter(*filter_params)
 
+            # sqlalchemy limit
+            max = getQueryLimit(request)
+            if max is not None:
+                query = query.limit(max)
+            else:
+                # default limit then if user not speacfiy valid max, or 100 if not speacfied in init
+                query = query.limit(current_app.config.get('OURAPI_LIMIT', 100))
+
             data = [platform.format() for platform in query.all()]
             status = 200
 
@@ -403,6 +480,14 @@ def get_condition():
             if filter_params:
                 query = query.filter(*filter_params)
 
+            # sqlalchemy limit
+            max = getQueryLimit(request)
+            if max is not None:
+                query = query.limit(max)
+            else:
+                # default limit then if user not speacfiy valid max, or 100 if not speacfied in init
+                query = query.limit(current_app.config.get('OURAPI_LIMIT', 100))
+
             data = [condition.format() for condition in query.all()]
             status = 200
 
@@ -411,12 +496,13 @@ def get_condition():
         else:
             data = {'code': 400, 'message': 'please provide valid apikey.'}
             status = 400
-    except Exception as e:
+    except:
         print('error in get_condition {}'.format(sys.exc_info()))
         status = 500
 
     finally:
         return jsonify(data), status
+
 
 
 @api.route('/api/get_warehouse_locations', methods=['GET'])
@@ -438,6 +524,14 @@ def get_warehouse_locations():
             filter_params = get_filter_params(filters)
             if filter_params:
                 query = query.filter(*filter_params)
+
+            # sqlalchemy limit
+            max = getQueryLimit(request)
+            if max is not None:
+                query = query.limit(max)
+            else:
+                # default limit then if user not speacfiy valid max, or 100 if not speacfied in init
+                query = query.limit(current_app.config.get('OURAPI_LIMIT', 100))
 
             data = [warehouse_loc.format() for warehouse_loc in query.all()]
             status = 200
@@ -476,6 +570,14 @@ def get_location_bins():
             filter_params = get_filter_params(filters)
             if filter_params:
                 query = query.filter(*filter_params)
+
+            # sqlalchemy limit
+            max = getQueryLimit(request)
+            if max is not None:
+                query = query.limit(max)
+            else:
+                # default limit then if user not speacfiy valid max, or 100 if not speacfied in init
+                query = query.limit(current_app.config.get('OURAPI_LIMIT', 100))
 
             data = [locationbin.format() for locationbin in query.all()]
             status = 200
@@ -516,6 +618,14 @@ def get_catalogue_locations():
             if filter_params:
                 query = query.filter(*filter_params)
 
+            # sqlalchemy limit
+            max = getQueryLimit(request)
+            if max is not None:
+                query = query.limit(max)
+            else:
+                # default limit then if user not speacfiy valid max, or 100 if not speacfied in init
+                query = query.limit(current_app.config.get('OURAPI_LIMIT', 100))
+
             data = [catalogue_location.format() for catalogue_location in query.all()]
             status = 200
 
@@ -554,6 +664,14 @@ def get_catalogue_locations_bins():
             filter_params = get_filter_params(filters)
             if filter_params:
                 query = query.filter(*filter_params)
+
+            # sqlalchemy limit
+            max = getQueryLimit(request)
+            if max is not None:
+                query = query.limit(max)
+            else:
+                # default limit then if user not speacfiy valid max, or 100 if not speacfied in init
+                query = query.limit(current_app.config.get('OURAPI_LIMIT', 100))
 
             data = [catalogue_locations_bins.format() for catalogue_locations_bins in query.all()]
             status = 200

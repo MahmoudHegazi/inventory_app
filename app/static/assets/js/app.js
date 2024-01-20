@@ -38,6 +38,32 @@ function displayAjaxError(message, status='success'){
         `);
     }
 }
+// get formated datetime acording to py and db rules 
+function getFullDate(type='date'){
+  let date = '';
+  try {
+    const getOneFromTwo = (condition, val1, val2)=>{
+        return condition ? val1 : val2;
+    };
+    const now = new Date();
+    const month = getOneFromTwo((parseInt(now.getMonth()) >= 9), (now.getMonth()+1), `0${(now.getMonth()+1)}`);
+    const day = getOneFromTwo(parseInt(now.getDate()) > 9, now.getDate(), `0${now.getDate()}`);
+
+    if (type === 'datetime'){
+        hours = getOneFromTwo((now.getHours() > 9), now.getHours(), `0${now.getHours()}`);
+        minutes = getOneFromTwo((now.getMinutes() > 9), now.getMinutes(), `0${now.getMinutes()}`);
+        seconds = getOneFromTwo((now.getSeconds() > 9), now.getSeconds(), `0${now.getSeconds()}`);
+        date = `${now.getFullYear()}-${month}-${day} ${hours}:${minutes}:${seconds}`;
+    } else {
+        date = `${now.getFullYear()}-${month}-${day}`;
+    }
+    
+  } catch (error){
+      console.log('error from getFullDate', error);
+  }
+
+  return date.trim();
+}
 
 /* hover effect */
 function applyHoverEffect(){
@@ -52,6 +78,21 @@ function applyHoverEffect(){
         }
     }, ".hover_shadow");
     return true;
+}
+
+/* get formated date 2024-01-011 */
+function getFullDate(){
+  let date = '';
+  try {
+    const now = new Date();
+    const month = (parseInt(now.getMonth()) >= 9) ? (now.getMonth()+1) : `0${(now.getMonth()+1)}`;
+    const day = (parseInt(now.getDate()) >= 10) ? now.getDate() : `0${now.getDate()}`;
+    date = `${now.getFullYear()}-${month}-${day}`;
+  } catch (error){
+      console.log('error from getFullDate', error);
+  }
+
+  return date;
 }
 
 /* !function uses data-supplier attribute and value of search input to display element using data-selector *= contains global js function fast and use DOM selector only for search (simple used for direct given cell only with no column select) like data-attr = x */
@@ -1218,7 +1259,7 @@ function toggleContentUpDown(contentSelector='', upSelector='', downSelector='')
   }
 }
 
-function generateBarcodeActions(elmSelector='', dataSelector=''){
+function generateBarcodeActions(elmSelector='', dataSelector='', maxLength=48){
   if (elmSelector && $(elmSelector).length && dataSelector && $(dataSelector).length){
 
     const targetSelect = $(elmSelector);
@@ -1226,11 +1267,24 @@ function generateBarcodeActions(elmSelector='', dataSelector=''){
       const values = [];
       const selectedValues = targetSelect.val();
       if (selectedValues){
-        selectedValues.forEach((colkey)=>{
+        for (let k=0; k<selectedValues.length; k++){
+          const currentLength = values.toLocaleString().replaceAll(',','').length;
+          if (currentLength >= maxLength){
+            break;
+          }
+          const colkey = selectedValues[k];
           const dataColVal = targetSelect.attr(`data-${colkey}`);
           if (typeof(dataColVal) !== undefined && dataColVal !== false){
-            values.push(dataColVal);
+            // values to get commas
+            if ((currentLength + dataColVal.length + (values.length-1)) < maxLength){
+              values.push(dataColVal);
+            } else {
+              continue;
+            }
           }
+        }
+        selectedValues.forEach((colkey)=>{
+
         });
       }
       return values;
@@ -1409,6 +1463,23 @@ function longTimeFormComponent(formSelc="", mainSelc="", loadingSelc="", modalSe
   }
 }
 
+// toggle between multiple components 
+function siwtchComponent(e=null, link_elm=null, data_target=null){
+  if ((e === null && data_target && link_elm) || (e && $(e.currentTarget).length && $(e.currentTarget).attr('data-target') && $($(e.currentTarget).attr('data-target')).length)){
+    const dataTarget = (e === null && data_target) ? data_target : $(e.currentTarget).attr('data-target');
+    const linkElm = (e === null && link_elm) ? $(link_elm) : $(e.currentTarget);
+    const newActive = $(dataTarget);
+    const newLink = linkElm;
+
+    $(".switch_components").hide();
+    $(".active_component").removeClass('active_component');
+    newActive.show('fast', null, ()=>{
+              newLink.addClass("active_component");
+    });
+  } else {
+    console.log('siwtchComponent not worked');
+  }
+}
 
 $(document).ready(async function(){
     applyHoverEffect();

@@ -6,6 +6,10 @@ from wtforms.validators import InputRequired, Length, Email, NumberRange, Valida
 from wtforms.fields import DateTimeLocalField, FieldList 
 from wtforms.widgets import NumberInput
 from flask_wtf.file import FileField, FileAllowed, FileRequired
+import datetime
+from datetime import timedelta
+from dateutil.relativedelta import *
+
 
 
 def FileSizeLimit(max_size_in_mb):
@@ -428,6 +432,26 @@ class setupAPIForm(FlaskForm):
 
 class addKeyForm(FlaskForm):
     key_limit = IntegerField('Key limit', validators=[InputRequired()], default=0)
+    expiration_date =  DateTimeLocalField('Expiration date', id="expiration_date_create",
+                                          validators=[InputRequired()],
+                                          format="%Y-%m-%dT%H:%M", default=datetime.datetime.utcnow,
+                                          render_kw={
+                                              'min': datetime.datetime.utcnow().strftime("%Y-%m-%dT%H:%M"),
+                                              'max': str((datetime.datetime.utcnow()+relativedelta(months=+6)).strftime("%Y-%m-%dT%H:%M")),
+                                              }
+                                        )
+
+    def validate_expiration_date(form, field):
+        try:
+            # note 1 hour even is more than wtforms expires and client side prevent it even if he nasa user 1 hour is ok to me, but now start date is active once created and validated correctly no mater when form submited so real better ux
+            min = (datetime.datetime.utcnow()+relativedelta(hours=-1))
+            max = (datetime.datetime.utcnow()+relativedelta(months=+6))
+            valid = True if ((form.expiration_date.data >= min) and (form.expiration_date.data <= max)) else False
+            if not valid:
+                raise ValidationError('Please enter valid UTC date within 6 months.')
+        except Exception as e:
+            raise e
+
     add = SubmitField('Add', id="add_api_key")
 
 class removeKeyForm(FlaskForm):
@@ -437,4 +461,37 @@ class removeKeyForm(FlaskForm):
 class updateKeyForm(FlaskForm):
     update_key_id = HiddenField(validators=[InputRequired()])
     update_key_limit = IntegerField('Key limit', validators=[InputRequired()])
+    # note key will be activate after 1 minute, as well max time for keep open form 1 minute or your key must logical have min time you submit on it not open form, js too onsubmit
+    expiration_date =  DateTimeLocalField('Expiration date', id="expiration_date_update",
+                                          validators=[optional()], 
+                                          format="%Y-%m-%dT%H:%M", default=datetime.datetime.utcnow,
+                                          render_kw={
+                                              'max': str((datetime.datetime.utcnow()+relativedelta(months=+6)).strftime("%Y-%m-%dT%H:%M")),
+                                              }
+                                        )
     update_key = SubmitField('Update Key')
+
+    def validate_expiration_date(form, field):
+        try:
+            utf_now = datetime.datetime.utcnow()
+            max = (utf_now+relativedelta(months=+6, hours=+1))
+            valid = True if form.expiration_date.data <= max else False
+            if not valid:
+                raise ValidationError('Please enter valid UTC date within 6 months.')
+        except Exception as e:
+            raise e
+
+class renewKeyForm(FlaskForm):
+    renew = SubmitField('Renew Key')
+
+class addWhiteListIPsForm(FlaskForm):
+    white_ips = TextAreaField('White Listed IPS',validators=[Length(max=5000)], render_kw={
+        'placeholder': 'Enter White List IP addresses separated by a comma.'
+        })
+    add_ips = SubmitField('Add IPs', id='add_white_list')
+
+class addBlackListIPsForm(FlaskForm):
+    black_ips = TextAreaField('Black Listed IPS',validators=[Length(max=5000)], render_kw={
+        'placeholder': 'Enter Black List IP addresses separated by a comma.'
+        })
+    add_ips = SubmitField('Add IPs', id='add_black_list')

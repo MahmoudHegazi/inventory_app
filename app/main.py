@@ -8,12 +8,14 @@ from flask import Flask, app, Blueprint, session, redirect, url_for, flash, Resp
 from .models import *
 from .forms import CatalogueExcelForm, ExportDataForm, importCategoriesAPIForm, importOffersAPIForm, SetupBestbuyForm, importOrdersAPIForm,\
 generateCatalogueBarcodeForm, UpdateUsernameForm, UpdatePasswordForm, UpdateNameForm, UpdateEmailForm, setupAPIForm, addKeyForm, removeKeyForm,\
-updateKeyForm
+updateKeyForm, renewKeyForm, addWhiteListIPsForm, addBlackListIPsForm
 from . import vendor_permission, admin_permission, db, excel, bcrypt
 from .functions import get_mapped_catalogues_dicts, getTableColumns, getFilterBooleanClauseList, ExportSqlalchemyFilter,\
 get_export_data, get_charts, get_excel_rows, get_sheet_row_locations, chunks, apikey_or_none, upload_catalogues, calc_chunks_result, \
 bestbuy_ready, get_remaining_requests, get_requests_before_1minute, upload_orders, calc_orders_result, updateDashboardListings,\
-updateDashboardOrders, import_orders, order_ids_chunks, download_order_image, get_errors_message, generate_ourapi_key
+updateDashboardOrders, import_orders, order_ids_chunks, download_order_image, get_errors_message, generate_ourapi_key,\
+get_activity_dateobjs, complete_activity_date, get_charts_data, get_hashed_sqlalchemycol, ExportSqlalchemyFilter, get_unencrypted_cols,\
+get_sqlalchemy_filters, get_ordered_dicts
 from flask_login import login_required, current_user
 import flask_excel
 import pyexcel
@@ -22,6 +24,7 @@ from datetime import datetime, timedelta
 from barcode import EAN13, Code128
 import barcode
 from barcode.writer import SVGWriter
+from dateutil.relativedelta import *
 #from app import excel
 
 
@@ -188,9 +191,6 @@ def import_catalogues_excel():
         status = 'success' if success else 'danger'
         flash(message, status)
         return redirect(url_for('routes.catalogues'))
-
-
-
 
 # export listing
 @main.route('/export_listings', methods=['GET'])
@@ -1031,12 +1031,14 @@ def generate_barcode(catalogue_id):
         flash('Unknown error Unable to create barcode', 'danger')
     finally:
         return redirect(url_for('routes.view_catalogue', catalogue_id=catalogue_id))
-    
+
 ################################### Profile ######################################
 @main.route('/profile', methods=['GET'])
 @login_required
 @vendor_permission.require()
 def profile():
+    #str(OurApiKeys.query.filter_by(id=23).first().remove_white_ip('9'))
+    #return str(OurApiKeys.query.filter_by(id=23).first().add_white_ips('9, ,'))
     try:
         update_username = UpdateUsernameForm(username=current_user.uname)
         update_password = UpdatePasswordForm()
@@ -1046,6 +1048,9 @@ def profile():
         add_key = addKeyForm()
         delete_key = removeKeyForm()
         update_key = updateKeyForm()
+        renew_key = renewKeyForm()
+        white_list = addWhiteListIPsForm()
+        black_list = addBlackListIPsForm()
         ourapi_requests_limit = UserMeta.query.filter_by(user_id=current_user.id, key='ourapi_requests_limit').first()
         ourapi_keys_max = UserMeta.query.filter_by(user_id=current_user.id, key='ourapi_keys_max').first()
         # dynamic get valid number of user keys if any, else look for init else set default number 10
@@ -1054,11 +1059,126 @@ def profile():
         return render_template(
             'profile.html', update_username=update_username,
             update_password=update_password, udate_name=udate_name, update_email=update_email, setup_api=setup_api, add_key=add_key,
-            delete_key=delete_key, update_key=update_key,
+            delete_key=delete_key, update_key=update_key, renew_key=renew_key, white_list=white_list, black_list=black_list,
             ourapi_requests_limit=ourapi_requests_limit, ourapi_keys_max=ourapi_keys_max, user_keys_max=user_keys_max)
-    except:
+    except Exception as e:
         flash('unable to display profile page', 'danger')
         return redirect(url_for('routes.index'))
+
+@main.route('/proccess_chart_filters/<string:chart_id>', methods=['POST'])
+@login_required
+@vendor_permission.require()
+def proccess_chart_filters(chart_id):
+    res = {'code': 400, 'message': 'Invalid Data.'}
+    try:
+        cols = request.form.getlist('cols[]')
+        bys = request.form.getlist('bys[]')
+        values = request.form.getlist('values[]')
+
+        encrypted_cols = get_unencrypted_cols(cols)
+        if len(cols) > 0 and len(cols) == len(bys) and len(bys) == len(values) and encrypted_cols is not None:
+            request_filters = get_ordered_dicts(['col', 'by', 'value'], encrypted_cols, bys, values)
+            if len(request_filters) > 0:
+                sqlalchemy_filters = get_sqlalchemy_filters(request_filters)
+                if len(sqlalchemy_filters) > 0:
+                    chartdata_after_filter = get_charts(db, current_user, charts_ids=[chart_id], filter_args=sqlalchemy_filters)
+                    if isinstance(chartdata_after_filter, list) and len(chartdata_after_filter) == 1:
+                        if len(chartdata_after_filter[0]['data']) > 0 and len(chartdata_after_filter[0]['labels']) > 0:
+                            res = {
+                                'code': 200,
+                                'chart_id': chart_id,
+                                'data': chartdata_after_filter[0]['data'],
+                                'labels': chartdata_after_filter[0]['labels']
+                                }
+                        else:
+                            res = {'code': 404, 'message': 'No data found for applied filters, please change/remove the filters.'}
+                    else:
+                        res = {'code': 404, 'message': 'Chart Not Found, unable to apply filters.'}
+                else:
+                    res = {'code': 400, 'message': 'Invalid Data.'}
+            else:
+                res = {'code': 404, 'message': 'No Changes Detected.'}
+    except Exception as e:
+        res = {'code': 400, 'message': 'Invalid Data.'}
+        print('error from proccess_chart_filters {}'.format(sys.exc_info()))
+    finally:
+        return jsonify(res)
+
+### charts avitvties
+@main.route('/proccess_chart_activity/<string:chart_id>', methods=['POST'])
+@login_required
+@vendor_permission.require()
+def proccess_chart_activity(chart_id):
+    result = {'code': 400, 'message': 'Invalid Data.'}
+    try:
+        value = request.form.get('value', None)
+        filterby = request.form.get('filterby', None)
+        date_type = request.form.get('data_type', None)
+
+        if value and chart_id and isinstance(value, str) and isinstance(filterby, str) and filterby and isinstance(date_type, str) and date_type:
+            start_and_end = value.strip()
+            if ',' not in start_and_end:
+                # default utc (note custom is send 1 value user selected and from python i get the now not from js client side so all dates and format and timezone valid and no abuse)
+                start_and_end = complete_activity_date(start_and_end, type_format='date', utc=False)
+
+            date_objs = get_activity_dateobjs(activity_dates=start_and_end, type_format='date', utc=False)
+            if date_objs and isinstance(date_objs, list) and len(date_objs) == 2:
+                # should be ultimate secure return sqlalchemy column not direct get value from client of db info and column , also note column client is encrypted only in client but selected un unecrypted from python
+                sqlalchemy_column_or_none = get_hashed_sqlalchemycol(recived_hash=filterby, chart_id=chart_id)
+                if sqlalchemy_column_or_none:
+                    time_format = "%Y-%m-%d" if date_type else "%Y-%m-%d %H:%M:%S"
+                    # (all acitivty is between only) (work with datetime dates objects better it valid for dates and datetime dynamic)
+                    now_date = date_objs[0].strftime(time_format)
+                    prev_date = date_objs[1].strftime(time_format)
+
+                    # get list sqlalchemy BinaryExpression of filters same as client requested but secure and full from backend only client data not used if used like dates it hard validated and if reach here it valid datetime objects two
+                    sqlalchemy_date_filters = [sqlalchemy_column_or_none.between(date_objs[1], date_objs[0])]
+
+                    chartdata_after_filter = get_charts(db, current_user, charts_ids=[chart_id], filter_args=sqlalchemy_date_filters)
+                    # final check , check if data returned and label as get_charts smart if no data return empty array
+                    if isinstance(chartdata_after_filter, list) and len(chartdata_after_filter) == 1:
+                        if len(chartdata_after_filter[0]['data']) > 0 and len(chartdata_after_filter[0]['labels']) > 0:
+                            # success result
+                            result = {
+                                'code': 200,
+                                'chart_id': chart_id,
+                                'data': chartdata_after_filter[0]['data'],
+                                'labels': chartdata_after_filter[0]['labels'],
+                                'message': 'Between ({})-({})'.format(now_date, prev_date)
+                                }
+                        else:
+                            result = {'code': 404, 'message': 'No data to display Between ({})-({}) no action.'.format(prev_date, now_date)}
+                    else:
+                        result = {'code': 404, 'message': 'Chart Not Found, unable to apply activity filter.'}
+    except Exception as e:
+        print('error from proccess_chart_activity {}'.format(sys.exc_info()))
+        result = {'code': 500, 'message': 'Unable to process your request, please try again later.{}'.format(sys.exc_info())}
+        
+    finally:
+        return result
+
+# cancel all chart filters
+@main.route('/cancel_chart', methods=['POST'])
+@login_required
+@vendor_permission.require()
+def cancel_chart():
+    res = {'code': 400, 'message': 'Invalid Data.'}
+    try:
+        chart_id = request.form.get('chart_id', None)
+        if chart_id:
+            original_charts_data =  get_charts(db, current_user, charts_ids=[chart_id])
+            if isinstance(original_charts_data, list) and len(original_charts_data) == 1 and len(original_charts_data[0]['data']) > 0 and len(original_charts_data[0]['labels']) > 0:
+                res = {
+                    'code': 200,
+                    'data': original_charts_data[0]['data'],
+                    'labels': original_charts_data[0]['labels'],
+                    'message': 'All filters and activity have been cancelled.'
+                    }
+    except Exception as e:
+        res = {'code': 500, 'message': 'Unable to cancel filters right now.'}
+        print('system error {}'.format(sys.exc_info()))
+    finally:
+        return jsonify(res)
 
 @main.route('/update_name', methods=['POST'])
 @login_required
@@ -1244,7 +1364,7 @@ def add_key():
                             else:
                                 break
                         if target_key:
-                            new_key = OurApiKeys(user_id=current_user.id, key=target_key, key_limit=submited_limit)
+                            new_key = OurApiKeys(user_id=current_user.id, key=target_key, key_limit=submited_limit, expiration_date=form.expiration_date.data)
                             new_key.insert()
                             flash('Successfully added new key.', 'success')
                         else:
@@ -1260,8 +1380,10 @@ def add_key():
     except Exception as e:
         flash('unable to add new key right now.', 'danger')
         print('system error {}'.format(sys.exc_info()))
+
     finally:
         return redirect(url_for('main.profile', movetocomponent='api'))
+
 
 
 @main.route('/remove_key/<int:id>', methods=['POST'])
@@ -1285,7 +1407,8 @@ def remove_key(id):
         print('system error {}'.format(sys.exc_info()))
     finally:
         return redirect(url_for('main.profile', movetocomponent='api'))
-    
+
+
 @main.route('/update_key/<int:id>', methods=['POST'])
 @login_required
 @vendor_permission.require()
@@ -1293,47 +1416,114 @@ def update_key(id):
     try:
         form = updateKeyForm()
         if form.validate_on_submit():
+            changes = 0
             submited_limit = int(form.update_key_limit.data)
             selected_key = OurApiKeys.query.filter_by(id=id, user_id=current_user.id).one_or_none()
             if selected_key is not None:
-                if int(selected_key.key_limit) != submited_limit:
-                    ourapi_requests_limit = UserMeta.query.filter_by(user_id=current_user.id, key='ourapi_requests_limit').first()
-                    if ourapi_requests_limit:
-                        requests_limit = int(ourapi_requests_limit.value)
+                ourapi_requests_limit = UserMeta.query.filter_by(user_id=current_user.id, key='ourapi_requests_limit').first()
+                if ourapi_requests_limit:
+                    if form.expiration_date.data != selected_key.expiration_date:
+                        selected_key.expiration_date = form.expiration_date.data
+                        changes += 1
 
-                        # sum of all except the key will updated now that do alot of calc fix
-                        keys_requests_sum = db.session.query(func.sum(OurApiKeys.key_limit)).filter(OurApiKeys.user_id==current_user.id, OurApiKeys.id != id).scalar()
-                        if keys_requests_sum is None:
-                            keys_requests_sum = 0
-                        else:
-                            keys_requests_sum = int(keys_requests_sum)
+                    valid_limit = False
+                    limit_changed = False
+                    if int(selected_key.key_limit) != submited_limit:    
+                            limit_changed = True
 
-                        remaning_requests = 0
-                        valid_limit = False
-                        if (submited_limit <= requests_limit) and (keys_requests_sum <= requests_limit) and (int(requests_limit-keys_requests_sum) >= submited_limit):
-                            valid_limit = True
+                            requests_limit = int(ourapi_requests_limit.value)
 
-                        if keys_requests_sum <= requests_limit:
-                            remaning_requests = int(requests_limit-keys_requests_sum)
+                            # sum of all except the key will updated now that do alot of calc fix
+                            keys_requests_sum = db.session.query(func.sum(OurApiKeys.key_limit)).filter(OurApiKeys.user_id==current_user.id, OurApiKeys.id != id).scalar()
+                            if keys_requests_sum is None:
+                                keys_requests_sum = 0
+                            else:
+                                keys_requests_sum = int(keys_requests_sum)
 
-                        if valid_limit:
-                            selected_key.key_limit = submited_limit
-                            selected_key.update()
-                            flash('Successfully updated key with id:{}.'.format(id), 'success')
-                        else:
-                            flash('Invalid key limit sent, maximum number of key requests allowed is {}.'.format(remaning_requests), 'danger')
+                            remaning_requests = 0
+                            if (submited_limit <= requests_limit) and (keys_requests_sum <= requests_limit) and (int(requests_limit-keys_requests_sum) >= submited_limit):
+                                valid_limit = True
+
+                            if keys_requests_sum <= requests_limit:
+                                remaning_requests = int(requests_limit-keys_requests_sum)
+
+                            if valid_limit:
+                                selected_key.key_limit = submited_limit
+                                changes += 1
+                                
+
+                    if limit_changed and not valid_limit:
+                        # limit changed, but invalid limit, so no update done
+                        flash('Invalid key limit sent, maximum number of key requests allowed is {}.'.format(remaning_requests), 'danger')
+                    elif changes > 0:
+                        # limit maybe changed, and if it changed it valid limit, so update done, if limit_changed = false so it come here so if only date changed it update as well or any new val
+                        selected_key.update()
+                        flash('Successfully updated key with id:{}.'.format(id), 'success')
                     else:
-                        flash('API not setup, please re-setup it.', 'danger')
+                        flash('No changed detected.', 'info')
+
                 else:
-                    flash('No changed detected.', 'info')
+                    flash('API not setup, please re-setup it.', 'danger')
             else:
                 flash('Key not found', 'danger')
         else:
-            flash('The form has expired, please try again.', 'danger')
+            message = ','.join(['{}:{}'.format(label, ','.join(errors)) if label != 'csrf_token' else 'System: The form has expired, please try again.' for label, errors in form.errors.items()])
+            message = message if message else 'Unknown error Please try again.'
+            flash(message, 'danger')
     except Exception as e:
         flash('unable to update key right now.', 'danger')
         print('system error {}'.format(sys.exc_info()))
 
     finally:
         return redirect(url_for('main.profile', movetocomponent='api'))
+
+
+
+@main.route('/renew_key/<int:id>', methods=['POST'])
+@login_required
+@vendor_permission.require()
+def renew_key(id):
+    try:
+        form = renewKeyForm()
+        if form.validate_on_submit():
+            # both secuirty confirm and check if key exist
+            key_exist = OurApiKeys.query.filter_by(id=id, user_id=current_user.id).one_or_none()
+            if key_exist is not None:
+                target_key = ''
+                for i in range(10):
+                    target_key = generate_ourapi_key(bcrypt)
+                    if target_key:
+                        # note the key like multiple user id so must be unique per all users
+                        key_exist_db = OurApiKeys.query.filter_by(key=target_key).first()
+                        if not key_exist_db:
+                            # key is unique now
+                            break
+                        else:
+                            continue
+                    else:
+                        break
+                if target_key:
+                    key_exist.key = target_key
+                    now = datetime.utcnow()
+                    # use last expiration date used in last update or when inserted if no updates, to be consider
+                    if key_exist.expiration_seconds > float(0):
+                        key_exist.expiration_date = now + timedelta(seconds=int(key_exist.expiration_seconds))
+                    else:
+                        key_exist.expiration_date = now + relativedelta(months=+1)
+                        
+                    key_exist.update()
+                    flash('Successfully renew the key with id:({}).'.format(id), 'success')
+                else:
+                    flash("Unable to renew the key with id:({}), Please try again.".format(id), 'danger')
+            else:
+                flash('Key not found', 'danger')
+        else:
+            flash('The form has expired, please try again.', 'danger')
+    except Exception as e:
+        flash('unable to renew key right now.', 'danger')
+        print('system error {}'.format(sys.exc_info()))
+
+    finally:
+        return redirect(url_for('main.profile', movetocomponent='api'))
+
 

@@ -19,7 +19,7 @@ from sqlalchemy.sql import extract
 from sqlalchemy import or_, and_, func , asc, desc
 from datetime import datetime, timedelta
 from uuid import uuid4
-
+import hashlib
 
 def is_safe_redirect_url(target):
     host_url = urlparse(request.host_url)
@@ -513,7 +513,13 @@ def get_export_data(db, flask_excel, current_user_id, table_name, columns, opera
                 locations = ','.join(locations_arr)
                 categoryCode = item.category.code if item.category else ''
                 categoryLabel = item.category.label if item.category else ''
-                export_data.append([item.id, item.sku, item.product_name, item.product_description, item.brand, categoryCode, categoryLabel, item.price, item.sale_price, item.quantity, item.product_model, item.condition.name, item.upc, locations])
+                # set null on delete of condition, so there sometimes null conditions in cataluge instead of delete catalogues of that condition
+                item_condition_name = item.condition.name if item.condition and item.condition.name else ''
+                export_data.append([
+                    item.id, item.sku, item.product_name, item.product_description,
+                    item.brand, categoryCode, categoryLabel, item.price, item.sale_price,
+                    item.quantity, item.product_model, item_condition_name, item.upc, locations
+                    ])
             # modfied array to return the addiontal relational data like locations or bins
             response['data'] = export_data
             
@@ -644,7 +650,58 @@ def get_export_data(db, flask_excel, current_user_id, table_name, columns, opera
     return response
 
 # charts
+def get_activity_dates(days, type_format='date', utc=False):
+    result = ''
+    try:
+        datetime_format = '%Y-%m-%d' if type_format == 'date' else '%Y-%m-%d %H:%M:%S'
+        method = datetime.utcnow if utc else datetime.now
+        now = method()
+        target_before_now = now - timedelta(days=int(days))
+        result = '{},{}'.format(now.strftime(datetime_format), target_before_now.strftime(datetime_format));
+    except:
+        print('error in get_activity_dates {}'.format(sys.exc_info()))
+        result = ''
+    return result
 
+# function for custom, small reverse of get_activity_dates
+def complete_activity_date(activity_date='2024-01-09', type_format='date', utc=False):
+    result = ''
+    try:
+        datetime_format = '%Y-%m-%d' if type_format == 'date' else '%Y-%m-%d %H:%M:%S'
+        target_before_now = datetime.strptime(activity_date, datetime_format)
+        method = datetime.utcnow if utc else datetime.now
+        now = method()
+        result = '{},{}'.format(now.strftime(datetime_format), target_before_now.strftime(datetime_format))
+    except:
+        print('error in get_activity_dates {}'.format(sys.exc_info()))
+        result = ''
+    return result
+
+def get_activity_dateobjs(activity_dates='2024-01-09,2024-01-03', type_format='date', utc=False):
+    result = []
+    try:
+        if activity_dates and isinstance(activity_dates, str) and ',' in activity_dates and len(activity_dates.split(',')) == 2:
+            datetime_format = '%Y-%m-%d' if type_format == 'date' else '%Y-%m-%d %H:%M:%S'
+            activity_dateslist = activity_dates.strip().split(',')
+            dates = [datetime.strptime(date, datetime_format) for date in activity_dateslist]
+            if len(dates) == 2:
+                processTime = datetime.now()
+                req_now = dates[0]
+                prev_now = dates[1]
+                # note also there are const validation function for validate client side, as i not use wtform, so secure, ajax, also note i sent date from py render and got it and validate it here date can be csrf_token for example and validated with db for ajax or session for better secuirty and short term and login
+                # make sure date or datetime sent from py less than or equal if multie thread even render page not no know how can be now but even it valid, process date or datetime now when validate code
+                if req_now <= processTime and prev_now <= processTime and  prev_now <= req_now:
+                    result = dates
+                else:
+                    result = []
+            else:
+                result = []
+    except:
+        print('error in get_activity_dateobjs {}'.format(sys.exc_info()))
+        result = []
+    finally:
+        return result
+    
 def getChartData(chart_query_result, label_i=0, data_i=1):
     labels = []
     data = []
@@ -654,11 +711,165 @@ def getChartData(chart_query_result, label_i=0, data_i=1):
 
     return {'labels': labels, 'data': data}
 
-def get_charts(db, current_user, charts_ids=[]):
+def str_hash_prop(prop):
+    # you can set any hash method as ur system requires
+    return str(hashlib.md5(prop.encode()).hexdigest())
+
+def get_hashed_sqlalchemycol(recived_hash, chart_id):
+    target_hashed_prop = None
+    try:
+        if recived_hash is not None and isinstance(recived_hash, str) and chart_id and isinstance(chart_id, str):
+            # this called twice, spearte the concerns, and performan so only when need unhash search for the hashes direct, better also if 1 class have 1 list like done in sqlalchemyFilter but function more quick performance
+            allowed_hashed = [
+                str_hash_prop('date_catalogue_added_to_system'),
+                str_hash_prop('last_update_date_of_catalogue'),
+                str_hash_prop('start_date_of_discount'),
+                str_hash_prop('end_date_of_discount'),
+                str_hash_prop('date_listing_added_to_system'),
+                str_hash_prop('last_update_date_of_supplier'),
+                str_hash_prop('date_supplier_added_to_system'),
+                str_hash_prop('last_update_date_of_supplier'),
+                str_hash_prop('date_of_order'),
+                str_hash_prop('date_order_added_to_system'),
+                str_hash_prop('last_update_date_of_order'),
+                str_hash_prop('date_of_purchase'),
+                str_hash_prop('date_purchase_added_to_system'),
+                str_hash_prop('last_update_date_of_purchase')
+            ]
+            charts_data = get_charts_data()
+            allowed_hasheds = list(filter(lambda hashedOrNone: True if hashedOrNone is not None else False, allowed_hashed))
+            # recived_hash in charts_data[chart_id] but without say recived_hash in which come from client replace it with real dict val of backed
+            for i in range(len(allowed_hasheds)):
+                allowed_hash = allowed_hasheds[i]
+                if allowed_hash == recived_hash:
+                    
+                    if chart_id in charts_data:
+                        chart_data = charts_data[chart_id]
+                        if allowed_hashed[i] in chart_data:
+                            target_hashed_prop = chart_data[allowed_hashed[i]]
+                            break
+                    break
+                else:
+                    continue
+    except:
+        print('error in get_hashed_sqlalchemycol {}'.format(sys.exc_info()))
+        target_hashed_prop = None
+    finally:
+        return target_hashed_prop
+
+# return all dates columns for charts with values type instrumentedattribute to validated with
+def get_charts_data():
+    allowed_charts_ids = {}
+    try:
+        catalogue_columns = {
+                str_hash_prop('date_catalogue_added_to_system'): Catalogue.created_date,
+                str_hash_prop('last_update_date_of_catalogue'): Catalogue.updated_date
+        }
+
+        listing_columns = {
+                str_hash_prop('start_date_of_discount'): Listing.discount_end_date,
+                str_hash_prop('end_date_of_discount'): Listing.discount_start_date,
+                str_hash_prop('date_listing_added_to_system'): Listing.created_date,
+                str_hash_prop('last_update_date_of_supplier'): Listing.updated_date
+            }
+        supplier_columns = {
+                str_hash_prop('date_supplier_added_to_system'): Supplier.created_date,
+                str_hash_prop('last_update_date_of_supplier'): Supplier.updated_date
+            }
+        # secure names now used in client and submited not same as db names, also for ux noob devs when use my code easy know the chart date betweens
+        order_columns = {
+                str_hash_prop('date_of_order'): Order.date,
+                str_hash_prop('date_order_added_to_system'): Order.created_date,
+                str_hash_prop('last_update_date_of_order'): Order.updated_date
+            }
+
+        purchase_columns = {
+                str_hash_prop('date_of_purchase'): Purchase.date,
+                str_hash_prop('date_purchase_added_to_system'): Purchase.created_date,
+                str_hash_prop('last_update_date_of_purchase'): Purchase.updated_date
+            }
+
+        allowed_charts_ids = {
+            'top_ordered_products': {**listing_columns, **catalogue_columns, **order_columns},
+            'less_ordered_products': {**listing_columns, **catalogue_columns, **order_columns},
+            'most_purchased_products': {**listing_columns, **catalogue_columns, **purchase_columns},
+            'less_purchased_products': {**listing_columns, **catalogue_columns, **purchase_columns},
+            'top_purchases_suppliers': {**supplier_columns, **purchase_columns},
+            'less_purchases_suppliers': {**supplier_columns, **purchase_columns},
+            'suppliers_purchases': {**supplier_columns, **purchase_columns},
+            'orders_yearly_performance': {**order_columns, **listing_columns, **catalogue_columns},
+            'purchases_yearly_performance': {**purchase_columns, **listing_columns, **catalogue_columns}
+        }
+    except Exception as e:
+        allowed_charts_ids = None
+        print('error in get_charts_data {}'.format(sys.exc_info()))
+    
+    finally:
+        return allowed_charts_ids
+
+
+def get_unencrypted_cols(cols):
+    result_cols = []
+    try:
+        x = ExportSqlalchemyFilter()
+        for col in cols:
+            found_col = False
+            break_table = False
+            for table, system_cols in x.tables_data.items():
+                if break_table:
+                    break
+                for system_col in system_cols:
+                    hashed_col = str_hash_prop(system_col)
+                    if hashed_col == col and system_col not in result_cols:
+                        result_cols.append(system_col)
+                        found_col = True
+                        break_table = True
+                        break
+            if found_col == False:
+                break
+        if len(result_cols) == len(cols):
+            return str(result_cols)
+        else:
+            return None
+    except:
+        result_cols = None
+        print('error from get_unencrypted_cols')
+    finally:
+        return result_cols
+
+def filter_formater(txt):
+    result = str(txt).strip()
+    try:
+        if '.' in result:
+            result_list = result.split('.')
+            if len(result_list) == 2:
+                table_name = result_list[0]
+                col = result_list[1]
+                
+                if '_' in col:
+                    col = ' '.join([part.capitalize() for part in col.strip().split('_')])
+                result ='By: {} of the {}.'.format(col, table_name)
+    except:
+        print('error from format_txt {}'.format(sys.exc_info()))
+    finally:
+        return result
+    
+def get_filter_list(data=[]):
+    return [{'key':filter_formater(item), 'val': str_hash_prop(item)} for item in data]
+
+def get_charts(db, current_user, charts_ids=[], filter_args=[]):
     result = {}
     result_array = []
     index = 0
     try:
+        exporter = ExportSqlalchemyFilter()
+
+        
+        listing_catalogue_order = get_filter_list([*exporter.listing_columns, *exporter.catalogue_columns,*exporter.order_columns])
+
+        supplier_purchase = get_filter_list([*exporter.supplier_columns, *exporter.purchase_columns])
+
+
         for chart_id in charts_ids:
             index += 1
             if chart_id not in result:            
@@ -673,7 +884,13 @@ def get_charts(db, current_user, charts_ids=[]):
                         Order, Listing.id == Order.listing_id
                     ).filter(
                         Catalogue.user_id == current_user.id
-                    ).group_by(Listing.id).order_by(desc('total_quantities')).limit(5).all()
+                    )
+
+                    if filter_args and len(filter_args) > 0:
+                        chart_query = chart_query.filter(*filter_args).group_by(Listing.id).order_by(desc('total_quantities')).limit(5).all()
+                    else:
+                        chart_query = chart_query.group_by(Listing.id).order_by(desc('total_quantities')).limit(5).all()
+                    
                     chartdata = getChartData(chart_query, label_i=0, data_i=1)
                     chart_data = {
                         'id': 'top_ordered_products',
@@ -684,7 +901,68 @@ def get_charts(db, current_user, charts_ids=[]):
                         'background_colors': [ 'rgba(255, 99, 132, 0.2)', 'rgba(255, 159, 64, 0.2)', 'rgba(255, 205, 86, 0.2)', 'rgba(75, 192, 192, 0.2)', 'rgba(54, 162, 235, 0.2)', 'rgba(153, 102, 255, 0.2)', 'rgba(201, 203, 207, 0.2)'],
                         'border_colors': [ 'rgb(255, 99, 132)', 'rgb(255, 159, 64)', 'rgb(255, 205, 86)', 'rgb(75, 192, 192)', 'rgb(54, 162, 235)', 'rgb(153, 102, 255)', 'rgb(201, 203, 207)' ],
                         'description': 'Products with the largest number of orders',
-                        'col': 12
+                        'col': 12,
+                        'activity': [
+                            # order also effect html python here manage full client side
+                            {
+                                'key': '7 Days',
+                                'value': get_activity_dates(days=7, type_format='date'),
+                                'type': 'date',
+                                'filter_by': str_hash_prop('date_of_order'),
+                                'filter_by_title': 'Filter By The Date Of Order.'
+                            },
+                            {
+                                'key': '15 Days',
+                                'value': get_activity_dates(days=15, type_format='date'),
+                                'type': 'date',
+                                'filter_by': str_hash_prop('date_of_order'),
+                                'filter_by_title': 'Filter By The Date Of Order.'
+                            },
+                            {
+                                'key': '1 Month',
+                                'value': get_activity_dates(days=30, type_format='date'),
+                                'type': 'date',
+                                'filter_by': str_hash_prop('date_of_order'),
+                                'filter_by_title': 'Filter By The Date Of Order.'
+                            },
+                            {
+                                'key': '45 Days',
+                                'value': get_activity_dates(days=45, type_format='date'),
+                                'type': 'date',
+                                'filter_by': str_hash_prop('date_of_order'),
+                                'filter_by_title': 'Filter By The Date Of Order.'
+                            },
+                            {
+                                'key': '90 Days',
+                                'value': get_activity_dates(days=90, type_format='date'),
+                                'type': 'date',
+                                'filter_by': str_hash_prop('date_of_order'),
+                                'filter_by_title': 'Filter By The Date Of Order.'
+                            },
+                            {
+                                'key': '180 Days',
+                                'value': get_activity_dates(days=180, type_format='date'),
+                                'type': 'date',
+                                'filter_by': str_hash_prop('date_of_order'),
+                                'filter_by_title': 'Filter By The Date Of Order.'
+                            },
+                            {
+                                'key': '12 Months',
+                                'value': get_activity_dates(days=365, type_format='date'),
+                                'type': 'date',
+                                'filter_by': str_hash_prop('date_of_order'),
+                                'filter_by_title': 'Filter By The Date Of Order.'
+                            },
+                            {
+                                'key': 'Custom',
+                                'value': '',
+                                'type': 'date',
+                                'filter_by': str_hash_prop('date_of_order'),
+                                'filter_by_title': 'Filter By The Date Of Order, custom select date.'
+                            },
+                        ],
+                        # ex i need cols be 
+                        'filters': listing_catalogue_order
                     }
                     result[chart_id] = True
                     result_array.append(chart_data)
@@ -701,7 +979,13 @@ def get_charts(db, current_user, charts_ids=[]):
                         Order, Listing.id == Order.listing_id
                     ).filter(
                         Catalogue.user_id == current_user.id
-                    ).group_by(Listing.id).order_by(asc('total_quantities')).limit(5).all()
+                    )
+
+                    if filter_args and len(filter_args) > 0:
+                        chart_query = chart_query.filter(*filter_args).group_by(Listing.id).order_by(asc('total_quantities')).limit(5).all()
+                    else:
+                        chart_query = chart_query.group_by(Listing.id).order_by(asc('total_quantities')).limit(5).all()
+
                     chartdata = getChartData(chart_query, label_i=0, data_i=1)
                     chart_data = {
                         'id': 'less_ordered_products',
@@ -729,7 +1013,13 @@ def get_charts(db, current_user, charts_ids=[]):
                         Catalogue, Listing.catalogue_id == Catalogue.id
                     ).filter(
                         Catalogue.user_id == current_user.id
-                    ).group_by(Listing.id).order_by(desc('total_quantities')).limit(5).all()
+                    )
+
+                    if filter_args and len(filter_args) > 0:
+                        chart_query = chart_query.filter(*filter_args).group_by(Listing.id).order_by(desc('total_quantities')).limit(5).all()
+                    else:
+                        chart_query = chart_query.group_by(Listing.id).order_by(desc('total_quantities')).limit(5).all()
+
                     chartdata = getChartData(chart_query, label_i=0, data_i=1)
                     chart_data = {
                         'id': 'most_purchased_products',
@@ -757,7 +1047,13 @@ def get_charts(db, current_user, charts_ids=[]):
                         Catalogue, Listing.catalogue_id == Catalogue.id
                     ).filter(
                         Catalogue.user_id == current_user.id
-                    ).group_by(Listing.id).order_by(asc('total_quantities')).limit(5).all()
+                    )
+
+                    if filter_args and len(filter_args) > 0:
+                        chart_query = chart_query.filter(*filter_args).group_by(Listing.id).order_by(asc('total_quantities')).limit(5).all()
+                    else:
+                        chart_query = chart_query.group_by(Listing.id).order_by(asc('total_quantities')).limit(5).all()
+
                     chartdata = getChartData(chart_query, label_i=0, data_i=1)
                     chart_data = {
                         'id': 'less_purchased_products',
@@ -782,7 +1078,13 @@ def get_charts(db, current_user, charts_ids=[]):
                         Purchase, Supplier.id==Purchase.supplier_id
                     ).filter(
                         Supplier.user_id == current_user.id
-                    ).group_by(Purchase.supplier_id).order_by(desc('total_purchases')).limit(5).all()
+                    )
+
+                    if filter_args and len(filter_args) > 0:
+                        chart_query = chart_query.filter(*filter_args).group_by(Purchase.supplier_id).order_by(desc('total_purchases')).limit(5).all()
+                    else:
+                        chart_query = chart_query.group_by(Purchase.supplier_id).order_by(desc('total_purchases')).limit(5).all()
+
                     chartdata = getChartData(chart_query, label_i=0, data_i=1)
                     chart_data = {
                         'id': 'top_purchases_suppliers',
@@ -790,14 +1092,74 @@ def get_charts(db, current_user, charts_ids=[]):
                         'data': chartdata['data'],
                         'labels': chartdata['labels'],
                         'label': 'Top Purchases Suppliers',
-                        'description': 'The supplier with the most number of purchases'
+                        'description': 'The supplier with the most number of purchases',
+                        'activity': [
+                            # order also effect html python here manage full client side
+                            {
+                                'key': '7 Days',
+                                'value': get_activity_dates(days=7, type_format='date'),
+                                'type': 'date',
+                                'filter_by': str_hash_prop('date_of_purchase'),
+                                'filter_by_title': 'Filter By The Date Of Purchase.'
+                            },
+                            {
+                                'key': '15 Days',
+                                'value': get_activity_dates(days=15, type_format='date'),
+                                'type': 'date',
+                                'filter_by': str_hash_prop('date_of_purchase'),
+                                'filter_by_title': 'Filter By The Date Of Purchase.'
+                            },
+                            {
+                                'key': '1 Month',
+                                'value': get_activity_dates(days=30, type_format='date'),
+                                'type': 'date',
+                                'filter_by': str_hash_prop('date_of_purchase'),
+                                'filter_by_title': 'Filter By The Date Of Purchase.'
+                            },
+                            {
+                                'key': '45 Days',
+                                'value': get_activity_dates(days=45, type_format='date'),
+                                'type': 'date',
+                                'filter_by': str_hash_prop('date_of_purchase'),
+                                'filter_by_title': 'Filter By The Date Of Purchase.'
+                            },
+                            {
+                                'key': '90 Days',
+                                'value': get_activity_dates(days=90, type_format='date'),
+                                'type': 'date',
+                                'filter_by': str_hash_prop('date_of_purchase'),
+                                'filter_by_title': 'Filter By The Date Of Purchase.'
+                            },
+                            {
+                                'key': '180 Days',
+                                'value': get_activity_dates(days=180, type_format='date'),
+                                'type': 'date',
+                                'filter_by': str_hash_prop('date_of_purchase'),
+                                'filter_by_title': 'Filter By The Date Of Purchase.'
+                            },
+                            {
+                                'key': '12 Months',
+                                'value': get_activity_dates(days=365, type_format='date'),
+                                'type': 'date',
+                                'filter_by': str_hash_prop('date_of_purchase'),
+                                'filter_by_title': 'Filter By The Date Of Purchase.'
+                            },
+                            {
+                                'key': 'Custom',
+                                'value': '',
+                                'type': 'date',
+                                'filter_by': str_hash_prop('date_of_purchase'),
+                                'filter_by_title': 'Filter By The Date Of Purchase, custom select date.'
+                            },
+                        ],
+                        'filters': supplier_purchase
                     }
                     result[chart_id] = True
                     result_array.append(chart_data)
                     continue
                 
                 elif chart_id == 'less_purchases_suppliers':
-    
+
                     # chart 5 (type of this charts matters later when have alot of suppliers and purchases will define who suppliers not work with him alot)
                     chart_query = db.session.query(
                         Supplier.name,
@@ -806,7 +1168,13 @@ def get_charts(db, current_user, charts_ids=[]):
                         Purchase, Supplier.id==Purchase.supplier_id
                     ).filter(
                         Supplier.user_id == current_user.id
-                    ).group_by(Purchase.supplier_id).order_by(asc('total_purchases')).limit(5).all()
+                    )
+
+                    if filter_args and len(filter_args) > 0:
+                        chart_query = chart_query.filter(*filter_args).group_by(Purchase.supplier_id).order_by(asc('total_purchases')).limit(5).all()
+                    else:
+                        chart_query = chart_query.group_by(Purchase.supplier_id).order_by(asc('total_purchases')).limit(5).all()
+
                     chartdata = getChartData(chart_query, label_i=0, data_i=1)
                     chart_data = {
                         'id': 'less_purchases_suppliers',
@@ -830,7 +1198,13 @@ def get_charts(db, current_user, charts_ids=[]):
                         Purchase, Supplier.id==Purchase.supplier_id
                     ).filter(
                         Supplier.user_id == current_user.id
-                    ).group_by(Purchase.supplier_id).order_by(desc('total_purchases')).all()
+                    )
+
+                    if filter_args and len(filter_args) > 0:
+                        chart_query = chart_query.filter(*filter_args).group_by(Purchase.supplier_id).order_by(desc('total_purchases')).all()
+                    else:
+                        chart_query = chart_query.group_by(Purchase.supplier_id).order_by(desc('total_purchases')).all()
+
                     chartdata = getChartData(chart_query, label_i=0, data_i=1)
                     chart_data = {
                         'id': 'suppliers_purchases',
@@ -856,7 +1230,13 @@ def get_charts(db, current_user, charts_ids=[]):
                         Catalogue, Listing.catalogue_id==Catalogue.id
                     ).filter(
                         Catalogue.user_id == current_user.id
-                    ).group_by(extract('year', Order.date)).order_by(asc('total_orders')).all()
+                    )
+
+                    if filter_args and len(filter_args) > 0:
+                        chart_query = chart_query.filter(*filter_args).group_by(extract('year', Order.date)).order_by(asc('total_orders')).all()
+                    else:
+                        chart_query = chart_query.group_by(extract('year', Order.date)).order_by(asc('total_orders')).all()
+
                     chartdata = getChartData(chart_query, label_i=0, data_i=1)
                     chart_data = {
                         'id': 'orders_yearly_performance',
@@ -884,7 +1264,13 @@ def get_charts(db, current_user, charts_ids=[]):
                         Catalogue, Listing.catalogue_id==Catalogue.id
                     ).filter(
                         Catalogue.user_id == current_user.id
-                    ).group_by(extract('year', Purchase.date)).order_by(asc('total_purchases')).all()
+                    )
+
+                    if filter_args and len(filter_args) > 0:
+                        chart_query = chart_query.filter(*filter_args).group_by(extract('year', Purchase.date)).order_by(asc('total_purchases')).all()
+                    else:
+                        chart_query = chart_query.group_by(extract('year', Purchase.date)).order_by(asc('total_purchases')).all()
+
                     # perfere for performance line chart as it up and down, but prefere for years bar
                     chartdata = getChartData(chart_query, label_i=0, data_i=1)
                     chart_data = {
@@ -1942,6 +2328,8 @@ def generate_ourapi_key(bcrypt):
         unique_key = str(unique_key).replace('-', 'n')
     else:
         unique_key = 'p{}'.format(unique_key)
+    # add unique string part to the key also it salat
+    unique_key = str(unique_key) + '-' +str(secure_salat)
     return str(unique_key)
 
 
@@ -2010,3 +2398,76 @@ def pass_api_request(apikey_id, db):
     before_2m_formated = before_2m.strftime("%Y-%m-%d %H:%M:%S")
     total_within_2_min = db.session.query(func.count(ApiKeysLogs.id)).filter(ApiKeysLogs.key_id==apikey_id, ApiKeysLogs.created_date >= before_2m_formated, ApiKeysLogs.created_date <= today_formated).scalar()
     return True if isinstance(total_within_2_min, int) and (total_within_2_min < 25) else False
+
+
+# get sqlalchemy limit
+def getQueryLimit(request):
+        result = None
+        try:
+            max_qp = request.args.get('max', None)
+            max = int(str(max_qp).strip()) if max_qp is not None and str(max_qp).strip().isnumeric() else -1
+            if isinstance(max, int) and max >= 0:
+                 result = max
+        except:
+            result = None
+            print('error from getQueryLimit, {}'.format(sys.exc_info()))
+        finally:
+            return result
+        
+# charts
+def get_sqlalchemy_filters(request_filters=[]):
+    filters = []
+    try:
+        table_classes = [Supplier, Listing, Platform, Purchase, Order, Catalogue, WarehouseLocations, LocationBins, CatalogueLocations, Category]
+        operators = ['=', '!=', '>', '<']
+        for request_filter in request_filters:
+            target_filter = None
+            if 'col' in request_filter and 'by' in request_filter and 'value' in request_filter:
+                col = request_filter['col']
+                by = request_filter['by']
+                value = request_filter['value']
+                request_col = col.strip()
+                if '.' in request_col and len(request_col.split('.')) == 2:
+                    request_filter_list = request_col.split('.')
+                    classname = request_filter_list[0]
+                    colname = request_filter_list[1]
+                    if classname and colname:
+                        target_class = None
+                        for table_class in table_classes:
+                            table_name = table_class.__tablename__.capitalize()
+                            if table_name == classname:
+                                for sqlalchemy_column in table_class.__table__.columns:
+                                    if sqlalchemy_column.name == colname:                   
+                                        target_filter = {'col': sqlalchemy_column, 'by': by, 'value': value}
+                                        break
+                                break
+                    else:
+                        continue
+                else:
+                    continue
+            else:
+                continue
+    
+            if target_filter and target_filter['by'] in operators:
+                new_sqlalchemy_filter = None
+                if target_filter['by'] == '!=':
+                    new_sqlalchemy_filter = target_filter['col'] != target_filter['value']
+                elif target_filter['by'] == '>':
+                    new_sqlalchemy_filter = target_filter['col'] > target_filter['value']
+                elif target_filter['by'] == '<':
+                    new_sqlalchemy_filter = target_filter['col'] < target_filter['value']
+                else:
+                    new_sqlalchemy_filter = target_filter['col'] == target_filter['value']
+    
+                if new_sqlalchemy_filter is not None:
+                    filters.append(new_sqlalchemy_filter)
+                else:
+                    filters.append('ehyabn den l mtnka')
+                    continue
+            else:
+                continue
+    except:
+        print('error from get_sqlalchemy_filters: {}'.format(sys.exc_info()))
+        raise
+    finally:
+        return filters

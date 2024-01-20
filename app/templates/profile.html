@@ -10,7 +10,7 @@
       {% if current_user and current_user.is_authenticated %}
       <div class="d-flex justify-content-end align-items-center flex-wrap">
         <!-- links -->
-      </div>
+      </div>      
       <div class="row mt-2">
         <div class="border_darkgrey rounded col-sm-3 p-3 d-flex justify-content-center align-items-start cursor-pointer text-decoration-none text-dark media_small_width_100">
           <div class="row m-0 w-100 p-2">
@@ -160,31 +160,84 @@
                           <h5 class="text-center">API Keys ({{current_user.api_keys|length}})</h5>
                       </div>
                       <div class="d-flex justify-content-between align-items-center my-2">
-                        <div><span>Requests Limit: </span><span>{% if ourapi_requests_limit %}{{ourapi_requests_limit.value}}{% else %}-{% endif %}</span></div>
+                        <div><span>Requests Limit Per Day: </span><span>{% if ourapi_requests_limit %}{{ourapi_requests_limit.value}}{% else %}-{% endif %}</span></div>
                         <div><span>Maximum keys: </span><span>{{user_keys_max}}</span></div>
                       </div>
                       {% for key in current_user.api_keys %}
                           <!--  key cont -->
                           <div class="key_cont w-100 border border-dark rounded p-1">
+                              {% if key.is_expired() %}
+                              <div style="background:#ce3333;display:none !important;" class="expired_keys border border-dark rounded p-2 d-flex justify-content-between align-items-center">
+                                <img class="repeated_image expire" src="{{url_for('static', filename='assets/images/expired_icon2.png')}}" height="40" style="">
+                                {% if renew_key and renew_key.renew is defined %}
+                                <!-- for make sure every key only submited throgh it's form not 1 form for all keys so never later pass wtforms using diffrent not expired key -->
+                                <form class="w-75" id="renew_form_{{loop.index}}" method="post" action="{{url_for('main.renew_key', id=key.id)}}">
+                                    {{renew_key.csrf_token(id='csrf_token_renew'~loop.index)}}
+                                    {{renew_key.renew(class='btn btn-warning btn-block btn-sm rounded', id=('renew_'~loop.index), title='Please note that the key code will be changed upon renewal.')}}
+                                </form>
+                                {% else %}
+                                <div class="alert alert-danger">Unable to Display Update Renew form right now.</div>
+                                {% endif %}
+                                <img class="repeated_image expire" src="{{url_for('static', filename='assets/images/expired_icon3.png')}}" height="40" style="">
+                              </div>
+                              {% endif %}
                               <div class="row m-0 w-100">
                                   <div class="col-4 goodbg p-2 border_right_white">API Key:</div>
                                   <div class="col-8 bg-dark text-white break_word p-2">{{key.key}}</div>
                               </div>
                               <div class="row m-0 w-100" title="This number reflects the maximum number of API calls that can be made using this key, you can set it while creating the key, and you can update it using the Update Key button.">
-                                <div class="col-4 goodbg p-2 border_top_black border_right_white">Key requests limit:</div>
+                                <div class="col-4 goodbg p-2 border_top_black border_right_white">Key requests limit per day:</div>
                                 <div class="col-8 bg-dark text-white break_word p-2 border_top_white">{{key.key_limit}}</div>
                               </div>
                               <div class="row m-0 w-100" title="This number reflects the total requests made using this key, and is updated daily ahead of API requests made using this key.">
                                 <div class="col-4 goodbg p-2 border_top_black border_right_white">Total requests:</div>
                                 <div class="col-8 bg-dark text-white break_word p-2 border_top_white">{{key.total_requests}}</div>
                               </div>
+                              <div class="row m-0 w-100" title="This number reflects the total requests made using this key, and is updated daily ahead of API requests made using this key.">
+                                <div class="col-4 goodbg p-2 border_top_black border_right_white">Expiration Date:</div>
+                                <div class="col-8 bg-dark text-white break_word p-2 border_top_white">{{key.expiration_date}}</div>
+                              </div>
+                              <div class="row m-0 w-100" title="This number reflects the total requests made using this key, and is updated daily ahead of API requests made using this key.">
+                                <div class="col-4 goodbg p-2 border_top_black border_right_white">Expiration After:</div>
+                                <div class="col-8 bg-dark text-white break_word p-2 border_top_white">{{key.get_expiration_days()}}</div>
+                              </div>
                               <div class="row m-0 w-100">
                                   <div class="col-4 goodbg p-2 border_top_black border_right_white">Actions:</div>
                                   <div class="col-8 bg-dark text-white break_word p-2 border_top_white">
-                                      <button class="btn btn-outline-warning btn-sm update_ourapi_key" data-url="{{url_for('main.update_key', id=key.id)}}" data-key-id="{{key.id}}" data-key-limit="{{key.key_limit}}" data-target="#UpdateKeyFormModal" data-toggle="modal">Update Key</button>
+                                      <button class="btn btn-outline-warning btn-sm update_ourapi_key" data-url="{{url_for('main.update_key', id=key.id)}}" data-key-id="{{key.id}}" data-key-limit="{{key.key_limit}}" data-key-expiration_date="{{key.expiration_date.strftime('%Y-%m-%dT%H:%M')}}" data-target="#UpdateKeyFormModal" data-toggle="modal">Update Key</button>
                                       <button class="btn btn-outline-danger btn-sm wtform_modal_deletebtn" data-key-id="{{key.id}}" data-url="{{url_for('main.remove_key', id=key.id)}}" data-target="#RemoveKeyFormModal" data-toggle="modal">Remove Key</button>
                                       <button class="btn btn-outline-info btn-sm" onclick="copyOurAPIKey(event, '{{key.key}}')">Copy Key</button>
-                                      <span style="min-width: 29px;float:right;" class="badge badge-warning"><span>ID: </span><span>{{key.id}}</span></span>
+                                      <button class="btn btn-outline-light btn-sm" data-target="#AdvancedFormModal" data-toggle="modal">Advanced</button>
+                                      <span style="min-width: 29px;float:right;" class="px-2 badge badge-warning"><span>ID: </span><span>{{key.id}}</span></span>
+                                  </div>
+
+                                  <div class="w-100 white_ips_conts" id="style:display:none1 !important;" id="whiteips_cont_{{key.id}}">
+                                    <!-- mover component start -->
+                                    <div id="mover_{{key.id}}" class="white_ips_rows border border-secondary rounded p-2 movement_item row m-0" 
+                                    data-target="#white_list_ips" data-owner="#whiteips_cont_{{key.key}}">
+                                      <div class="w-100 p-1 d-flex justify-content-start align-items-center with_selected" id="with_selected_{{key.id}}" style="display:none !important;">
+                                        <span style="min-width:max-content !important;" class="mr-2">With Selected:</span>
+                                        <button data-row="#whiteip_{{key.id}}_{{loop.index}}" class="remove_multiple_ips btn btn-danger btn-sm" style="min-width:max-content !important;display:none;">Delete All</button>
+                                        <input class="remove_whiteips" id="remove_whiteips_{{key.id}}" />
+                                      </div>
+                                      {% for white_ip in key.get_white_ips() %}
+                                        <div id="whiteip_{{key.id}}_{{loop.index}}" class="col-sm-12 p-1 bg-light d-flex justify-content-between align-items-center p-2 border border-dark">
+                                          <span>
+                                            <span><input class="remove_whiteip_checkbox"
+                                              data-value="{{white_ip}}"
+                                              data-row="#whiteip_{{key.id}}_{{loop.index}}"
+                                              data-with-selected="#with_selected_{{key.id}}"
+                                              data-ips-input="#remove_whiteips_{{key.id}}"
+                                              type="checkbox" /></span>
+                                            <span class="text-dark">Allowed IP: </span>
+                                            <span class="white_ipaddress_value badge badge-success" title="any request from this IP Address is allowed expect if it within the black list">
+                                              <strong>{{white_ip}}</strong>
+                                            </span>
+                                          </span>
+                                        </div>
+                                      {% endfor %}
+                                    </div>
+                                    <!-- mover component end -->
                                   </div>
                               </div>                              
                           </div>
@@ -222,7 +275,7 @@
     </div>
   </div>
   {% from 'forms.html' import profile_forms %}
-  {{ profile_forms(add_key=add_key, delete_key=delete_key, update_key=update_key) }}
+  {{ profile_forms(add_key=add_key, delete_key=delete_key, update_key=update_key, white_list=white_list, black_list=black_list) }}
 
 {% endblock %}
 {% block page_scripts %}
@@ -234,11 +287,15 @@ deleteWtformsModalProccess(dataAttId='data-key-id', formId='remove_key_form', id
 
 fillEditForm(triggerSelector = '.update_ourapi_key', formSelector = '#update_key_form', modalSelector = '#UpdateKeyFormModal', {
     id: 'data-key-id',
-    name: 'data-key-limit'
+    limit: 'data-key-limit',
+    expiration_date: 'data-key-expiration_date'
 }, inputIds = {
     id: '#update_key_id',
-    name: '#update_key_limit'
+    limit: '#update_key_limit',
+    expiration_date: '#expiration_date_update'
 });
+
+
 
 const componentsMap = {
     user_details: {
@@ -271,6 +328,7 @@ function getMoveToComponentParams(){
   }
   return null;
 }
+
 
 function componentsSwitcherComponent(){
   if ($(".switcher_link").length){
@@ -331,7 +389,6 @@ function copyOurAPIKey(e, key){
       targetElm.addClass('popovering');
 
       if (copyTitleTimeout){
-        console.log('hello');
         clearTimeout(copyTitleTimeout);
       }
       copyTitleTimeout = setTimeout(function(){
@@ -345,6 +402,22 @@ function copyOurAPIKey(e, key){
       }, 650);
   }
 }
+
+$(document).ready(function(){
+  $(".switch_components_links").on('click', siwtchComponent);
+});
+
+/* ux */
+Promise.all(
+  Array.from(document.querySelectorAll(".repeated_image")).filter(
+    img => !img.complete
+    ).map(img => new Promise(resolve => { img.onload = img.onerror = resolve; }))
+
+).then(
+        () => {
+          $(".expired_keys").slideDown('fast');
+        }
+);
 
 </script>
 {% endblock page_scripts %}

@@ -472,7 +472,7 @@
           </div>
           <div class="form-group">
             {{generate_barcode_form.data.label}}
-            {{generate_barcode_form.data(class='form-control', placeholder='You Can always edit this string as you like for example replace comma with underscore _ etc or add custom data, or write full custom string to that product without select columns')}}
+            {{generate_barcode_form.data(class='form-control', placeholder='You Can always edit this string as you like for example replace comma with underscore _ etc or add custom data, or write full custom string to that product without select columns', title='Please note that the maximum value for full text is 48, if the specified value is greater than 48 or the final result is greater than 48, the last value specified will be ignored.')}}
           </div>
           {{generate_barcode_form.generate(class='btn btn-primary')}}
          </form>
@@ -1441,7 +1441,7 @@
 </div>
 {% endmacro %}
 
-{% macro profile_forms(add_key, delete_key, update_key) %}
+{% macro profile_forms(add_key, delete_key, update_key, white_list, black_list) %}
 <div class="modal fade" id="AddKeyFormModal">
   <div class="modal-dialog">
     <div class="modal-content">
@@ -1456,8 +1456,13 @@
         <form id="add_key_form" method="post" action="{{url_for('main.add_key')}}">
           {{add_key.csrf_token(id='csrf_token_addkey')}}
           <div class="form-group">
-            {{add_key.key_limit.label}}
+            {{add_key.key_limit.label(text='Key limit per day')}}
             {{add_key.key_limit(class='form-control', placeholder='enter Limit of this key', title='enter Limit of this key')}}
+          </div>
+          <div class="form-group">
+            {{add_key.expiration_date.label}}
+            {{add_key.expiration_date(class='form-control', placeholder='enter Expiration date of this key, or leave default 6 months', title='key will not be valid after expiration date, so it more secure to set small period of time')}}
+            <p class="ml-1">Please note Max is 6 months, time in UTC</p>
           </div>
           {{add_key.add(class='btn btn-success btn-block')}}
         </form>
@@ -1517,8 +1522,13 @@
           {{update_key.csrf_token(id='csrf_token_updatekey')}}
           {{update_key.update_key_id()}}
           <div class="form-group">
-            {{update_key.update_key_limit.label}}
+            {{update_key.update_key_limit.label(text='Key limit per day')}}
             {{update_key.update_key_limit(class='form-control')}}
+          </div>
+          <div class="form-group">
+            {{update_key.expiration_date.label}}
+            {{update_key.expiration_date(class='form-control', placeholder='enter Expiration date of this key, or leave default 6 months', title='key will not be valid after expiration date, so it more secure to set small period of time')}}
+            <p class="ml-1">Please note Max is 6 months, time in UTC.</p>
           </div>
           {{update_key.update_key(class='btn btn-success btn-block')}}
         </form>
@@ -1533,4 +1543,59 @@
     </div>
   </div>
 </div>
+
+
+<div class="modal fade" id="AdvancedFormModal">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <!-- Modal Header -->
+      <div class="modal-header">
+        <h4 class="modal-title">Advanced</h4>
+        <button type="button" class="close" data-dismiss="modal">&times;</button>
+      </div>
+      <!-- Modal body -->
+      <div class="modal-body">
+        <div class="w-100 m-0 p-2 row bg_cornflowerblue mb-3">
+          <button class="switch_components_links col-sm-6 bg-light p-1 text-dark text-center btn rounded active_component" id="white_list_btn" data-target="#add_white_component"><span>White List</span></button>
+          <button class="switch_components_links col-sm-6 bg-dark p-1 text-center text-white btn rounded" id="black_list_btn" data-target="#add_black_component"><span>Black List</span></button>
+        </div>
+        <div class="switch_components active_component" id="add_white_component">
+          {% if white_list and white_list.white_ips is defined and white_list.add_ips is defined %}
+          <form id="add_white_form" method="post" action="{{url_for('main.add_key')}}">
+            {{white_list.csrf_token(id='csrf_token_addwhite')}}
+            <div class="form-group p-2 bg-success text-white">
+              {{white_list.white_ips.label(class='badge badge-light')}}
+              {{white_list.white_ips(class='form-control', title='only requests from this IPS will be allowed for that API key, if server can not get IP address becuase requester is behined proxy or vpn the request also will be ignored, so if you use proxy provide the IP address of it and make sure it not hidden ip or leave this field blank to disable white list')}}
+            </div>
+            {{white_list.add_ips(class='btn btn-success btn-block')}}
+          </form>
+          <div id="white_list_ips" class="w-100 p-2"></div>
+          {% else %}
+          <div class="alert alert-danger">Unable to Display Add White List form right now.</div>
+          {% endif %}
+        </div>
+        <div class="switch_components" id="add_black_component" style="display:none;">
+            {% if black_list and black_list.black_ips is defined and black_list.add_ips is defined %}
+            <form id="add_black_form" method="post" action="{{url_for('main.add_key')}}">
+              {{black_list.csrf_token(id='csrf_token_addblack')}}
+              <div class="form-group bg-dark text-white p-2">
+                {{black_list.black_ips.label(class='badge badge-danger')}}
+                {{black_list.black_ips(class='form-control', title='Add black List IP, note it overide the white list also, so if IP listed in white list and in black list, it will prevented from send request')}}
+              </div>
+              {{black_list.add_ips(class='btn btn-dark btn-block')}}
+            </form>
+            {% else %}
+            <div class="alert alert-danger">Unable to Display Add Black List form right now.</div>
+            {% endif %}
+        </div>
+      </div>
+      <!-- Modal footer -->
+      <div class="modal-footer">
+        <button type="button" class="btn btn-danger" data-dismiss="modal">Close</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+
 {% endmacro %}

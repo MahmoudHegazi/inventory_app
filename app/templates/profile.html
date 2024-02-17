@@ -16,7 +16,10 @@
           <div class="row m-0 w-100 p-2">
             <div id="user_details" class="col-sm-12 border border-secondary rounded shadow p-3 break_word mb-2 hover_darkcyan active_darkcyan switcher_link" data-target="#details_component">User Details</div>
             <div id="user_credentials" class="col-sm-12 border border-secondary rounded shadow p-3 break_word mb-2 hover_darkcyan switcher_link" data-target="#credentials_component">User Credentials</div>
+            <div id="user_manager" class="col-sm-12 border border-secondary rounded shadow p-3 break_word mb-2 hover_darkcyan switcher_link" data-target="#manager_component">Manage Users</div>
+            {% if current_user.isAdmin() %}
             <div id="api" class="col-sm-12 border border-secondary rounded shadow p-3 break_word mb-2 hover_darkcyan switcher_link" data-target="#api_component">API</div>
+            {% endif %}
           </div>
         </div>
         <div class="col-sm-9 p-3 row rounded mx-auto d-flex justify-content-center align-items-center media_small_width_100 shadow border_darkgrey">
@@ -143,6 +146,62 @@
             </div>
             <!-- User Information End -->
 
+            <!-- Manage Users -->
+
+                <div class="container effect_components" id="manager_component" style="display:none;">
+                  <div class="container">
+                    <div class="mt-1 mb-2 d-flex justify-content-between align-items-center">
+                      <h4>Manage Users</h4>
+                      <div>
+                        <!-- Important buttons and links -->
+                      </div>
+                    </div>
+                  </div>
+
+                  {% if current_user.isAdmin() %}
+                  <!-- manage users forms -->
+                  <div class="w-100 p-2 mt-2 border_darkgrey">
+                    <div>
+                      <h5 class="text-center">Create New User</h5>
+                    </div>
+                    <div class="row m-0">
+                      <!-- create user form start -->
+                      <div class="col-sm-12 border mb-2 p-2">
+                          {% if add_user and add_user.name is defined and add_user.uname is defined and add_user.pwd is defined and add_user.pwd_confirm is defined and add_user.email is defined %}
+                          <form id="add_user_form" method="post" action="{{url_for('auth.admin_add_user')}}">
+                              {{add_user.csrf_token(id='csrf_token_add_user')}}
+                              <div class="form-group">
+                                {{add_user.name.label}}
+                                {{add_user.name(class='form-control', placeholder='Name')}}
+                              </div>
+                              <div class="form-group">
+                                {{add_user.uname.label}}
+                                {{add_user.uname(class='form-control', placeholder='Username', title="Must be Unqiue")}}
+                              </div>
+                              <div class="form-group">
+                                {{add_user.pwd.label}}
+                                {{add_user.pwd(class='form-control', placeholder='Enter Password', autocomplete='new-password')}}
+                              </div>
+                              <div class="form-group">
+                                {{add_user.pwd_confirm.label}}
+                                {{add_user.pwd_confirm(class='form-control', placeholder='Confirm Password')}}
+                              </div>
+                              <div class="form-group">
+                                {{add_user.email.label}}
+                                {{add_user.email(class='form-control', placeholder='Email')}}
+                              </div>
+                              {{add_user.add(class='btn btn-success btn-block btn-sm')}}
+                          </form>
+                          {% else %}
+                          <div class="alert alert-danger">Unable to Display Add New User form right now.</div>
+                          {% endif %}
+                      </div>
+                    </div>
+                  </div>
+                  <!-- Manage user forms end -->
+                </div>
+            <!-- Manage Users end -->
+            {% endif %}
             <!-- API-->
             <div class="container effect_components" id="api_component" style="display:none;">
               {% if ourapi_requests_limit and ourapi_keys_max %}
@@ -285,6 +344,7 @@
 
 deleteWtformsModalProccess(dataAttId='data-key-id', formId='remove_key_form', idInputId='remove_key_id', modalId='RemoveKeyFormModal');
 
+
 fillEditForm(triggerSelector = '.update_ourapi_key', formSelector = '#update_key_form', modalSelector = '#UpdateKeyFormModal', {
     id: 'data-key-id',
     limit: 'data-key-limit',
@@ -306,12 +366,15 @@ const componentsMap = {
         link_elm: '#user_credentials',
         data_target: '#credentials_component'
     },
+    user_manager: {
+        link_elm: '#user_manager',
+        data_target: '#manager_component'
+    },
     api: {
         link_elm: '#api',
         data_target: '#api_component'
     }
 };
-
 function getMoveToComponentParams(){
   
   const moveToComponent = getQueryParm('movetocomponent');
@@ -418,6 +481,7 @@ Promise.all(
           $(".expired_keys").slideDown('fast');
         }
 );
+
 
 </script>
 {% endblock page_scripts %}

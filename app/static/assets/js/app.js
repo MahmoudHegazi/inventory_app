@@ -711,10 +711,11 @@ function fillEditCategory(){
 }
 
 
-function fillEditForm(triggerSelector='', formSelector='', modalSelector='', dataAttrs={}, inputIds={}){
+function fillEditForm(triggerSelector='', formSelector='', modalSelector='', dataAttrs={}, inputIds={}, customTypes={}){
   // check run one time only when page loaded
   if (
     typeof(dataAttrs) === 'object' && typeof(inputIds) === 'object' && 
+    typeof(customTypes) === 'object',
     Object.keys(dataAttrs).length === Object.keys(inputIds).length &&
     formSelector && $(formSelector).length && 
     modalSelector && $(modalSelector).length &&
@@ -741,8 +742,18 @@ function fillEditForm(triggerSelector='', formSelector='', modalSelector='', dat
         // start clear the actions
         for (let prop in dataAttrs){
           //console.log($(event.currentTarget).attr(dataAttrs[prop]).trim());
-          $(inputIds[prop]).val($(event.currentTarget).attr(dataAttrs[prop]).trim());
+          
           //console.log($(inputIds[prop]));
+          // handle special types of inputs
+          const setVal = $(event.currentTarget).attr(dataAttrs[prop]).trim();
+          const inputToFilled = $(inputIds[prop]);
+          if (customTypes.hasOwnProperty(prop) && customTypes[prop].hasOwnProperty('open') &&
+              typeof(customTypes[prop]['open']) === 'function') {
+            // (handle all custom elements 1 check small pc usages) check first if input in custom types have set custom type methods valid function can dynamic set any element exist or new element will added in future 99% logical, even can make ajax action to display value with jinja2 data
+            customTypes[prop]['open'](setVal, inputToFilled);
+          } else {
+            inputToFilled.val(setVal);
+          }
         }
         $(formSelector).attr('action', $(event.currentTarget).attr('data-url'));
       } else {
@@ -752,7 +763,11 @@ function fillEditForm(triggerSelector='', formSelector='', modalSelector='', dat
   
     $(modalSelector).on('hidden.bs.modal', () => {
       for (let prop in dataAttrs){
-        $(inputIds[prop]).val('');
+          if (customTypes.hasOwnProperty(prop) && customTypes[prop].hasOwnProperty('close') && typeof(customTypes[prop]['close']) === 'function') {
+            customTypes[prop]['close']($(inputIds[prop]));
+          } else {
+            $(inputIds[prop]).val('');
+          }
       }
       $(formSelector).attr('action', '');
     });

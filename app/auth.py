@@ -6,8 +6,8 @@ from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.utils import secure_filename
 from flask_login import login_user, logout_user, current_user
 from .models import User, Role, UserRoles, Dashboard
-from .forms import SignupForm, LoginForm
-from . import login_manager, bcrypt, app, db
+from .forms import SignupForm, LoginForm, addNewUserForm
+from . import login_manager, bcrypt, app, db, VendorReadAction, vendor_needs
 from markupsafe import escape
 from datetime import datetime, timedelta
 from flask_principal import Identity, AnonymousIdentity, \
@@ -35,6 +35,10 @@ def on_identity_loaded(sender, identity):
         for user_role in current_user.roles:
             identity.provides.add(RoleNeed(user_role.role.name))
 
+            for role_permission in user_role.role.permissions:
+                current_permission = role_permission.permission.permission.value
+                if current_permission in vendor_needs:
+                    identity.provides.add(vendor_needs[current_permission](str(role_permission.permission.id)))
 
 
 @auth.route('/login', methods=['GET', 'POST'])
@@ -147,3 +151,59 @@ def logout():
     session.pop('import_orders_report', None)
 
     return redirect(url_for('auth.login'))
+
+
+# Create users admin 
+@auth.route('/add_user', methods=['POST'])
+def admin_add_user():
+    try:
+        # check if vendor role found else create it
+        vendor_role = Role.query.filter_by(name='vendor').one_or_none()
+        if vendor_role is None:
+            vendor_role = Role(name='vendor')
+            vendor_role.insert()
+
+        form = addNewUserForm()
+        if form.validate_on_submit():
+            user_exist = User.query.filter_by(uname=form.uname.data).one_or_none()
+            email_exist = User.query.filter_by(email=form.email.data).one_or_none()
+            if user_exist is None and email_exist is None:
+
+                # this add all user relational tables all togther or fail togther and also 1 commit
+                user_dashboard = Dashboard()
+                new_user = User(
+                    name=form.name.data, 
+                    uname=form.uname.data,
+                    upass=bcrypt.generate_password_hash(form.pwd.data),
+                    email=form.email.data
+                    )
+                # create new vendor default role for the user
+                new_user.roles.append(UserRoles(role_id=vendor_role.id))
+                user_dashboard.user = new_user
+                user_dashboard.insert()
+
+                flash('Successfully Created New User', 'success')
+            else:
+                flashes = []
+                if user_exist is not None:
+                    flashes.append('Username is taken, please try something else.')
+                
+                if email_exist is not None:
+                    flashes.append('Email is taken, please try something else.') 
+                
+                if len(flashes) > 0:
+                    flash(','.join(flashes), 'danger')
+
+        else:
+            for label, errors in form.errors.items():
+                if label == 'csrf_token':
+                    flash('Form Expired Please try again', 'danger')
+                else:
+                    flash('{}:{}'.format(label, ','.join(errors)), 'danger')
+        
+    except Exception as e:
+        print('System Error: {} , info: {}'.format(e, sys.exc_info()))
+        flash('Unable to create new users right now, please try again later.', 'danger')
+
+    finally:
+        return redirect(url_for('main.profile'))

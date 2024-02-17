@@ -53,6 +53,26 @@
     position: relative;
     max-height: 100%;
 }
+.blue_shadow {
+    box-shadow: 1px 2px 8px midnightblue !important;
+}
+.aqua_shadow {
+    box-shadow: 1px 2px 8px #30bbaa !important;
+}
+.blue_green_tshadow {
+    text-shadow: 1px 1px 2px black, 0 0 25px #5f39c5ed, 0 0 5px #46b74f !important;
+}
+.roles_and_premssions {
+    background: url('https://static.vecteezy.com/system/resources/thumbnails/020/071/626/small/background-abstract-gradient-blue-hd-photo.jpg');
+    background-repeat: no-repeat;
+    background-position: center;
+    background-size: cover;
+}
+.max_height_600{
+    max-height:600px!important;
+    overflow: auto!important;
+    word-wrap: break-word!important;
+}
 
 .fancyscroll_main.active_effect {
     background: #3737a7;
@@ -390,7 +410,47 @@ img#api_unsetup {
     max-width: 100%;
     word-break: break-word;
   }
+  .break_word {
+    word-wrap: break-word !important;
+  }
 
+  .small_close_topright {
+    background: orangered !important;
+    color: white !important;
+    border-radius: 50% !important;
+    padding: 3px !important;
+    font-size: x-small !important;
+    height: 17px !important;
+    display: inline-block !important;
+    line-height: 0px !important;
+    cursor: pointer !important;
+    position: absolute !important;
+    right: 0 !important;
+    top: 1px !important;
+  }
+  .small_close_topright1 {
+    background: orangered !important;
+    color: white !important;
+    padding: 5px !important;
+    font-size: x-small !important;
+    height: 22px !important;
+    text-align: center !important;
+    line-height: 0px !important;
+    cursor: pointer !important;
+    position: absolute !important;
+    right: 0 !important;
+    top: 1px !important;
+  }
+
+  div.inventory_card {
+    padding-top:0px!important;
+    background:chartreuse !important;
+  }
+  h6.inventory_title {
+    border-top:none!important;
+    background: honeydew !important;
+  }
+  
 @media only screen and (max-width: 768px) {
     .media_small_width_100 {
         width: 100%  !important;

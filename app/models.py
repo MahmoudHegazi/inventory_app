@@ -1,6 +1,7 @@
 import datetime
 import sys
 import decimal
+import enum
 #from sqlalchemy.types import TypeDecorator
 from sqlalchemy import desc, asc
 from sqlalchemy.orm import relationship, backref
@@ -12,9 +13,19 @@ from app import db
 from flask_login import UserMixin
 from sqlalchemy.orm.attributes import get_history
 from dateutil.relativedelta import *
-################################ ---------- Tables for Authentication (Start) ---------------- #########################
+
 Base = declarative_base()
 
+
+################################ ---------- Enums (Start) ---------------- #########################
+class AllowedPermissions(enum.Enum):    
+    read = 'read'
+    add = 'add'
+    update = 'update'
+    delete = 'delete'
+
+
+################################ ---------- Tables for Authentication (Start) ---------------- #########################
 
 class Dashboard(db.Model):
     __tablename__ = 'dashboard'
@@ -49,6 +60,7 @@ class Dashboard(db.Model):
     def delete(self):
         db.session.delete(self)
         db.session.commit()
+    
 
     def format(self):
         return {
@@ -83,8 +95,9 @@ class User(UserMixin, db.Model):
     catalogues = db.relationship('Catalogue', backref='user', cascade="all, delete", lazy='dynamic', passive_deletes=True)
     keys_logs = db.relationship("ApiKeysLogs", backref="user", cascade="all, delete", passive_deletes=True)
 
-    def __init__(self, dashboard_id, name, uname, email, upass, image='default_user.png', approved=True):
-        self.dashboard_id = dashboard_id
+    def __init__(self, name, uname, email, upass, dashboard_id=None, image='default_user.png', approved=True):
+        if dashboard_id:
+            self.dashboard_id = dashboard_id
         self.name = name
         self.uname = uname
         self.email = email
@@ -105,7 +118,11 @@ class User(UserMixin, db.Model):
             return True
         else:
             return False
-
+        
+    def get_roles(self):
+        return db.session.query(Role).join(UserRoles, UserRoles.role_id==Role.id).join(User, UserRoles.user_id==User.id).filter(Role.system==False, UserRoles.user_id==self.id).all()
+    
+    
     def insert(self):
         db.session.add(self)
         db.session.commit()
@@ -177,11 +194,18 @@ class Role(db.Model):
     __tablename__ = 'role'
     id = db.Column(db.Integer, primary_key=True, nullable=False)
     name = db.Column(db.String(45), nullable=False, unique=True)
+    system = db.Column(db.Boolean, nullable=True, default=False)
+    superuser = db.Column(db.Boolean, nullable=True, default=False)
+
     created_date = db.Column(db.DateTime, nullable=False, default=datetime.datetime.utcnow)
     updated_date = db.Column(db.DateTime, nullable=True, default=None, onupdate=datetime.datetime.utcnow)
     users = db.relationship("UserRoles", backref="role", cascade="all, delete", passive_deletes=True)
-    def __init__(self, name):
+    permissions = db.relationship("RolePermissions", backref="role", cascade="all, delete", passive_deletes=True)
+
+    def __init__(self, name, system=False, superuser=False):
         self.name = name
+        self.system = system
+        self.superuser = superuser
 
     def insert(self):
         db.session.add(self)
@@ -193,6 +217,9 @@ class Role(db.Model):
     def delete(self):
         db.session.delete(self)
         db.session.commit()
+
+    def get_permissions(self):
+        return [up.permission for up in self.permissions]
 
     def format(self):
         return {
@@ -209,9 +236,11 @@ class UserRoles(db.Model):
     role_id = db.Column(db.Integer, db.ForeignKey('role.id', ondelete="SET NULL", onupdate="CASCADE"), nullable=False)
     created_date = db.Column(db.DateTime, nullable=False, default=datetime.datetime.utcnow)
     updated_date = db.Column(db.DateTime, nullable=True, default=None, onupdate=datetime.datetime.utcnow)
-    def __init__(self, user_id, role_id):
-        self.user_id = user_id
-        self.role_id = role_id
+    def __init__(self, user_id=None, role_id=None):
+        if user_id:
+            self.user_id = user_id
+        if role_id:
+            self.role_id = role_id
 
     def insert(self):
         db.session.add(self)
@@ -233,7 +262,68 @@ class UserRoles(db.Model):
         'updated_date': self.updated_date
         }
 
+class Permission(db.Model):
+    __tablename__ = 'permission'
+    id = db.Column(db.Integer, primary_key=True, nullable=False)
+    permission = db.Column(Enum(AllowedPermissions), nullable=False)
+    created_date = db.Column(DateTime, nullable=False, default=datetime.datetime.utcnow)
+    updated_date = db.Column(DateTime, nullable=True, default=None, onupdate=datetime.datetime.utcnow)
+    all_users_permissions = db.relationship("RolePermissions", backref="permission", cascade="all, delete", passive_deletes=True)
 
+    def __init__(self, permission):
+        self.permission = permission
+
+    def insert(self):
+        db.session.add(self)
+        db.session.commit()
+
+    def update(self):
+        db.session.commit()
+
+    def delete(self):
+        db.session.delete(self)
+        db.session.commit()
+
+    def format(self):
+        return {
+            'id': self.id,
+            'permission': self.permission,
+            'created_date': self.created_date,
+            'updated_date': self.updated_date
+        }
+
+class RolePermissions(db.Model):
+    __tablename__ = 'role_permissions'
+    id = db.Column(db.Integer, primary_key=True, nullable=False, autoincrement=True)
+    role_id = db.Column(db.Integer, db.ForeignKey('role.id', ondelete="CASCADE", onupdate="CASCADE"), nullable=False)
+    permission_id = db.Column(db.Integer, db.ForeignKey('permission.id', ondelete="CASCADE", onupdate="CASCADE"), nullable=False)
+    created_date = db.Column(DateTime, nullable=False, default=datetime.datetime.utcnow)
+    updated_date = db.Column(DateTime, nullable=True, default=None, onupdate=datetime.datetime.utcnow)
+
+    def __init__(self, role_id, permission_id):
+        self.role_id = role_id
+        self.permission_id = permission_id
+
+    def insert(self):
+        db.session.add(self)
+        db.session.commit()
+
+    def update(self):
+        db.session.commit()
+
+    def delete(self):
+        db.session.delete(self)
+        db.session.commit()
+
+    def format(self):
+        return {
+            'id': self.id,
+            'role_id': self.role_id,
+            'permission_id': self.permission_id,
+            'created_date': self.created_date,
+            'updated_date': self.updated_date
+        }
+    
 ################################ ---------- Tables for Authentication (End) ---------------- #########################
 
 ################################ ---------- Tables for Inventory (Start) ---------------- #########################

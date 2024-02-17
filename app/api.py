@@ -72,7 +72,7 @@ def get_suppliers():
         db_apikey = OurApiKeys.query.filter_by(id=ourapi_apikey_id).one_or_none()
         if ourapi_apikey_id and db_apikey and db_apikey.user.id:
             
-            query = Supplier.query.filter_by(user_id=db_apikey.user.id)
+            query = Supplier.query
             filter_params = get_filter_params(filters)
             if filter_params:
                 query = query.filter(*filter_params)
@@ -123,7 +123,7 @@ def get_categories():
         ourapi_apikey_id = session.get('ourapi_apikey_id', None)
         db_apikey = OurApiKeys.query.filter_by(id=ourapi_apikey_id).one_or_none()
         if ourapi_apikey_id and db_apikey and db_apikey.user.id:
-            query = Category.query.filter_by(dashboard_id=db_apikey.user.dashboard.id)
+            query = Category.query
             filter_params = get_filter_params(filters)
             # if any params add only sqlalchemy binaryexpression objects
             if filter_params:
@@ -178,7 +178,7 @@ def get_catalogues():
         db_apikey = OurApiKeys.query.filter_by(id=ourapi_apikey_id).one_or_none()
         if ourapi_apikey_id and db_apikey and db_apikey.user.id:
 
-            query = Catalogue.query.filter_by(user_id=db_apikey.user.id)
+            query = Catalogue.query
             filter_params = get_filter_params(filters)
             if filter_params:
                 query = query.filter(*filter_params)
@@ -223,7 +223,7 @@ def get_listings():
         ourapi_apikey_id = session.get('ourapi_apikey_id', None)
         db_apikey = OurApiKeys.query.filter_by(id=ourapi_apikey_id).one_or_none()
         if ourapi_apikey_id and db_apikey and db_apikey.user.id:
-            query = Listing.query.filter_by(dashboard_id=db_apikey.user.dashboard.id)
+            query = Listing.query
             filter_params = get_filter_params(filters)
             if filter_params:
                 query = query.filter(*filter_params)
@@ -269,9 +269,7 @@ def get_purchases():
         db_apikey = OurApiKeys.query.filter_by(id=ourapi_apikey_id).one_or_none()
         if ourapi_apikey_id and db_apikey and db_apikey.user.id:
             
-            query = db.session.query(Purchase).join(
-                Supplier, Purchase.supplier_id==Supplier.id
-                ).filter(Supplier.user_id==db_apikey.user.id)
+            query = db.session.query(Purchase)
 
             filter_params = get_filter_params(filters)
             if filter_params:
@@ -335,9 +333,7 @@ def get_orders():
         db_apikey = OurApiKeys.query.filter_by(id=ourapi_apikey_id).one_or_none()
         if ourapi_apikey_id and db_apikey and db_apikey.user.id:
             
-            query = db.session.query(Order).join(
-                Listing, Order.listing_id==Listing.id
-                ).filter(Listing.dashboard_id==db_apikey.user.dashboard.id)
+            query = db.session.query(Order)
 
             filter_params = get_filter_params(filters)
             if filter_params:
@@ -385,9 +381,7 @@ def get_ordertaxes():
         db_apikey = OurApiKeys.query.filter_by(id=ourapi_apikey_id).one_or_none()
         if ourapi_apikey_id and db_apikey and db_apikey.user.id:
             
-            query = db.session.query(OrderTaxes).join(
-                Order, OrderTaxes.order_id==Order.id
-                ).join(Listing, Order.listing_id==Listing.id).filter(Listing.dashboard_id==db_apikey.user.dashboard.id)
+            query = db.session.query(OrderTaxes)
 
             filter_params = get_filter_params(filters)
             if filter_params:
@@ -432,7 +426,7 @@ def get_platform():
         db_apikey = OurApiKeys.query.filter_by(id=ourapi_apikey_id).one_or_none()
         if ourapi_apikey_id and db_apikey and db_apikey.user.id:
             
-            query = db.session.query(Platform).filter(Platform.dashboard_id==db_apikey.user.dashboard.id)
+            query = db.session.query(Platform)
             filter_params = get_filter_params(filters)
             if filter_params:
                 query = query.filter(*filter_params)
@@ -475,7 +469,7 @@ def get_condition():
         db_apikey = OurApiKeys.query.filter_by(id=ourapi_apikey_id).one_or_none()
         if ourapi_apikey_id and db_apikey and db_apikey.user.id:
             
-            query = db.session.query(Condition).filter(Condition.dashboard_id==db_apikey.user.dashboard.id)
+            query = db.session.query(Condition)
             filter_params = get_filter_params(filters)
             if filter_params:
                 query = query.filter(*filter_params)
@@ -520,7 +514,7 @@ def get_warehouse_locations():
         db_apikey = OurApiKeys.query.filter_by(id=ourapi_apikey_id).one_or_none()
         if ourapi_apikey_id and db_apikey and db_apikey.user.id:
             
-            query = db.session.query(WarehouseLocations).filter(WarehouseLocations.dashboard_id==db_apikey.user.dashboard.id)
+            query = db.session.query(WarehouseLocations)
             filter_params = get_filter_params(filters)
             if filter_params:
                 query = query.filter(*filter_params)
@@ -563,9 +557,7 @@ def get_location_bins():
         db_apikey = OurApiKeys.query.filter_by(id=ourapi_apikey_id).one_or_none()
         if ourapi_apikey_id and db_apikey and db_apikey.user.id:
             
-            query = db.session.query(LocationBins).join(
-                WarehouseLocations, LocationBins.location_id==WarehouseLocations.id
-                ).filter(WarehouseLocations.dashboard_id==db_apikey.user.dashboard.id)
+            query = db.session.query(LocationBins)
 
             filter_params = get_filter_params(filters)
             if filter_params:
@@ -612,7 +604,7 @@ def get_catalogue_locations():
             
             query = db.session.query(CatalogueLocations).join(
                 WarehouseLocations, CatalogueLocations.location_id==WarehouseLocations.id
-                ).filter(WarehouseLocations.dashboard_id==db_apikey.user.dashboard.id)
+                )
 
             filter_params = get_filter_params(filters)
             if filter_params:
@@ -655,11 +647,7 @@ def get_catalogue_locations_bins():
         db_apikey = OurApiKeys.query.filter_by(id=ourapi_apikey_id).one_or_none()
         if ourapi_apikey_id and db_apikey and db_apikey.user.id:
             
-            query = db.session.query(CatalogueLocationsBins).join(
-                CatalogueLocations, CatalogueLocationsBins.location_id==CatalogueLocations.id
-                ).join(
-                WarehouseLocations, CatalogueLocations.location_id==WarehouseLocations.id
-                ).filter(WarehouseLocations.dashboard_id==db_apikey.user.dashboard.id)
+            query = db.session.query(CatalogueLocationsBins)
 
             filter_params = get_filter_params(filters)
             if filter_params:

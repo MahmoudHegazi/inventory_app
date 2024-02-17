@@ -1,4 +1,6 @@
 import os
+from collections import namedtuple
+from functools import partial
 from flask import Flask, render_template, redirect, url_for
 from flask_sqlalchemy import SQLAlchemy
 from flask_login import LoginManager, current_user
@@ -53,6 +55,48 @@ admin_permission = Permission(RoleNeed('admin'))
 # setup excel to add flask_excel's methods, and other data to request
 excel.init_excel(app)
 
+# avail system actions Flask-Principal for dynamic use
+# https://pythonhosted.org/Flask-Principal/
+VendorActionNeed = namedtuple('vendor_action', ['method', 'value'])
+VendorReadAction = partial(VendorActionNeed, 'read')
+VendorAddAction = partial(VendorActionNeed, 'add')
+VendorUpdateAction = partial(VendorActionNeed, 'update')
+VendorDeleteAction = partial(VendorActionNeed, 'delete')
+
+class VendorReadPermission(Permission):
+    def __init__(self, permission_id):
+        need = VendorReadAction(str(permission_id))
+        super(VendorReadPermission, self).__init__(need)
+
+class VendorAddPermission(Permission):
+    def __init__(self, permission_id):
+        need = VendorAddAction(str(permission_id))
+        super(VendorAddPermission, self).__init__(need)
+
+class VendorUpdatePermission(Permission):
+    def __init__(self, permission_id):
+        need = VendorUpdateAction(str(permission_id))
+        super(VendorUpdatePermission, self).__init__(need)
+
+class VendorDeletePermission(Permission):
+    def __init__(self, permission_id):
+        need = VendorDeleteAction(str(permission_id))
+        super(VendorDeletePermission, self).__init__(need)
+
+app_permissions = {
+    'read': VendorReadPermission,
+    'add': VendorAddPermission,
+    'update': VendorUpdatePermission,
+    'delete': VendorDeletePermission
+}
+
+vendor_needs = {
+    'read': VendorReadAction,
+    'add': VendorAddAction,
+    'update': VendorUpdateAction,
+    'delete': VendorDeleteAction
+}
+
 # keep routes in diffrent file than app configuration
 from .routes import routes
 from .auth import auth
@@ -66,6 +110,7 @@ apiEndpoints = app.register_blueprint(api)
 
 
 admin = Admin(app, name='Inventory', template_mode='bootstrap4')
+
 
 from .admin_models import InventoryModelView, userModalView, roleModalView, userRolesModalView, userMetaModalView, dashboardModalView, listingModalView, cataloguedModalView, purchaseModalView, orderModalView, supplierModalView, backlink
 from flask_admin.contrib.fileadmin import FileAdmin
@@ -101,6 +146,11 @@ def handle_forbidden(e):
 @app.errorhandler(404)
 def handle_not_found(e):
     return render_template('errors/error_404.html')
+
+@app.errorhandler(403)
+def handle_not_found(e):
+    from flask import redirect, url_for
+    return redirect(url_for('auth.login'))
 
 @app.errorhandler(405)
 def handle_method_not_allowed(e):

@@ -153,7 +153,7 @@ class AddMultipleListingForm(FlaskForm):
                                     choices=[(0, 'Select Platform')],
                                     render_kw={'style': 'display:none;', 'title': 'Select Platforms'}))
     """
-    platforms_selects = FieldList(SelectField('Platform', choices=[(1,'hi')], validators=[optional()], coerce=int, validate_choice=True))
+    platforms_selects = FieldList(SelectField('Platform', choices=[(1,'hi')], validators=[InputRequired()], coerce=int, validate_choice=True))
     catalogue_ids = FieldList(IntegerField(validators=[optional(), NumberRange(min=1)], render_kw={'style': 'display:none;'}))
 
     active = FieldList(SelectField('Active', validators=[optional()], choices=[(0, 'False'), (1, 'True')], default=0, coerce=int, validate_choice=True))
@@ -495,3 +495,44 @@ class addBlackListIPsForm(FlaskForm):
         'placeholder': 'Enter Black List IP addresses separated by a comma.'
         })
     add_ips = SubmitField('Add IPs', id='add_black_list')
+
+class addNewUserForm(FlaskForm):
+    
+    name = StringField('Name', id="add_name", validators=[InputRequired(), Length(min=1, max=45)])
+    uname = StringField('User Name', id="add_uname",  validators=[InputRequired(), Length(min=1, max=45)], render_kw={'autocomplete': 'username'})
+    pwd = PasswordField('Password', id="add_pwd", 
+                                validators=[InputRequired(),
+                                            validators.EqualTo('pwd_confirm', message='Passwords must match'),
+                                            Length(min=8, max=255)], render_kw={'autocomplete': 'new-password'})
+
+    pwd_confirm = PasswordField('Password Confirm', id="add_pwd_confirm", 
+                                validators=[InputRequired(), 
+                                            Length(min=8, max=255)], render_kw={'autocomplete': 'new-password'})
+    
+    email = StringField('Email', id="add_email",
+                            validators=[InputRequired(), Email(),
+                                        Length(min=5, max=255, message='Please enter a valid email.')])
+    add = SubmitField('Add User', id='add_user_submit')
+    
+    def validate_uname(self, uname):
+        from .models import User
+        self.userClass = User
+        try:
+            
+            uname_exist = self.userClass.query.filter_by(uname=uname.data).first()
+            if uname_exist:
+                raise ValidationError("{} User Name Is Taken.".format(uname.data))
+        except:
+            raise ValidationError("Unable to validate username right now.{}".format(self.userClass))
+        
+    def validate_email(self, email):        
+        try:
+            if not self.userClass:
+               from .models import User
+               self.userClass = User           
+               email_exist =  self.userClass.query.filter_by(email=email.data).first()
+               if email_exist:
+                   raise ValidationError("{} Email Is Taken.".format(email.data))
+        except:
+            raise ValidationError("Unable to validate Email right now.")
+

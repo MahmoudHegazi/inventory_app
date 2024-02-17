@@ -14,7 +14,8 @@ from flask import request, current_app, url_for
 from flask_login import current_user
 from sqlalchemy import func
 from .models import Supplier, Dashboard, Listing, Catalogue, Purchase, Order, Platform, CatalogueLocations, CatalogueLocationsBins,\
-    WarehouseLocations, LocationBins, Category, UserMeta, OrderTaxes, Condition, OurApiKeys, ApiKeysLogs
+    WarehouseLocations, LocationBins, Category, UserMeta, OrderTaxes, Condition, OurApiKeys, ApiKeysLogs, User, Permission, RolePermissions, \
+    Permission
 from sqlalchemy.sql import extract
 from sqlalchemy import or_, and_, func , asc, desc
 from datetime import datetime, timedelta
@@ -136,7 +137,8 @@ def updateDashboardListings(user_dashboard):
     # +1 and -1 has no way to be fixed and not synced, this way do what +1 and -1 do and it will fix incase indexing broken
     try:
         if user_dashboard:
-            user_dashboard.num_of_listings = len(user_dashboard.listings)
+            inv_listings = Listing.query.all()
+            user_dashboard.num_of_listings = len(inv_listings)
             user_dashboard.update()
             return user_dashboard.num_of_listings
         else:
@@ -150,13 +152,7 @@ def updateDashboardListings(user_dashboard):
 def updateDashboardOrders(db, user_dashboard):
     try:
         # updated could be order_estate != 'refunded,etc'
-        total_dashboard_orders = db.session.query(
-                    func.sum(Order.quantity)
-                ).join(
-                    Listing
-                ).filter(
-                    Listing.dashboard_id == user_dashboard.id,
-                ).scalar()
+        total_dashboard_orders = db.session.query(func.sum(Order.quantity)).scalar()
         user_dashboard.num_of_orders = total_dashboard_orders
         user_dashboard.update()
         return total_dashboard_orders
@@ -170,8 +166,6 @@ def updateDashboardPurchasesSum(db, Purchase, Listing, user_dashboard):
                     func.sum((Purchase.quantity*Listing.price))
                 ).join(
                     Listing
-                ).filter(
-                    Listing.dashboard_id == user_dashboard.id,
                 ).scalar()
         user_dashboard.sum_of_monthly_purchases = sum_dashboard_purchases
         user_dashboard.update()
@@ -495,7 +489,7 @@ def get_export_data(db, flask_excel, current_user_id, table_name, columns, opera
             Category, Category.id == Catalogue.category_id
         ).outerjoin(
             Condition, Condition.id == Catalogue.condition_id
-        ).filter(and_(Catalogue.user_id==current_user_id), filterBooleanClauseList).all()
+        ).filter(filterBooleanClauseList).all()
         if response['data']:
             export_data = []
             
@@ -553,7 +547,6 @@ def get_export_data(db, flask_excel, current_user_id, table_name, columns, opera
         ).outerjoin(
             OrderTaxes, OrderTaxes.order_id == Order.id
         ).filter(
-            and_(Catalogue.user_id == current_user_id),
             filterBooleanClauseList
         ).all()                    
         if response['data']:
@@ -601,7 +594,6 @@ def get_export_data(db, flask_excel, current_user_id, table_name, columns, opera
         ).join(
             Catalogue, Listing.catalogue_id == Catalogue.id
         ).filter(
-            and_(Catalogue.user_id == current_user_id),
             filterBooleanClauseList
         ).all()
         if response['data']:
@@ -620,7 +612,6 @@ def get_export_data(db, flask_excel, current_user_id, table_name, columns, opera
         ).join(
             Catalogue
         ).filter(
-            and_(Catalogue.user_id == current_user_id),
             filterBooleanClauseList
         ).all()
         if response['data']:
@@ -879,11 +870,7 @@ def get_charts(db, current_user, charts_ids=[], filter_args=[]):
                         Listing.product_name,
                         func.sum(Order.quantity).label('total_quantities')
                     ).join(
-                        Catalogue, Listing.catalogue_id == Catalogue.id
-                    ).join(
                         Order, Listing.id == Order.listing_id
-                    ).filter(
-                        Catalogue.user_id == current_user.id
                     )
 
                     if filter_args and len(filter_args) > 0:
@@ -974,11 +961,7 @@ def get_charts(db, current_user, charts_ids=[], filter_args=[]):
                         Listing.product_name,
                         func.sum(Order.quantity).label('total_quantities')
                     ).join(
-                        Catalogue, Listing.catalogue_id == Catalogue.id
-                    ).join(
                         Order, Listing.id == Order.listing_id
-                    ).filter(
-                        Catalogue.user_id == current_user.id
                     )
 
                     if filter_args and len(filter_args) > 0:
@@ -1009,10 +992,6 @@ def get_charts(db, current_user, charts_ids=[], filter_args=[]):
                         func.sum(Purchase.quantity).label('total_quantities')
                     ).join(
                         Purchase, Listing.id == Purchase.listing_id
-                    ).join(
-                        Catalogue, Listing.catalogue_id == Catalogue.id
-                    ).filter(
-                        Catalogue.user_id == current_user.id
                     )
 
                     if filter_args and len(filter_args) > 0:
@@ -1043,10 +1022,6 @@ def get_charts(db, current_user, charts_ids=[], filter_args=[]):
                         func.sum(Purchase.quantity).label('total_quantities')
                     ).join(
                         Purchase, Listing.id == Purchase.listing_id
-                    ).join(
-                        Catalogue, Listing.catalogue_id == Catalogue.id
-                    ).filter(
-                        Catalogue.user_id == current_user.id
                     )
 
                     if filter_args and len(filter_args) > 0:
@@ -1076,8 +1051,6 @@ def get_charts(db, current_user, charts_ids=[], filter_args=[]):
                         func.sum(Purchase.quantity).label('total_purchases')
                     ).join(
                         Purchase, Supplier.id==Purchase.supplier_id
-                    ).filter(
-                        Supplier.user_id == current_user.id
                     )
 
                     if filter_args and len(filter_args) > 0:
@@ -1092,6 +1065,7 @@ def get_charts(db, current_user, charts_ids=[], filter_args=[]):
                         'data': chartdata['data'],
                         'labels': chartdata['labels'],
                         'label': 'Top Purchases Suppliers',
+                        'col': '6',
                         'description': 'The supplier with the most number of purchases',
                         'activity': [
                             # order also effect html python here manage full client side
@@ -1166,8 +1140,6 @@ def get_charts(db, current_user, charts_ids=[], filter_args=[]):
                         func.sum(Purchase.quantity).label('total_purchases')
                     ).join(
                         Purchase, Supplier.id==Purchase.supplier_id
-                    ).filter(
-                        Supplier.user_id == current_user.id
                     )
 
                     if filter_args and len(filter_args) > 0:
@@ -1196,8 +1168,6 @@ def get_charts(db, current_user, charts_ids=[], filter_args=[]):
                         func.sum(Purchase.quantity).label('total_purchases')
                     ).join(
                         Purchase, Supplier.id==Purchase.supplier_id
-                    ).filter(
-                        Supplier.user_id == current_user.id
                     )
 
                     if filter_args and len(filter_args) > 0:
@@ -1228,8 +1198,6 @@ def get_charts(db, current_user, charts_ids=[], filter_args=[]):
                         Listing, Order.listing_id==Listing.id
                     ).join(
                         Catalogue, Listing.catalogue_id==Catalogue.id
-                    ).filter(
-                        Catalogue.user_id == current_user.id
                     )
 
                     if filter_args and len(filter_args) > 0:
@@ -1243,9 +1211,69 @@ def get_charts(db, current_user, charts_ids=[], filter_args=[]):
                         'type': 'bar',
                         'data': chartdata['data'],
                         'labels': chartdata['labels'],
-                        'label': 'Orders Per Year',
+                        'label': 'Orders Per Year1',
                         'description': 'The number of orders per year',
-                        'col': '6'
+                        'col': '6',
+                        'activity': [
+                            # order also effect html python here manage full client side
+                            {
+                                'key': '7 Days',
+                                'value': get_activity_dates(days=7, type_format='date'),
+                                'type': 'date',
+                                'filter_by': str_hash_prop('date_of_order'),
+                                'filter_by_title': 'Filter By The Date Of Order.'
+                            },
+                            {
+                                'key': '15 Days',
+                                'value': get_activity_dates(days=15, type_format='date'),
+                                'type': 'date',
+                                'filter_by': str_hash_prop('date_of_order'),
+                                'filter_by_title': 'Filter By The Date Of Order.'
+                            },
+                            {
+                                'key': '1 Month',
+                                'value': get_activity_dates(days=30, type_format='date'),
+                                'type': 'date',
+                                'filter_by': str_hash_prop('date_of_order'),
+                                'filter_by_title': 'Filter By The Date Of Order.'
+                            },
+                            {
+                                'key': '45 Days',
+                                'value': get_activity_dates(days=45, type_format='date'),
+                                'type': 'date',
+                                'filter_by': str_hash_prop('date_of_order'),
+                                'filter_by_title': 'Filter By The Date Of Order.'
+                            },
+                            {
+                                'key': '90 Days',
+                                'value': get_activity_dates(days=90, type_format='date'),
+                                'type': 'date',
+                                'filter_by': str_hash_prop('date_of_order'),
+                                'filter_by_title': 'Filter By The Date Of Order.'
+                            },
+                            {
+                                'key': '180 Days',
+                                'value': get_activity_dates(days=180, type_format='date'),
+                                'type': 'date',
+                                'filter_by': str_hash_prop('date_of_order'),
+                                'filter_by_title': 'Filter By The Date Of Order.'
+                            },
+                            {
+                                'key': '12 Months',
+                                'value': get_activity_dates(days=365, type_format='date'),
+                                'type': 'date',
+                                'filter_by': str_hash_prop('date_of_order'),
+                                'filter_by_title': 'Filter By The Date Of Order.'
+                            },
+                            {
+                                'key': 'Custom',
+                                'value': '',
+                                'type': 'date',
+                                'filter_by': str_hash_prop('date_of_order'),
+                                'filter_by_title': 'Filter By The Date Of Order, custom select date.'
+                            },
+                        ],
+                        'filters': listing_catalogue_order
                     }
                     # 'year_picker_ajax': {'years': [2012, 2013, 2014]}, add dynamic ajax year input in chart, remaning
                     result[chart_id] = True
@@ -1258,12 +1286,6 @@ def get_charts(db, current_user, charts_ids=[], filter_args=[]):
                     chart_query = db.session.query(
                         extract('year', Purchase.date),
                         func.sum(Purchase.quantity).label('total_purchases')
-                    ).join(
-                        Listing, Purchase.listing_id==Listing.id
-                    ).join(
-                        Catalogue, Listing.catalogue_id==Catalogue.id
-                    ).filter(
-                        Catalogue.user_id == current_user.id
                     )
 
                     if filter_args and len(filter_args) > 0:
@@ -1406,7 +1428,7 @@ def upload_catalogues(offers_data, current_user):
     try:        
         result = {'total': len(offers_data), 'uploaded': 0, 'updated': 0, 'not_changed': 0, 'luploaded': 0, 'lupdated': 0, 'lnot_changed': 0, 'new_categories': 0}
         # create platform for best buy if not exist
-        best_buy_platform = Platform.query.filter_by(name='bestbuy', dashboard_id=current_user.dashboard.id).first()
+        best_buy_platform = Platform.query.filter_by(name='bestbuy').first()
         if not best_buy_platform:
             best_buy_platform = Platform(dashboard_id=current_user.dashboard.id, name='bestbuy')
             best_buy_platform.insert()
@@ -1440,13 +1462,13 @@ def upload_catalogues(offers_data, current_user):
                 discount_start_date = mysql_strdate(offer['discount']['start_date']) if 'discount' in offer and isinstance(offer['discount'], dict) and 'start_date' in offer['discount'] else None
                 discount_end_date = mysql_strdate(offer['discount']['end_date']) if 'discount' in offer and isinstance(offer['discount'], dict) and 'end_date' in offer['discount'] else None
 
-                selected_category = Category.query.filter_by(dashboard_id=current_user.dashboard.id, code=category_code).first()
+                selected_category = Category.query.filter_by(code=category_code).first()
                 if not selected_category:
                     selected_category = Category(dashboard_id=current_user.dashboard.id, code=category_code, label=category_label, level=0, parent_code='')
                     selected_category.insert()
                     result['new_categories'] += 1
 
-                selected_catalogue = Catalogue.query.filter_by(sku=product_sku, user_id=current_user.id).first()
+                selected_catalogue = Catalogue.query.filter_by(sku=product_sku).first()
                 not_changed = False
                 if selected_catalogue:
                     update_require = False
@@ -1501,7 +1523,7 @@ def upload_catalogues(offers_data, current_user):
 
                 # check if listing exist in same platform
                 selected_listing = Listing.query.filter_by(
-                    dashboard_id=current_user.dashboard.id, catalogue_id=selected_catalogue.id,
+                    catalogue_id=selected_catalogue.id,
                     sku=selected_catalogue.sku, platform_id=best_buy_platform.id
                 ).first()
 
@@ -1582,7 +1604,7 @@ def upload_orders(orders, current_user, db):
         
         user_dashboard = current_user.dashboard
 
-        best_buy_platform = Platform.query.filter_by(name='bestbuy', dashboard_id=user_dashboard.id).first()
+        best_buy_platform = Platform.query.filter_by(name='bestbuy').first()
         if not best_buy_platform:
             best_buy_platform = Platform(dashboard_id=current_user.dashboard.id, name='bestbuy')
             best_buy_platform.insert()
@@ -1669,7 +1691,6 @@ def upload_orders(orders, current_user, db):
                     order_state = order['order_state'] if 'order_state' in order else None
     
                     new_order = db.session.query(Order).join(Listing, Order.listing_id==Listing.id).filter(
-                        Listing.dashboard_id == user_dashboard.id,
                         Listing.platform_id == best_buy_platform.id,
                         Order.order_id != None,
                         Order.order_id == order_id,
@@ -2373,7 +2394,7 @@ def valid_ourapi_key(db_apikey, db):
                 # current keys requests made and limit per today
                 key_total_requests = int(db_apikey.total_requests)
                 key_requests_limit = int(db_apikey.key_limit)
-
+                # totals shared between inventory members
                 sum_totals = int(db.session.query(func.sum(OurApiKeys.total_requests)).filter(OurApiKeys.user_id==key_user_id).scalar())
                 if (sum_totals < requests_limit) and (key_total_requests < key_requests_limit):
                     valid = True
@@ -2462,7 +2483,6 @@ def get_sqlalchemy_filters(request_filters=[]):
                 if new_sqlalchemy_filter is not None:
                     filters.append(new_sqlalchemy_filter)
                 else:
-                    filters.append('ehyabn den l mtnka')
                     continue
             else:
                 continue
@@ -2471,3 +2491,72 @@ def get_sqlalchemy_filters(request_filters=[]):
         raise
     finally:
         return filters
+
+def order_by(data=[], descending=False, key=''):
+    if len(data) > 0 and key:
+        arugs = {
+          'reverse': descending,
+          'key': lambda db_obj: db_obj[key] if isinstance(db_obj, dict) else getattr(db_obj, key)
+        }
+        data.sort(**arugs)
+        
+        return data
+    else:
+        return []
+    
+
+def handle_crud_action(systemid=0, role_exist=None, form_permission_data=None, actions=[[],[]]):
+    if systemid:
+        system_perimssion = Permission.query.filter_by(id=systemid).one_or_none()
+        if system_perimssion:
+            role_perimssion = RolePermissions.query.filter_by(role_id=role_exist.id, permission_id=system_perimssion.id).first()
+            if form_permission_data == True:
+                # means require add of this if not exist
+                if not role_perimssion:
+                    
+                    RolePermissions(role_id=role_exist.id, permission_id=system_perimssion.id).insert()
+                    actions[0].append(system_perimssion.permission.value)
+            else:
+                # simple and best performance and clear (means require delete of this if exist)
+                if role_perimssion:
+
+                    role_perimssion.delete()
+                    actions[1].append(system_perimssion.permission.value)
+    return actions
+
+def getPermission(permission_name=''):
+    permission = -1
+    if permission_name and isinstance(permission_name, str):
+        perm = Permission.query.filter_by(permission=permission_name).first()
+        if perm.permission.value == permission_name:
+            permission = perm.id
+    return permission
+
+
+# Flask-Principal customized (it allow multiple permissions for endpoint ex this endpoint need read and edit) (this method never return error)
+def user_have_permissions(app_permissions, permissions=[]):
+    try:
+        have_permissions = True
+        for perm in permissions:
+            if perm in app_permissions:
+                permission_id = getPermission(perm)
+                if permission_id != -1:
+                    if app_permissions[perm](str(permission_id)).can():
+                        continue
+                    else:
+                        # identity not have the require permission or user not have this permission
+                        have_permissions = False
+                        break
+                else:
+                    # db permssion not exist or method can not return it
+                    have_permissions = False
+                    break
+            else:
+                # invalid permssion
+                have_permissions = False
+                break
+        return have_permissions
+    except:
+        print("error from user_have_permissions {}".format(sys.exc_info()))
+        return False
+    

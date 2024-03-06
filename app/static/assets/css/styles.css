@@ -88,6 +88,9 @@
     align-items: center;
     box-shadow: 1px 2px 8px lightgreen;
 }
+.lightgreen_shadow {
+    box-shadow: 1px 2px 8px lightgreen !important;
+}
 .fancyscroll_scroller.fixed_sticky {
     position: fixed !important;
     bottom: 10px !important;
@@ -236,6 +239,24 @@ color_lightpink {
     color: white;
     text-shadow: 0px 1px darkorange;
     font-family: monospace;
+}
+/* darkturquoise  chartreuse darkgoldenrod darkcyan  darkgray olivedrab darkorange darkseagreen darkslateblue*/
+.fancy_title {
+    background: chartreuse;
+    color: white;
+    padding-left: 10px;
+    font-weight: bold;
+    text-shadow: 2px 2px 4px #000000;
+}
+.h4_fancy {
+    min-width: 80%;
+    text-align: center;
+    background: aliceblue !important;
+    word-break: brea-word;
+}
+
+.max_300 {
+    max-height: 250px !important; overflow: auto;
 }
 
 .mini_green_header {

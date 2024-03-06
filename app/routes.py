@@ -7,18 +7,12 @@ import flask_excel
 from flask import Flask, Blueprint, session, redirect, url_for, flash, Response, request, render_template, jsonify, abort, current_app
 from flask_wtf import Form
 from .models import User, Supplier, Dashboard, Listing, Catalogue, Purchase, Order, Platform, WarehouseLocations, LocationBins, \
-CatalogueLocations, CatalogueLocationsBins, Category, UserMeta, OrderTaxes, Condition
-from .forms import addListingForm, editListingForm, addCatalogueForm, editCatalogueForm, \
-removeCatalogueForm, removeListingForm, addSupplierForm, editSupplierForm, removeSupplierForm, \
-addPurchaseForm, editPurchaseForm, removePurchaseForm, addOrderForm, editOrderForm, removeOrderForm, CatalogueExcelForm, \
-removeCataloguesForm, removeListingsForm, removeAllCataloguesForm, addPlatformForm, editPlatformForm, removePlatformForm, \
-addLocationForm, editLocationForm, removeLocationForm, addBinForm, editBinForm, removeBinForm, AddMultipleListingForm, \
-addCategoryForm, editCategoryForm, removeCategoryForm, importCategoriesAPIForm, importOffersAPIForm, SetupBestbuyForm, \
-importOrdersAPIForm, addConditionForm, editConditionForm, removeConditionForm, generateCatalogueBarcodeForm
+CatalogueLocations, CatalogueLocationsBins, Category, UserMeta, OrderTaxes, Condition, Inventory
+from .forms import *
 from . import db, vendor_permission, app_permissions
 from .functions import updateDashboardListings, updateDashboardOrders, updateDashboardPurchasesSum, secureRedirect, get_charts, \
 bestbuy_ready, get_ordered_dicts, float_or_none, float_or_zero, update_order_taxes, get_orders_and_shippings, get_separate_order_taxes, \
-fill_generate_barcode, order_by, user_have_permissions
+fill_generate_barcode, order_by, user_have_permissions, inv
 from sqlalchemy.exc import IntegrityError
 from flask_login import login_required, current_user
 from flask import request as flask_request
@@ -157,8 +151,9 @@ def get_model_dict(model, row):
         return {x: getattr(row, x) for x in columns}
     else:
         raise ValueError(f"The provided row is not of type {model.__table__.name.title()}")
-    
-################ -------------------------- Catalogue -------------------- ################
+
+from flask import make_response
+################ -------------------------- Catalogue The looping without result nice movie name nsometimes learning one of that -------------------- ################
 @routes.route('/catalogues', methods=['GET'])
 @login_required
 @vendor_permission.require(http_exception=403)
@@ -168,7 +163,7 @@ def catalogues():
         if can_read:
             pagination = makePagination(
                 request.args.get('page', 1),
-                db.session.query(Catalogue),
+                inv(db.session.query(Catalogue), User.id, Catalogue.user_id),
                 lambda total_pages: [url_for('routes.catalogues', page=page_index) for page_index in range(1, total_pages+1)],
                 limit_parm=session.get('limit', 10),
                 by='product_name'
@@ -201,7 +196,8 @@ def view_catalogue(catalogue_id):
         can_read = user_have_permissions(app_permissions, permissions=['read'])
         if can_read:
             deleteform = removeCatalogueForm()
-            target_catalogue = Catalogue.query.filter_by(id=catalogue_id).one_or_none()
+            
+            target_catalogue = inv(Catalogue.query.filter_by(id=catalogue_id), User.id, Catalogue.user_id).one_or_none()
             if target_catalogue is not None:
                 listing_platforms = [{
                     'url': url_for('routes.view_listing', listing_id=catalogue_listing.id),
@@ -247,7 +243,8 @@ def add_catalogue():
         locations_bins_data = []
         allowed_bins_ids = []
         try:
-            current_locations = WarehouseLocations.query.all()
+            
+            current_locations = inv(WarehouseLocations.query, User.dashboard_id, WarehouseLocations.dashboard_id).all()
             for location in current_locations:
                 current_location_obj = {'location': location.id, 'bins': [bin.id for bin in location.bins]}
                 locations_choices.append((location.id, location.name))
@@ -257,8 +254,8 @@ def add_catalogue():
                 locations_bins_data.append(current_location_obj)
 
 
-            categories = [(cat.id, '{}:{}'.format(cat.code, cat.label)) for cat in Category.query.all()]
-            conditions = [(cond.id, '{}: {}'.format(cond.id, cond.name)) for cond in Condition.query.all()]
+            categories = [(cat.id, '{}:{}'.format(cat.code, cat.label)) for cat in inv(Category.query, User.dashboard_id, Category.dashboard_id).all()]
+            conditions = [(cond.id, '{}: {}'.format(cond.id, cond.name)) for cond in inv(Condition.query, User.dashboard_id, Condition.dashboard_id).all()]
             
             form = addCatalogueForm()
             form.warehouse_locations.choices = locations_choices
@@ -274,18 +271,19 @@ def add_catalogue():
             success = None
             try:
                 if form.validate_on_submit():
-                    selected_category = Category.query.filter_by(id=form.category_code.data).first()
+                    
+                    selected_category = inv(Category.query.filter_by(id=form.category_code.data), User.dashboard_id, Category.dashboard_id).first()
                     if selected_category:
-                        selected_condition = Condition.query.filter_by(id=form.condition.data).first()
+                        selected_condition = inv(Condition.query.filter_by(id=form.condition.data), User.dashboard_id, Condition.dashboard_id).first()
                         if selected_condition:
                             # using sqlalchemy.orm.collections.instrumentedlist append technique to insert all relations one time if catalogue inserted, and in child locations as well so if error happend before inser which last thing all actions will ignored (1 commit for all)
                             new_catalogue = Catalogue(user_id=current_user.id, sku=form.sku.data, product_name=form.product_name.data, product_description=form.product_description.data, brand=form.brand.data, category_id=selected_category.id, price=form.price.data, sale_price=form.sale_price.data, quantity=form.quantity.data, product_model=form.product_model.data, upc=form.upc.data, condition_id=form.condition.data)
                             for warehouse_location_id in form.warehouse_locations.data:
-                                valid_location = WarehouseLocations.query.filter_by(id=warehouse_location_id).one_or_none()
+                                valid_location = inv(WarehouseLocations.query.filter_by(id=warehouse_location_id), User.dashboard_id, WarehouseLocations.dashboard_id).one_or_none()
                                 if valid_location is not None:
                                     new_catalogue_location = CatalogueLocations(location_id=valid_location.id)
                                     for bin_id in form.locations_bins.data:
-                                        valid_bin = LocationBins.query.filter_by(id=bin_id, location_id=valid_location.id).one_or_none()
+                                        valid_bin = inv(db.query(LocationBins).query.join(WarehouseLocations, LocationBins.location_id==WarehouseLocations.id), User.dashboard_id, WarehouseLocations.dashboard_id).one_or_none()
                                         if valid_bin is not None:
                                             new_location_bin = CatalogueLocationsBins(bin_id=valid_bin.id)
                                             new_catalogue_location.bins.append(new_location_bin)
@@ -343,9 +341,10 @@ def edit_catalogue(catalogue_id):
             allowed_locations_bins_ids = []
             selected_locs_ids = []
             selected_bins_ids = []
+            
 
-            current_locations = WarehouseLocations.query.all()
-            target_catalogue = Catalogue.query.filter_by(id=catalogue_id).one_or_none()
+            current_locations = inv(WarehouseLocations.query, User.dashboard_id, WarehouseLocations.dashboard_id).all()
+            target_catalogue = inv(Catalogue.query.filter_by(id=catalogue_id), User.id, Catalogue.user_id).one_or_none()
             if target_catalogue is not None:
                 for location in current_locations:
                     current_location_obj = {'location': location.id, 'bins': [bin.id for bin in location.bins]}
@@ -360,9 +359,10 @@ def edit_catalogue(catalogue_id):
                     selected_locs_ids.append(cat_loc.location_id)
                     for loc_bin in cat_loc.bins:
                         selected_bins_ids.append(loc_bin.bin_id)
-                
-                categories = [(cat.id, '{}:{}'.format(cat.code, cat.label)) for cat in Category.query.all()]
-                conditions = [(cond.id, '{}: {}'.format(cond.id, cond.name)) for cond in Condition.query.all()]
+
+                categories = [(cat.id, '{}:{}'.format(cat.code, cat.label)) for cat in inv(Category.query, User.dashboard_id, Category.dashboard_id).all()]
+                conditions = [(cond.id, '{}: {}'.format(cond.id, cond.name)) for cond in inv(Condition.query, User.dashboard_id, Condition.dashboard_id).all()]
+
 
                 categoryId = target_catalogue.category.id if target_catalogue.category else None
                 form = editCatalogueForm(
@@ -413,13 +413,14 @@ def edit_catalogue(catalogue_id):
 
                     if target_catalogue.category_id != form.category_code.data:
                         # code should always be valid by wtforms, incase invalid it will ignored without notifcation
-                        target_category = Category.query.filter_by(id=form.category_code.data).first()
+
+                        target_category = inv(Category.query.filter_by(id=form.category_code.data), User.dashboard_id, Category.dashboard_id).first()
                         if target_category:
                             target_catalogue.category_id = target_category.id
 
                     if target_catalogue.condition_id != form.condition.data:
                         # note there are shield before that which is wtforms validation so if wtforms hacked and could sent invalid id, this check will prevent add this invalid id
-                        target_condition = Condition.query.filter_by(id=form.condition.data).first()
+                        target_condition = inv(Condition.query.filter_by(id=form.condition.data), User.dashboard_id, Condition.dashboard_id).first()
                         if target_condition:
                             target_catalogue.condition_id = target_condition.id
 
@@ -438,7 +439,7 @@ def edit_catalogue(catalogue_id):
                     if target_catalogue.upc != form.upc.data:
                         target_catalogue.upc = form.upc.data
 
-                    # location updates missing
+                    # location updates missing 
                     # CatalogueLocationsBins.query.filter(location_id==cuurent_catalogue_location.location_id,bin_id=current_bin_in)
                     user_warehouse_locations_ids = form.warehouse_locations.data
                     user_locations_bin_ids = form.locations_bins.data
@@ -448,7 +449,13 @@ def edit_catalogue(catalogue_id):
                         # check if old loc id exist in the new array sent after sumbit form else delete it
                         if old_selected_loc_id in user_warehouse_locations_ids:
                             # if user selected same location id, need check if bins of current location in loop still used or user remove it after submit form
-                            not_changed_location = CatalogueLocations.query.filter_by(location_id=old_selected_loc_id, catalogue_id=target_catalogue.id).one_or_none()
+                           
+                            not_changed_location = inv(db.session.query(CatalogueLocations).join(
+                                Catalogue, CatalogueLocations.catalogue_id==Catalogue.id
+                            ), User.id, Catalogue.user_id).filter(
+                                CatalogueLocations.location_id==old_selected_loc_id, CatalogueLocations.catalogue_id==target_catalogue.id
+                            ).one_or_none()
+
                             if not_changed_location:                            
                                 for old_bin in not_changed_location.bins:
                                     # if current user old bin id in the sent list from form conitnue else delete this old bin as user not selected it anymore
@@ -460,7 +467,13 @@ def edit_catalogue(catalogue_id):
                                 continue
                         else:
                             # delete location if it was old location of catalogue but not sent in the new array
-                            removed_loc = CatalogueLocations.query.filter_by(location_id=old_selected_loc_id, catalogue_id=target_catalogue.id).one_or_none()
+                            
+                            removed_loc = inv(db.session.query(CatalogueLocations).join(
+                                Catalogue, CatalogueLocations.catalogue_id==Catalogue.id
+                            ), User.id, Catalogue.user_id).filter(
+                                CatalogueLocations.location_id==old_selected_loc_id, CatalogueLocations.catalogue_id==target_catalogue.id
+                            ).one_or_none()
+
                             if removed_loc:
                                 removed_loc.delete()
 
@@ -469,8 +482,12 @@ def edit_catalogue(catalogue_id):
                     # insert all new locations from locations ids list sent from user
 
                     for user_loc_id in user_warehouse_locations_ids:
-                        
-                        location_exist = CatalogueLocations.query.filter_by(location_id=user_loc_id, catalogue_id=target_catalogue.id).one_or_none()
+
+                        location_exist = inv(db.session.query(CatalogueLocations).join(
+                                Catalogue, CatalogueLocations.catalogue_id==Catalogue.id
+                            ), User.id, Catalogue.user_id).filter(
+                                CatalogueLocations.location_id==user_loc_id, CatalogueLocations.catalogue_id==target_catalogue.id
+                            ).one_or_none()
                         if location_exist is not None:
                             continue
                         else:
@@ -486,18 +503,26 @@ def edit_catalogue(catalogue_id):
                     for user_bin_id in user_locations_bin_ids:                    
                         # this solve the very hard problem as technquie I used must secured professional and detected as I sent to js all avail bins ids ignoring their parnt locations so must in insert validate and detect the location of the selected bin
                         # this query says is there CatalogueLocationsBins recored that bin id same as bin_id sent from user form, and also its location id for location owned by target catalogue locations (the previous step make sure new locations inserted in beging to target_catalogue before insert bins so new selected location valid must be found)
-                        bin_exist = CatalogueLocationsBins.query.filter(CatalogueLocationsBins.bin_id==user_bin_id, CatalogueLocationsBins.location_id.in_(all_catalogue_locations_ids)).first()
+
+                        bin_exist = inv(db.session.query(CatalogueLocationsBins).join(
+                                CatalogueLocations, CatalogueLocationsBins.location_id==CatalogueLocations.id
+                            ).join(
+                                Catalogue, CatalogueLocations.catalogue_id==Catalogue.id
+                            ), User.id, Catalogue.user_id).filter(
+                                CatalogueLocationsBins.bin_id==user_bin_id, CatalogueLocationsBins.location_id.in_(all_catalogue_locations_ids)
+                            ).first()
+                        
                         if bin_exist is not None:
                             # if bin already exist not continue
                             continue
                         else:
                             # here user selected new bin that need to be inserted
-                            
-                            target_bin = LocationBins.query.filter_by(id=user_bin_id).one_or_none()
-                            
+                            target_bin = inv(db.session.query(LocationBins).join(WarehouseLocations, LocationBins.location_id==WarehouseLocations.id).filter(LocationBins.id==user_bin_id), User.dashboard_id, WarehouseLocations.dashboard_id).one_or_none()
+
+
                             # get and validate submited bin and confirm its parent dashboardid same as user dashboard_id
                             if target_bin is not None and target_bin.warehouse_location.dashboard_id == current_user.dashboard.id:
-                                catalogue_location = CatalogueLocations.query.filter_by(catalogue_id=target_catalogue.id, location_id=target_bin.warehouse_location.id).one_or_none()
+                                catalogue_location = inv(db.session.query(CatalogueLocations).join(Catalogue, CatalogueLocations.catalogue_id==Catalogue.id).filter(CatalogueLocations.catalogue_id==target_catalogue.id, CatalogueLocations.location_id==target_bin.warehouse_location.id), User.id, Catalogue.user_id).one_or_none()
                                 if catalogue_location is not None:
                                     new_bin = CatalogueLocationsBins(bin_id=target_bin.id)                                
                                     catalogue_location.bins.append(new_bin)
@@ -546,7 +571,7 @@ def delete_catalogue(catalogue_id):
     if can_delete:
         try:
             form = removeCatalogueForm()
-            target_Catalogue = Catalogue.query.filter_by(id=catalogue_id).one_or_none()
+            target_Catalogue = inv(Catalogue.query.filter_by(id=catalogue_id), User.id, Catalogue.user_id).one_or_none()
             if target_Catalogue is not None:
                 if form.validate_on_submit():
                     target_Catalogue.delete()
@@ -579,7 +604,7 @@ def delete_catalogues():
         try:
             form = removeCataloguesForm()
             deleted_ids = []
-            inv_catalogues = Catalogue.query.all()
+            inv_catalogues = inv(Catalogue.query, User.id, Catalogue.user_id).all()
             if form.validate_on_submit():
                 user_catalogues_ids = [str(user_catalogue.id) for user_catalogue in inv_catalogues]
 
@@ -590,7 +615,7 @@ def delete_catalogues():
 
                 for selected_catalogue_id in selected_catalogues:
                     if selected_catalogue_id in user_catalogues_ids:
-                        selected_catalogue = Catalogue.query.filter_by(id=selected_catalogue_id).one_or_none()
+                        selected_catalogue = inv(Catalogue.query.filter_by(id=selected_catalogue_id), User.id, Catalogue.user_id).one_or_none()
                         if selected_catalogue:
                             deleted_ids.append(selected_catalogue.id)
                             selected_catalogue.delete()
@@ -624,7 +649,7 @@ def delete_all_catalogues():
             form = removeAllCataloguesForm()
             
             if form.validate_on_submit():
-                system_catalogues = Catalogue.query.all()
+                system_catalogues = inv(Catalogue.query, User.id, Catalogue.user_id).all()
                 for selected_catalogue in system_catalogues:
                     selected_catalogue.delete()
                     deleted +=1
@@ -661,7 +686,7 @@ def listings():
             # total_pages + 1 (becuase range not take last number while i need it to display the last page)
             pagination = makePagination(
                     request.args.get('page', 1),
-                    db.session.query(Listing),
+                    inv(Listing.query, User.dashboard_id, Listing.dashboard_id),
                     lambda total_pages: [url_for('routes.listings', page=page_index) for page_index in range(1, total_pages+1)],
                     limit_parm=session.get('limit', 10),
                     by='product_name',
@@ -694,7 +719,7 @@ def view_listing(listing_id):
             deleteform = removeListingForm()
             delete_purchase = removePurchaseForm()
             delete_order =  removeOrderForm()
-            target_listing = db.session.query(Listing).filter(Listing.id == listing_id).one_or_none()
+            target_listing = inv(db.session.query(Listing).filter(Listing.id == listing_id), User.dashboard_id, Listing.dashboard_id).one_or_none()
             if not target_listing:
                 message = 'The listing specified with id: {} could not be found. It may be removed or deleted.'.format(listing_id)
                 success = False
@@ -724,10 +749,10 @@ def add_listing():
     if can_add:
         form = addListingForm()
         try:
-            user_catalogues = Catalogue.query.all()
+            user_catalogues = inv(Catalogue.query, User.id, Catalogue.user_id).all()
             form.catalogue_id.choices = [(catalogue.id, catalogue.product_name) for catalogue in user_catalogues]
 
-            inv_platforms = Platform.query.all()
+            inv_platforms = inv(Platform.query, User.dashboard_id, Platform.dashboard_id).all()
             form.platform_id.choices = [(p.id, p.name) for p in inv_platforms]
         except:
             print('System Error: {}'.format(sys.exc_info()))
@@ -738,8 +763,8 @@ def add_listing():
             success = None
             try:
                 if form.validate_on_submit():
-                    selected_catalogue = Catalogue.query.filter_by(id=form.catalogue_id.data).one_or_none()
-                    selected_platform = Platform.query.filter_by(id=form.platform_id.data).first()
+                    selected_catalogue = inv(Catalogue.query.filter_by(id=form.catalogue_id.data), User.id, Catalogue.user_id).one_or_none()
+                    selected_platform = inv(Platform.query.filter_by(id=form.platform_id.data), User.dashboard_id, Platform.dashboard_id).first()
                     if selected_catalogue:
                         if selected_platform:
                             new_listing = Listing(dashboard_id=current_user.dashboard.id, catalogue_id=selected_catalogue.id, platform_id=selected_platform.id, active=form.active.data, discount_start_date=form.discount_start_date.data, discount_end_date=form.discount_end_date.data, unit_discount_price=form.unit_discount_price.data, unit_origin_price=form.unit_origin_price.data, quantity_threshold=form.quantity_threshold.data, currency_iso_code=form.currency_iso_code.data, shop_sku=form.shop_sku.data, offer_id=form.offer_id.data, reference=form.reference.data, reference_type=form.reference_type.data)
@@ -794,8 +819,8 @@ def edit_listing(listing_id):
         form = None
         target_listing = None
         try:
-            target_listing = db.session.query(Listing).filter(Listing.id == listing_id).one_or_none()
             
+            target_listing = inv(db.session.query(Listing).filter(Listing.id == listing_id), User.dashboard_id, Listing.dashboard_id).one_or_none()
             if target_listing is not None:
                 form = editListingForm(
                     catalogue_id=target_listing.catalogue_id,
@@ -812,9 +837,10 @@ def edit_listing(listing_id):
                     reference=target_listing.reference,
                     reference_type=target_listing.reference_type
                 )
-                user_catalogues = Catalogue.query.all()
+
+                user_catalogues = inv(Catalogue.query, User.id, Catalogue.user_id).all()
                 form.catalogue_id.choices = [(catalogue.id, catalogue.product_name) for catalogue in user_catalogues]
-                inv_platforms = Platform.query.all()
+                inv_platforms = inv(Platform.query, User.dashboard_id, Platform.dashboard_id).all()
                 form.platform_id.choices = [(p.id, p.name) for p in inv_platforms]
             else:
                 flash('Unable to display Edit listing form, target listing maybe removed', 'danger')
@@ -828,8 +854,8 @@ def edit_listing(listing_id):
         success = True
         if request.method == 'POST':
             try:
-                selected_catalogue = Catalogue.query.filter_by(id=form.catalogue_id.data).one_or_none()
-                selected_platform = Platform.query.filter_by(id=form.platform_id.data).one_or_none()
+                selected_catalogue = inv(Catalogue.query.filter_by(id=form.catalogue_id.data), User.id, Catalogue.user_id).one_or_none()
+                selected_platform = inv(Platform.query.filter_by(id=form.platform_id.data), User.dashboard_id, Platform.dashboard_id).one_or_none()
                 if form and form.validate_on_submit():
                     if selected_catalogue:
                         if selected_platform:
@@ -982,7 +1008,8 @@ def delete_listing(listing_id):
         try:
             user_dashboard = current_user.dashboard
             form = removeListingForm()
-            target_listing = db.session.query(Listing).filter(Listing.id == listing_id).one_or_none()
+            
+            target_listing = inv(db.session.query(Listing).filter(Listing.id == listing_id), User.dashboard_id, Listing.dashboard_id).one_or_none()
             if target_listing is not None:
                 if form.validate_on_submit():
                     orders_total = sum([order.quantity for order in target_listing.orders])
@@ -1026,7 +1053,8 @@ def delete_listings():
         try:
             user_dashboard = current_user.dashboard
             form = removeListingsForm()
-            user_listings = db.session.query(Listing).all()
+            
+            user_listings = inv(db.session.query(Listing), User.dashboard_id, Listing.dashboard_id).all()
             
             if form.validate_on_submit():
 
@@ -1040,7 +1068,7 @@ def delete_listings():
 
                 for listing_id in selected_listings:
                     if listing_id in user_listings_ids:
-                        target_listing = Listing.query.filter_by(id=listing_id).one_or_none()
+                        target_listing = inv(Listing.query.filter_by(id=listing_id), User.dashboard_id, Listing.dashboard_id).one_or_none()
                         if target_listing:
                             orders_total = sum([order.quantity for order in target_listing.orders])
                             purchases_total = sum([purchase.quantity for purchase in target_listing.purchases])
@@ -1084,7 +1112,8 @@ def multiple_listing_add():
         try:
             form = AddMultipleListingForm()
             # fill choices only, if called process it back default so nothing selected in default (95%)
-            inv_platforms = Platform.query.all()
+            
+            inv_platforms = inv(Platform.query, User.dashboard_id, Platform.dashboard_id).all()
             populate_add_multiple_form(form, inv_platforms)
             if form.validate_on_submit():
                 total_created = 0
@@ -1114,8 +1143,9 @@ def multiple_listing_add():
                 )
                 user_dashboard_id = current_user.dashboard.id
                 for new_list in new_listings:
-                    valid_catalogue = Catalogue.query.filter_by(id=new_list['catalogue_id']).one_or_none()
-                    valid_platform = Platform.query.filter_by(id=new_list['platform_id']).one_or_none()
+                    
+                    valid_catalogue = inv(Catalogue.query.filter_by(id=new_list['catalogue_id']), User.id, Catalogue.user_id).one_or_none()
+                    valid_platform = inv(Platform.query.filter_by(id=new_list['platform_id']), User.dashboard_id, Platform.dashboard_id).one_or_none()
                     if valid_catalogue and valid_platform:
                         new_listing = Listing(dashboard_id=user_dashboard_id, **new_list)
                         new_listing.insert()
@@ -1155,14 +1185,14 @@ def view_purchase_listing(listing_id, purchase_id):
         try:
             deleteform = removePurchaseForm()
             # user dashboard, listing id to keep index stable and not generate invalid pages to the app (if dashboard, and listing id user can view his orders from invalid urls which not stable for indexing)
-            target_purchase = db.session.query(
+            target_purchase = inv(db.session.query(
                 Purchase
             ).join(
                 Listing, Purchase.listing_id==Listing.id
             ).filter(
                 Purchase.id == purchase_id,
                 Listing.id == listing_id,
-            ).one_or_none()
+            ), User.dashboard_id, Listing.dashboard_id).one_or_none()
 
             if target_purchase is None:
                 success = False
@@ -1196,16 +1226,17 @@ def add_purchase_listing(listing_id):
         redirect_url = None
         try:
             user_dashboard = current_user.dashboard
-            target_listing = db.session.query(Listing).filter(Listing.id == listing_id).one_or_none()
+            
+            target_listing = inv(db.session.query(Listing).filter(Listing.id == listing_id), User.dashboard_id, Listing.dashboard_id).one_or_none()
             if target_listing is None:
                 flash('Unable to find listing with id: ({})'.format(listing_id), 'danger')
                 return redirect(url_for('routes.listings'))
             
             form = addPurchaseForm(listing_id=target_listing.id)
             # user using this route can only use the listing of selected dashboard so not allow another dashboard's listing to be submited some how using this route as it not provided
-            dashboard_listings = db.session.query(Listing).all()
+            dashboard_listings = inv(db.session.query(Listing), User.dashboard_id, Listing.dashboard_id).all()
             form.listing_id.choices = [(listing.id, '{} - ({})'.format(listing.product_name, listing.sku) ) for listing in dashboard_listings]
-            form.supplier_id.choices = [(supplier.id, supplier.name) for supplier in Supplier.query.all()]
+            form.supplier_id.choices = [(supplier.id, supplier.name) for supplier in inv(Supplier.query, User.id, Supplier.user_id).all()]
 
         except Exception as e:
             print('System Error: {}'.format(sys.exc_info()))
@@ -1220,7 +1251,7 @@ def add_purchase_listing(listing_id):
                     redirect_url = secureRedirect(form.action_redirect.data) if form.action_redirect and form.action_redirect.data else None
 
                     # confirm listing id and supplier id are in user listings and suppliers (else user can create request for other user's suppliers)
-                    valid_ids = int(form.listing_id.data) in [listing.id for listing in dashboard_listings] and int(form.supplier_id.data) in [supplier.id for supplier in Supplier.query.all()]
+                    valid_ids = int(form.listing_id.data) in [listing.id for listing in dashboard_listings] and int(form.supplier_id.data) in [supplier.id for supplier in inv(Supplier.query, User.id, Supplier.user_id).all()]
                     if valid_ids:
                         new_purchase = Purchase(quantity=form.quantity.data, date=form.date.data, supplier_id=form.supplier_id.data, listing_id=form.listing_id.data)
                         # update sum of dashboard's purchases
@@ -1274,14 +1305,15 @@ def edit_purchase_listing(listing_id, purchase_id):
         dashboard_listings = []
         redirect_url = None
         try:
-            target_purchase = db.session.query(
+            
+            target_purchase = inv(db.session.query(
                 Purchase
             ).join(
                 Listing
             ).filter(
                 Purchase.id == purchase_id,
                 Listing.id == listing_id
-            ).one_or_none()
+            ), User.dashboard_id, Listing.dashboard_id).one_or_none()
 
             if target_purchase is None:
                 flash('Unable to find Purchase with id: ({})'.format(purchase_id), 'danger')
@@ -1289,9 +1321,9 @@ def edit_purchase_listing(listing_id, purchase_id):
             
             form = editPurchaseForm(listing_id=target_purchase.listing_id, supplier_id=target_purchase.supplier_id, quantity=target_purchase.quantity, date=target_purchase.date)
             # user using this route can only use the listing of selected dashboard so not allow another dashboard's listing to be submited some how using this route as it not provided
-            dashboard_listings = db.session.query(Listing).all()
+            dashboard_listings = inv(db.session.query(Listing), User.dashboard_id, Listing.dashboard_id).all()
             form.listing_id.choices = [(listing.id, '{} - ({})'.format(listing.product_name, listing.sku) ) for listing in dashboard_listings]
-            form.supplier_id.choices = [(supplier.id, supplier.name) for supplier in Supplier.query.all()]
+            form.supplier_id.choices = [(supplier.id, supplier.name) for supplier in inv(Supplier.query, User.id, Supplier.user_id).all()]
 
         except Exception as e:
             print('System Error: {}'.format(sys.exc_info()))
@@ -1306,8 +1338,8 @@ def edit_purchase_listing(listing_id, purchase_id):
                 if form.validate_on_submit():
                     # handle redirect securly
                     redirect_url = secureRedirect(form.action_redirect.data) if form.action_redirect and form.action_redirect.data else None
-                    selected_listing = Listing.query.filter_by(id=form.listing_id.data).one_or_none()
-                    valid_ids = int(form.listing_id.data) in [listing.id for listing in dashboard_listings] and int(form.supplier_id.data) in [supplier.id for supplier in Supplier.query.all()]
+                    selected_listing = inv(Listing.query.filter_by(id=form.listing_id.data), User.dashboard_id, Listing.dashboard_id).one_or_none()
+                    valid_ids = int(form.listing_id.data) in [listing.id for listing in dashboard_listings] and int(form.supplier_id.data) in [supplier.id for supplier in inv(Supplier.query, User.id, Supplier.user_id).all()]
                     if valid_ids and selected_listing:
 
                         if target_purchase.listing.catalogue.id != selected_listing.catalogue.id:
@@ -1406,14 +1438,15 @@ def delete_purchase_listing(listing_id, purchase_id):
             form = removePurchaseForm()
             redirect_url = secureRedirect(form.action_redirect.data) if form.action_redirect and form.action_redirect.data else None
             # user can change url by mistake so this query prevent any invalid url not given by system (unlike supplier purchase which is global for any dashboard) (Supplier Purchase diffrent alot that listing purchase)
-            target_purchase = db.session.query(
+            
+            target_purchase = inv(db.session.query(
                 Purchase
             ).join(
                 Listing
             ).filter(
                 Purchase.id == purchase_id,
                 Listing.id == listing_id
-            ).one_or_none()
+            ), User.dashboard_id, Listing.dashboard_id).one_or_none()
             
             if target_purchase is not None:
                 if form.validate_on_submit():
@@ -1465,16 +1498,17 @@ def view_order(listing_id, order_id):
         target_order = None
         taxes_data = {'order_taxes': [], 'shipping_taxes': []}
         try:
+            
             deleteform = removeOrderForm()
             # user dashboard, listing id to keep index stable and not generate invalid pages to the app (if dashboard, and listing id user can view his orders from invalid urls which not stable for indexing)
-            target_order = db.session.query(
+            target_order = inv(db.session.query(
                 Order
             ).join(
                 Listing
             ).filter(
                 Order.id == order_id,
                 Listing.id == listing_id
-            ).one_or_none()
+            ), User.dashboard_id, Listing.dashboard_id).one_or_none()
 
             if target_order is None:
                 success = False
@@ -1510,14 +1544,15 @@ def add_order(listing_id):
         redirect_url = None
         try:
             user_dashboard = current_user.dashboard
-            target_listing = db.session.query(Listing).filter(Listing.id == listing_id).one_or_none()
+            
+            target_listing = inv(db.session.query(Listing).filter(Listing.id == listing_id), User.dashboard_id, Listing.dashboard_id).one_or_none()
             if target_listing is None:
                 flash('Unable to find listing with id: ({})'.format(listing_id), 'danger')
                 return redirect(url_for('routes.listings'))
             
             form = addOrderForm(listing_id=target_listing.id)
             # user using this route can only use the listing of selected dashboard so not allow another dashboard's listing to be submited some how using this route as it not provided
-            dashboard_listings = db.session.query(Listing).all()
+            dashboard_listings = inv(db.session.query(Listing), User.dashboard_id, Listing.dashboard_id).all()
             form.listing_id.choices = [(listing.id, '{} - ({})'.format(listing.product_name, listing.sku) ) for listing in dashboard_listings]
 
         except Exception as e:
@@ -1549,7 +1584,7 @@ def add_order(listing_id):
                     valid_ids = int(form.listing_id.data) in [listing.id for listing in dashboard_listings]
                     
                     # note I allow user to change the listing in form thats why I query again  (the listing_id already vaildted in the if so it belongs to the user)
-                    selected_listing = Listing.query.filter_by(id=form.listing_id.data).one_or_none()                
+                    selected_listing = inv(Listing.query.filter_by(id=form.listing_id.data), User.dashboard_id, Listing.dashboard_id).one_or_none()                
                     if valid_ids and selected_listing is not None:
                         # check the quanity first
                         order_quantity = int(form.quantity.data)
@@ -1668,15 +1703,16 @@ def edit_order(listing_id, order_id):
         dashboard_listings = []
         redirect_url = None
         try:
+            
             # edit order is strict in all routes
-            target_order = db.session.query(
+            target_order = inv(db.session.query(
                 Order
             ).join(
                 Listing
             ).filter(
                 Order.id == order_id,
                 Listing.id == listing_id
-            ).one_or_none()
+            ), User.dashboard_id, Listing.dashboard_id).one_or_none()
 
             if target_order is None:
                 flash('Unable to find Order with id: ({})'.format(order_id), 'danger')
@@ -1737,7 +1773,7 @@ def edit_order(listing_id, order_id):
                 shiping_tax_ids = ','.join(shiping_tax_ids)
             )
             # user using this route can only use the listing of selected dashboard so not allow another dashboard's listing to be submited some how using this route as it not provided
-            dashboard_listings = db.session.query(Listing).all()
+            dashboard_listings = inv(db.session.query(Listing), User.dashboard_id, Listing.dashboard_id).all()
             form.listing_id.choices = [(listing.id, '{} - ({})'.format(listing.product_name, listing.sku) ) for listing in dashboard_listings]
 
         except Exception as e:
@@ -1756,9 +1792,8 @@ def edit_order(listing_id, order_id):
                     
 
                     valid_ids = int(form.listing_id.data) in [listing.id for listing in dashboard_listings]
-                    selected_listing = Listing.query.filter_by(id=form.listing_id.data).one_or_none()
 
-
+                    selected_listing = inv(Listing.query.filter_by(id=form.listing_id.data), User.dashboard_id, Listing.dashboard_id).one_or_none()
                     if valid_ids and selected_listing:
                         # here listing id changed, and this new listing for a diffrent catalogue (note usally every catalogue have 1 listing)
                         if target_order.listing.catalogue.id != selected_listing.catalogue.id:
@@ -1817,7 +1852,7 @@ def edit_order(listing_id, order_id):
                                 selected_listing.catalogue.update()
 
                                 # update order_taxes
-                                update_order_taxes(form, target_order)
+                                update_order_taxes(form, target_order, db)
                                 flash('Successfully Updated The order', 'success')
                             else:
                                 flash('Unable to add edit, the order quantity is greater than the new catalog quantity', 'warning')
@@ -1879,7 +1914,7 @@ def edit_order(listing_id, order_id):
                                     actions += 1
 
                             # one time run performance is must to run successfull if called more than one time in each if will fail message so logic says call it with performance is must (force user of function to follow performance)
-                            update_taxes_result = update_order_taxes(form, target_order)
+                            update_taxes_result = update_order_taxes(form, target_order, db)
                             if actions > 0:
                                 
                                 if quantity_changed:
@@ -1961,14 +1996,14 @@ def delete_order(listing_id, order_id):
             form = removeOrderForm()
             redirect_url = secureRedirect(form.action_redirect.data) if form.action_redirect and form.action_redirect.data else None
             # user can change url by mistake so this query prevent any invalid url not given by system (unlike supplier purchase which is global for any dashboard) (Supplier Purchase diffrent alot that listing purchase)
-            target_order = db.session.query(
+            target_order = inv(db.session.query(
                 Order
             ).join(
                 Listing
             ).filter(
                 Order.id == order_id,
                 Listing.id == listing_id
-            ).one_or_none()
+            ), User.dashboard_id, Listing.dashboard_id).one_or_none()
 
             if target_order is not None:
                 if form.validate_on_submit():
@@ -2013,7 +2048,11 @@ def orders():
             request_page = request.args.get('page', 1)
             order_remove = removeOrderForm()
 
-            orders_query = db.session.query(Order)
+            orders_query = inv(db.session.query(
+                Order
+            ).join(
+                Listing, Order.listing_id == Listing.id
+            ), User.dashboard_id, Listing.dashboard_id)
 
             pagination = makePagination(
                 request_page,
@@ -2056,7 +2095,7 @@ def suppliers():
             addform = addSupplierForm()
             editform = editSupplierForm()
             deleteform = removeSupplierForm()
-            suppliers = Supplier.query.all()
+            suppliers = inv(Supplier.query, User.id, Supplier.user_id).all()
             
         except Exception as e:
             print('System Error: {}'.format(sys.exc_info()))
@@ -2071,7 +2110,6 @@ def suppliers():
         flash("You do not have permissions to view suppliers.", 'danger')
         return redirect(url_for('routes.index'))
 
-
 @routes.route('/suppliers/<int:supplier_id>', methods=['GET'])
 @login_required
 @vendor_permission.require(http_exception=403)
@@ -2084,9 +2122,9 @@ def view_supplier(supplier_id):
         try:
             deleteform = removeSupplierForm()
             delete_purchase_form = removePurchaseForm()
-            supplier = Supplier.query.filter_by(id=supplier_id).one_or_none()
+            supplier = inv(Supplier.query.filter_by(id=supplier_id), User.id, Supplier.user_id).one_or_none()
             if supplier is not None:
-                purchases = Purchase.query.filter_by(supplier_id=supplier.id).all()
+                purchases = inv(db.session.query(Purchase).join(Listing, Purchase.supplier_id==Supplier.id).filter(Purchase.supplier_id==supplier.id), User.id, Supplier.user_id).all()
             else:
                 message = 'Unable to Find Supplier with id: {}, it maybe deleted.'.format(supplier_id)
                 success = False
@@ -2149,7 +2187,8 @@ def edit_supplier(supplier_id):
         try:
             form = editSupplierForm()
             if form.validate_on_submit():
-                target_supplier = Supplier.query.filter_by(id=supplier_id).one_or_none()
+                
+                target_supplier = inv(Supplier.query.filter_by(id=supplier_id), User.id, Supplier.user_id).one_or_none()
                 if target_supplier is not None:
                     if target_supplier.name != form.name.data:
                         target_supplier.name = form.name.data
@@ -2195,7 +2234,7 @@ def delete_supplier(supplier_id):
     if can:
         try:
             form = removeSupplierForm()
-            target_supplier = Supplier.query.filter_by(id=supplier_id).one_or_none()
+            target_supplier = inv(Supplier.query.filter_by(id=supplier_id), User.id, Supplier.user_id).one_or_none()
             if target_supplier is not None:
                 if form.validate_on_submit():
                     target_supplier.delete()
@@ -2225,14 +2264,14 @@ def view_purchase_supplier(supplier_id, purchase_id):
         try:        
             deleteform = removePurchaseForm()
             # user dashboard, listing id to keep index stable and not generate invalid pages to the app (if dashboard, and listing id user can view his orders from invalid urls which not stable for indexing)
-            target_purchase = db.session.query(
+            target_purchase = inv(db.session.query(
                 Purchase
             ).join(
                 Supplier, Purchase.supplier_id, Supplier.id
             ).filter(
                 Purchase.id == purchase_id,
                 Supplier.id == supplier_id
-            ).one_or_none()
+            ), User.id, Supplier.user_id).one_or_none()
 
             if target_purchase is None:
                 success = False
@@ -2263,11 +2302,11 @@ def add_purchase_supplier(supplier_id):
         target_supplier = None
         user_listings = []
         try:
-            target_supplier = Supplier.query.filter_by(id=supplier_id).one_or_none()
+            target_supplier = inv(Supplier.query.filter_by(id=supplier_id), User.id, Supplier.user_id).one_or_none()
             form = addPurchaseForm(supplier_id=target_supplier.id)
-            user_listings = db.session.query(Listing).all()
+            user_listings = inv(db.session.query(Listing), User.dashboard_id, Listing.dashboard_id).all()
             form.listing_id.choices = [(listing.id, '{} - ({})'.format(listing.product_name, listing.sku) ) for listing in user_listings]
-            form.supplier_id.choices = [(supplier.id, supplier.name) for supplier in Supplier.query.all()]
+            form.supplier_id.choices = [(supplier.id, supplier.name) for supplier in inv(Supplier.query.filter_by(id=supplier_id), User.id, Supplier.user_id).all()]
             if target_supplier is None:
                 flash('Unable to find supplier with id: ({})'.format(supplier_id), 'danger')
                 return redirect(url_for('routes.suppliers'))
@@ -2282,10 +2321,10 @@ def add_purchase_supplier(supplier_id):
             success = True
             try:
                 if form.validate_on_submit():
-                    target_listing = db.session.query(Listing).filter(Listing.id==form.listing_id.data).one_or_none()
+                    target_listing = inv(db.session.query(Listing).filter(Listing.id==form.listing_id.data), User.dashboard_id, Listing.dashboard_id).one_or_none()
                     if target_listing:
                         # confirm listing id and supplier id are in user listings and suppliers (else user can create request for other user's suppliers)
-                        valid_ids = int(form.listing_id.data) in [listing.id for listing in user_listings] and int(form.supplier_id.data) in [supplier.id for supplier in Supplier.query.all()]
+                        valid_ids = int(form.listing_id.data) in [listing.id for listing in user_listings] and int(form.supplier_id.data) in [supplier.id for supplier in inv(Supplier.query, User.id, Supplier.user_id).all()]
                         if valid_ids:
                             new_purchase = Purchase(quantity=form.quantity.data, date=form.date.data, supplier_id=form.supplier_id.data, listing_id=target_listing.id)
                             new_purchase.insert()
@@ -2336,21 +2375,27 @@ def edit_purchase_supplier(supplier_id, purchase_id):
         target_purchase = None
         user_listings = []
         try:
-            target_supplier = Supplier.query.filter_by(id=supplier_id).one_or_none()
+            target_supplier = inv(Supplier.query.filter_by(id=supplier_id), User.id, Supplier.user_id).one_or_none()
             if target_supplier is None:
                 flash('Unable to find supplier with id: ({})'.format(supplier_id), 'danger')
                 return redirect(url_for('routes.suppliers'))
         
-            target_purchase = db.session.query(Purchase).filter(Purchase.id == purchase_id).one_or_none()
+            target_purchase = inv(db.session.query(
+                Purchase
+            ).join(
+                Supplier, Purchase.supplier_id, Supplier.id
+            ).filter(
+                Purchase.id == purchase_id
+            ), User.id, Supplier.user_id).one_or_none()
 
             if target_purchase is None:
                 flash('Unable to find Purchase with id: ({})'.format(purchase_id), 'danger')
                 return redirect(url_for('routes.view_supplier', supplier_id=supplier_id))
             
             form = editPurchaseForm(supplier_id=target_purchase.supplier_id, listing_id=target_purchase.listing_id, quantity=target_purchase.quantity, date=target_purchase.date)
-            user_listings = db.session.query(Listing).all()
+            user_listings = inv(db.session.query(Listing), User.dashboard_id, Listing.dashboard_id).all()
             form.listing_id.choices = [(listing.id, '{} - ({})'.format(listing.product_name, listing.sku) ) for listing in user_listings]
-            form.supplier_id.choices = [(supplier.id, supplier.name) for supplier in Supplier.query.all()]
+            form.supplier_id.choices = [(supplier.id, supplier.name) for supplier in inv(Supplier.query, User.id, Supplier.user_id).all()]
             
         except Exception as e:
             print('System Error: {} , info: {}'.format(e, sys.exc_info()))
@@ -2361,8 +2406,8 @@ def edit_purchase_supplier(supplier_id, purchase_id):
             success = True
             try:
                 if form.validate_on_submit():
-                    valid_ids = int(form.listing_id.data) in [listing.id for listing in user_listings] and int(form.supplier_id.data) in [supplier.id for supplier in Supplier.query.all()]
-                    selected_listing = Listing.query.filter_by(id=form.listing_id.data).one_or_none()
+                    valid_ids = int(form.listing_id.data) in [listing.id for listing in user_listings] and int(form.supplier_id.data) in [supplier.id for supplier in inv(Supplier.query, User.id, Supplier.user_id).all()]
+                    selected_listing = inv(Listing.query.filter_by(id=form.listing_id.data), User.dashboard_id, Listing.dashboard_id).one_or_none()
                     if valid_ids and selected_listing:
 
                         if target_purchase.listing.catalogue.id != selected_listing.catalogue.id:
@@ -2450,7 +2495,14 @@ def delete_purchase_supplier(supplier_id, purchase_id):
     if can:
         try:
             form = removePurchaseForm()
-            target_purchase = db.session.query(Purchase).filter(Purchase.id == purchase_id).one_or_none()
+            target_purchase = inv(db.session.query(
+                Purchase
+            ).join(
+                Supplier, Purchase.supplier_id, Supplier.id
+            ).filter(
+                Purchase.id == purchase_id
+            ), User.id, Supplier.user_id).one_or_none()
+
             if target_purchase is not None:
                 if form.validate_on_submit():
 
@@ -2515,10 +2567,10 @@ def setup():
 
             setup_bestbuy = SetupBestbuyForm()
 
-            platforms = Platform.query.all()
-            locations = WarehouseLocations.query.all()
-            conditions = Condition.query.all()
-            categories = Category.query.all()
+            platforms = inv(Platform.query, User.dashboard_id, Platform.dashboard_id).all()
+            locations = inv(WarehouseLocations.query, User.dashboard_id, WarehouseLocations.dashboard_id).all()
+            conditions = inv(Condition.query, User.dashboard_id, Condition.dashboard_id).all()
+            categories = inv(Category.query, User.dashboard_id, Category.dashboard_id).all()
 
             # check if user have bestbuy_metas created for remanaing and max per request for current user  (note if global app config numbers changed next time user will try import data will require to setup again the api and auto update the global config number only if required update)
             bestbuy_installed = bestbuy_ready()
@@ -2542,7 +2594,7 @@ def add_platform():
         try:
             form = addPlatformForm()
             if form.validate_on_submit():
-                platform_exist = Platform.query.filter_by(name=form.name_add.data).first()
+                platform_exist = inv(Platform.query.filter_by(name=form.name_add.data), User.dashboard_id, Platform.dashboard_id).first()
                 if not platform_exist:
                     new_platform = Platform(dashboard_id=current_user.dashboard.id, name=form.name_add.data)
                     new_platform.insert()
@@ -2578,10 +2630,10 @@ def edit_platform(platform_id):
         try:
             form = editPlatformForm()
             if form.validate_on_submit():
-                target_platform = Platform.query.filter_by(id=platform_id).one_or_none()
+                target_platform = inv(Platform.query.filter_by(id=platform_id), User.dashboard_id, Platform.dashboard_id).one_or_none()
                 if target_platform is not None:
                     if target_platform.name != form.name_edit.data:
-                        platform_name_exist = Platform.query.filter_by(name=form.name_edit.data).first()
+                        platform_name_exist = inv(Platform.query.filter_by(name=form.name_edit.data), User.dashboard_id, Platform.dashboard_id).first()
                         if not platform_name_exist:
                             target_platform.name = form.name_edit.data
                             target_platform.update()
@@ -2621,7 +2673,7 @@ def delete_platform(platform_id):
     if can:
         try:
             form = removePlatformForm()
-            target_platform = Platform.query.filter_by(id=platform_id).one_or_none()
+            target_platform = inv(Platform.query.filter_by(id=platform_id), User.dashboard_id, Platform.dashboard_id).one_or_none()
             if target_platform is not None:
                 if form.validate_on_submit():
                     target_platform.delete()
@@ -2649,7 +2701,7 @@ def add_location():
         try:
             form = addLocationForm()
             if form.validate_on_submit():
-                exist_location = WarehouseLocations.query.filter_by(name=form.location_name_add.data).first()
+                exist_location = inv(WarehouseLocations.query.filter_by(name=form.location_name_add.data), User.dashboard_id, WarehouseLocations.dashboard_id).first()
                 if not exist_location:
                     new_location = WarehouseLocations(dashboard_id=current_user.dashboard_id, name=form.location_name_add.data)
                     new_location.insert()
@@ -2685,10 +2737,10 @@ def edit_location(location_id):
         try:
             form = editLocationForm()
             if form.validate_on_submit():
-                target_location = WarehouseLocations.query.filter_by(id=location_id).one_or_none()
+                target_location = inv(WarehouseLocations.query.filter_by(id=location_id), User.dashboard_id, WarehouseLocations.dashboard_id).one_or_none()
                 if target_location is not None:
                     if target_location.name != form.location_name_edit.data:
-                        exist_location_name = WarehouseLocations.query.filter_by(name=form.location_name_edit.data).first()
+                        exist_location_name = inv(WarehouseLocations.query.filter_by(name=form.location_name_edit.data), User.dashboard_id, WarehouseLocations.dashboard_id).first()
                         if not exist_location_name:
                             target_location.name = form.location_name_edit.data
                             target_location.update()
@@ -2728,7 +2780,7 @@ def delete_location(location_id):
     if can:
         try:
             form = removeLocationForm()
-            target_location = WarehouseLocations.query.filter_by(id=location_id).one_or_none()
+            target_location = inv(WarehouseLocations.query.filter_by(id=location_id), User.dashboard_id, WarehouseLocations.dashboard_id).one_or_none()
             if target_location is not None:
                 if form.validate_on_submit():
                     target_location.delete()
@@ -2758,10 +2810,10 @@ def add_bin(location_id):
         try:
             form = addBinForm()
             if form.validate_on_submit():
-                target_location = WarehouseLocations.query.filter_by(id=location_id).one_or_none()
+                target_location = inv(WarehouseLocations.query.filter_by(id=location_id), User.dashboard_id, WarehouseLocations.dashboard_id).one_or_none()
                 if target_location is not None:
                     # bin name can not duplicated in same location eg, bin1 in location x if duplicated so delete this or add additionl info eg: roof1, first point incase of this name can full descriptive of bin roof 1, spot1 etc instead of spot1
-                    exist_bin = LocationBins.query.filter_by(name=form.bin_name_add.data, location_id=target_location.id).first()
+                    exist_bin = inv(db.session.query(LocationBins).join(WarehouseLocations, LocationBins.location_id==WarehouseLocations.id).filter(LocationBins.name==form.bin_name_add.data, LocationBins.location_id==target_location.id), User.dashboard_id, WarehouseLocations.dashboard_id).first()
                     if not exist_bin:
                         new_bin = LocationBins(name=form.bin_name_add.data, location_id=target_location.id)
                         new_bin.insert()
@@ -2799,12 +2851,12 @@ def edit_bin(location_id, bin_id):
         try:
             form = editBinForm()
             if form.validate_on_submit():
-                target_location = WarehouseLocations.query.filter_by(id=location_id).one_or_none()
+                target_location = inv(WarehouseLocations.query.filter_by(id=location_id), User.dashboard_id, WarehouseLocations.dashboard_id).one_or_none()
                 if target_location is not None:
-                    target_bin = LocationBins.query.filter_by(id=bin_id, location_id=target_location.id).one_or_none()
+                    target_bin = inv(db.session.query(LocationBins).join(WarehouseLocations, LocationBins.location_id==WarehouseLocations.id).filter(LocationBins.id==bin_id, LocationBins.location_id==target_location.id), User.dashboard_id, WarehouseLocations.dashboard_id).one_or_none()
                     if target_bin is not None:
                         if target_bin.name != form.bin_name_edit.data:
-                            exist_bin_name = LocationBins.query.filter_by(name=form.bin_name_edit.data, location_id=target_location.id).first()
+                            exist_bin_name = inv(db.session.query(LocationBins).join(WarehouseLocations, LocationBins.location_id==WarehouseLocations.id).filter(LocationBins.name==form.bin_name_edit.data, LocationBins.location_id==target_location.id), User.dashboard_id, WarehouseLocations.dashboard_id).first()
                             if not exist_bin_name:
                                 target_bin.name = form.bin_name_edit.data
                                 target_bin.update()
@@ -2849,9 +2901,9 @@ def delete_bin(location_id, bin_id):
             form = removeBinForm()
             if form.validate_on_submit():
                 # there are cascade rule in sqlalchemy, and db can not found bin while its location deleted (!!! this high secuirty point)
-                target_location = WarehouseLocations.query.filter_by(id=location_id).one_or_none()
+                target_location = inv(WarehouseLocations.query.filter_by(id=location_id), User.dashboard_id, WarehouseLocations.dashboard_id).one_or_none()
                 if target_location is not None:
-                    target_bin = LocationBins.query.filter_by(id=bin_id, location_id=target_location.id).one_or_none()
+                    target_bin = inv(db.session.query(LocationBins).join(WarehouseLocations, LocationBins.location_id==WarehouseLocations.id).filter(LocationBins.id==bin_id, location_id==target_location.id), User.dashboard_id, WarehouseLocations.dashboard_id).one_or_none()
                     if target_bin is not None:
                         target_bin.delete()
                         flash('Successfully deleted Bin', 'success')
@@ -2881,7 +2933,7 @@ def add_condition():
         try:
             form = addConditionForm()
             if form.validate_on_submit():
-                condition_exist = Condition.query.filter_by(name=form.name_add.data).first()
+                condition_exist = inv(Condition.query.filter_by(name=form.name_add.data), User.dashboard_id, Condition.dashboard_id).first()
                 if not condition_exist:
                     new_platform = Condition(dashboard_id=current_user.dashboard.id, name=form.name_add.data)
                     new_platform.insert()
@@ -2918,10 +2970,10 @@ def edit_condition(condition_id):
         try:
             form = editConditionForm()
             if form.validate_on_submit():
-                target_condition = Condition.query.filter_by(id=condition_id).one_or_none()
+                target_condition = inv(Condition.query.filter_by(id=condition_id), User.dashboard_id, Condition.dashboard_id).one_or_none()
                 if target_condition is not None:
                     if target_condition.name != form.name_edit.data:
-                        condition_name_exist = Condition.query.filter_by(name=form.name_edit.data).first()
+                        condition_name_exist = inv(Condition.query.filter_by(name=form.name_edit.data), User.dashboard_id, Condition.dashboard_id).first()
                         if not condition_name_exist:
                             target_condition.name = form.name_edit.data
                             target_condition.update()
@@ -2961,7 +3013,7 @@ def delete_condition(condition_id):
     if can:
         try:
             form = removeConditionForm()
-            target_condition = Condition.query.filter_by(id=condition_id).one_or_none()
+            target_condition = inv(Condition.query.filter_by(id=condition_id), User.dashboard_id, Condition.dashboard_id).one_or_none()
             if target_condition is not None:
                 if form.validate_on_submit():
                     target_condition.delete()
@@ -2990,7 +3042,7 @@ def add_category():
             form = addCategoryForm()
             if form.validate_on_submit():
                 # category code and label are uniques for the dashboard (eg you can not have to categories with same title in invetory sidebar and random some here and some here)
-                exist_category = db.session.query(Category).filter(or_(Category.code==form.code.data, Category.label==form.label.data)).first()
+                exist_category = inv(db.session.query(Category).filter(or_(Category.code==form.code.data, Category.label==form.label.data)), User.dashboard_id, Category.dashboard_id).first()
                 if not exist_category:
                     new_category = Category(dashboard_id=current_user.dashboard_id, code=form.code.data, label=form.label.data, level=form.level.data, parent_code=form.parent_code.data)
                     new_category.insert()
@@ -3025,12 +3077,12 @@ def edit_category(category_id):
         try:
             form = editCategoryForm()
             if form.validate_on_submit():
-                target_category = Category.query.filter_by(id=category_id).one_or_none()
+                target_category = inv(Category.query.filter_by(id=category_id), User.dashboard_id, Category.dashboard_id).one_or_none()
                 if target_category is not None:
                     
                     # confirm new code not exist in system only when code updated
                     if target_category.code != form.code_edit.data:
-                        exist_category_code = Category.query.filter_by(code=form.code_edit.data).first()
+                        exist_category_code = inv(Category.query.filter_by(code=form.code_edit.data), User.dashboard_id, Category.dashboard_id).first()
 
                         if not exist_category_code:
                             target_category.code = form.code_edit.data
@@ -3041,7 +3093,7 @@ def edit_category(category_id):
                     
                     # confirm new label not exist in system only when label updated
                     if target_category.label != form.label_edit.data:
-                        exist_category_label = Category.query.filter_by(label=form.label_edit.data).first()
+                        exist_category_label = inv(Category.query.filter_by(label=form.label_edit.data), User.dashboard_id, Category.dashboard_id).first()
 
                         if not exist_category_label:
                             target_category.label = form.label_edit.data
@@ -3102,7 +3154,7 @@ def delete_category(category_id):
     if can:
         try:
             form = removeCategoryForm()
-            target_category = Category.query.filter_by(id=category_id).one_or_none()
+            target_category = inv(Category.query.filter_by(id=category_id), User.dashboard_id, Category.dashboard_id).one_or_none()
             if target_category is not None:
                 if form.validate_on_submit():
                     target_category.delete()

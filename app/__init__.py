@@ -1,4 +1,5 @@
 import os
+import secrets
 from collections import namedtuple
 from functools import partial
 from flask import Flask, render_template, redirect, url_for
@@ -29,7 +30,9 @@ app.config['BESTBUY_MAX'] = 100
 app.config['OURAPI_REQUESTS_LIMIT'] = 100
 app.config['OURAPI_KEYS_MAX'] = 10
 app.config['OURAPI_LIMIT'] = 100
-
+#app.config['SQLALCHEMY_DATABASE_URI'] = 'mysql://mr204h:Ilda2011@localhost/inventory123?charset=utf8mb4'
+app.config['SQLALCHEMY_DATABASE_URI'] = 'mysql://dbmasteruser:Success2023!@ls-78a3019a69abb8942e164ba31b7f79d941a5b928.cm1krsomo3zh.ca-central-1.rds.amazonaws.com/inventory123?charset=utf8mb4'
+app.config['SECRET_KEY'] = 'AUubvglCWMc4pKZCc_H_kMJuapiMsMmHBUVuWI2VbjRzk589o1GmwBXZe-xkDoOFv-WCAXqQmbAKet4plF_-aB0'
 #app.config['SALAT'] = os.environ.get('SALAT')
 db = SQLAlchemy(app)
 # if not used remove (pass encryptor unseen and no info for it)
@@ -48,6 +51,7 @@ login_manager.init_app(app)
 
 vendor_permission = Permission(RoleNeed('vendor'))
 admin_permission = Permission(RoleNeed('admin'))
+inventory_admin_permission = Permission(RoleNeed('inventory_admin'))
 
 # setup excel to add flask_excel's methods, and other data to request
 excel.init_excel(app)

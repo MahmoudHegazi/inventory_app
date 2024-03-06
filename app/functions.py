@@ -35,6 +35,9 @@ def get_safe_redirect(url=''):
         return url
     return ''
 
+def inv(query, userCol, joinUserCol):
+    # make sure dynamic user inventory id provided is not None if so AND will false result
+    return query.join(User, userCol==joinUserCol).filter(User.inventory_id==current_user.inventory_id)
 
 
 #### main functions ####
@@ -137,7 +140,7 @@ def updateDashboardListings(user_dashboard):
     # +1 and -1 has no way to be fixed and not synced, this way do what +1 and -1 do and it will fix incase indexing broken
     try:
         if user_dashboard:
-            inv_listings = Listing.query.all()
+            inv_listings = inv(Listing.query, User.dashboard_id, Listing.dashboard_id).all()
             user_dashboard.num_of_listings = len(inv_listings)
             user_dashboard.update()
             return user_dashboard.num_of_listings
@@ -152,7 +155,11 @@ def updateDashboardListings(user_dashboard):
 def updateDashboardOrders(db, user_dashboard):
     try:
         # updated could be order_estate != 'refunded,etc'
-        total_dashboard_orders = db.session.query(func.sum(Order.quantity)).scalar()
+        total_dashboard_orders = inv(db.session.query(
+                func.sum(Order.quantity)
+            ).join(
+                Listing, Order.listing_id==Listing.id
+            ), User.dashboard_id, Listing.dashboard_id).scalar()
         user_dashboard.num_of_orders = total_dashboard_orders
         user_dashboard.update()
         return total_dashboard_orders
@@ -162,11 +169,11 @@ def updateDashboardOrders(db, user_dashboard):
 
 def updateDashboardPurchasesSum(db, Purchase, Listing, user_dashboard):
     try:
-        sum_dashboard_purchases = db.session.query(
+        sum_dashboard_purchases = inv(db.session.query(
                     func.sum((Purchase.quantity*Listing.price))
                 ).join(
                     Listing
-                ).scalar()
+                ), User.dashboard_id, Listing.dashboard_id).scalar()
         user_dashboard.sum_of_monthly_purchases = sum_dashboard_purchases
         user_dashboard.update()
         return sum_dashboard_purchases
@@ -477,7 +484,7 @@ def get_export_data(db, flask_excel, current_user_id, table_name, columns, opera
     # catalogue
     if table_name == 'catalogue':
         # my sqlalchemy export filter lib simple as filter query, and it makes user securly by clicking btns create any sqlalchemy result securely with simple words, it can used in create custom charts dynamic
-        response['data'] = db.session.query(Catalogue).outerjoin(
+        response['data'] = inv(db.session.query(Catalogue).outerjoin(
             CatalogueLocations, CatalogueLocations.catalogue_id == Catalogue.id
         ).outerjoin(
             WarehouseLocations, CatalogueLocations.location_id == WarehouseLocations.id
@@ -489,7 +496,7 @@ def get_export_data(db, flask_excel, current_user_id, table_name, columns, opera
             Category, Category.id == Catalogue.category_id
         ).outerjoin(
             Condition, Condition.id == Catalogue.condition_id
-        ).filter(filterBooleanClauseList).all()
+        ), User.id, Catalogue.user_id).filter(filterBooleanClauseList).all()
         if response['data']:
             export_data = []
             
@@ -526,7 +533,7 @@ def get_export_data(db, flask_excel, current_user_id, table_name, columns, opera
         return response
     # listing
     elif table_name == 'listing':
-        response['data'] = db.session.query(Listing).join(
+        response['data'] = inv(db.session.query(Listing).join(
             Catalogue, Listing.catalogue_id==Catalogue.id
         ).outerjoin(
             Platform, Listing.platform_id==Platform.id
@@ -546,7 +553,7 @@ def get_export_data(db, flask_excel, current_user_id, table_name, columns, opera
             Order, Order.listing_id == Listing.id
         ).outerjoin(
             OrderTaxes, OrderTaxes.order_id == Order.id
-        ).filter(
+        ), User.dashboard_id, Listing.dashboard_id).filter(
             filterBooleanClauseList
         ).all()                    
         if response['data']:
@@ -585,7 +592,7 @@ def get_export_data(db, flask_excel, current_user_id, table_name, columns, opera
 
     elif table_name == 'purchase':
         # it's required to have supplier, listing, catalogue, to get purchases object so it faster and better to keep join not outerjoin
-        response['data'] = db.session.query(
+        response['data'] = inv(db.session.query(
             Purchase
         ).join(
             Supplier
@@ -593,7 +600,7 @@ def get_export_data(db, flask_excel, current_user_id, table_name, columns, opera
             Listing, Purchase.listing_id == Listing.id
         ).join(
             Catalogue, Listing.catalogue_id == Catalogue.id
-        ).filter(
+        ), User.id, Catalogue.user_id).filter(
             filterBooleanClauseList
         ).all()
         if response['data']:
@@ -605,13 +612,13 @@ def get_export_data(db, flask_excel, current_user_id, table_name, columns, opera
             response['message'] = 'No Matched Results Found (purchases).'
 
     elif table_name == 'order':
-        response['data'] = db.session.query(
+        response['data'] = inv(db.session.query(
             Order
         ).join(
             Listing
         ).join(
             Catalogue
-        ).filter(
+        ), User.id, Catalogue.user_id).filter(
             filterBooleanClauseList
         ).all()
         if response['data']:
@@ -624,7 +631,7 @@ def get_export_data(db, flask_excel, current_user_id, table_name, columns, opera
             response['message'] = 'No Matched Results Found (orders).'
     # supplier
     elif table_name == 'supplier':
-        response['data'] = db.session.query(Supplier).filter(and_(Supplier.user_id==current_user_id), filterBooleanClauseList).all()
+        response['data'] = inv(db.session.query(Supplier).filter(and_(Supplier.user_id==current_user_id), filterBooleanClauseList), User.id, Supplier.user_id).all()
         if response['data']:
             response['column_names'] = Supplier.__table__.columns.keys()
             if usejson == False:
@@ -866,12 +873,12 @@ def get_charts(db, current_user, charts_ids=[], filter_args=[]):
             if chart_id not in result:            
                 if chart_id == 'top_ordered_products':
                     # chart 1
-                    chart_query = db.session.query(
+                    chart_query = inv(db.session.query(
                         Listing.product_name,
                         func.sum(Order.quantity).label('total_quantities')
                     ).join(
                         Order, Listing.id == Order.listing_id
-                    )
+                    ), User.dashboard_id, Listing.dashboard_id)
 
                     if filter_args and len(filter_args) > 0:
                         chart_query = chart_query.filter(*filter_args).group_by(Listing.id).order_by(desc('total_quantities')).limit(5).all()
@@ -957,12 +964,12 @@ def get_charts(db, current_user, charts_ids=[], filter_args=[]):
                 
                 elif chart_id == 'less_ordered_products':
                     # chart 1
-                    chart_query = db.session.query(
+                    chart_query = inv(db.session.query(
                         Listing.product_name,
                         func.sum(Order.quantity).label('total_quantities')
                     ).join(
                         Order, Listing.id == Order.listing_id
-                    )
+                    ), User.dashboard_id, Listing.dashboard_id)
 
                     if filter_args and len(filter_args) > 0:
                         chart_query = chart_query.filter(*filter_args).group_by(Listing.id).order_by(asc('total_quantities')).limit(5).all()
@@ -987,12 +994,12 @@ def get_charts(db, current_user, charts_ids=[], filter_args=[]):
     
                 elif chart_id == 'most_purchased_products':
                     # chart 2
-                    chart_query = db.session.query(
+                    chart_query = inv(db.session.query(
                         Listing.product_name,
                         func.sum(Purchase.quantity).label('total_quantities')
                     ).join(
                         Purchase, Listing.id == Purchase.listing_id
-                    )
+                    ), User.dashboard_id, Listing.dashboard_id)
 
                     if filter_args and len(filter_args) > 0:
                         chart_query = chart_query.filter(*filter_args).group_by(Listing.id).order_by(desc('total_quantities')).limit(5).all()
@@ -1017,12 +1024,12 @@ def get_charts(db, current_user, charts_ids=[], filter_args=[]):
                 elif chart_id == 'less_purchased_products':
     
                     # chart 3
-                    chart_query = db.session.query(
+                    chart_query = inv(db.session.query(
                         Listing.product_name,
                         func.sum(Purchase.quantity).label('total_quantities')
                     ).join(
                         Purchase, Listing.id == Purchase.listing_id
-                    )
+                    ), User.dashboard_id, Listing.dashboard_id)
 
                     if filter_args and len(filter_args) > 0:
                         chart_query = chart_query.filter(*filter_args).group_by(Listing.id).order_by(asc('total_quantities')).limit(5).all()
@@ -1046,12 +1053,12 @@ def get_charts(db, current_user, charts_ids=[], filter_args=[]):
                 elif chart_id == 'top_purchases_suppliers':
     
                     # chart 4
-                    chart_query = db.session.query(
+                    chart_query = inv(db.session.query(
                         Supplier.name,
                         func.sum(Purchase.quantity).label('total_purchases')
                     ).join(
                         Purchase, Supplier.id==Purchase.supplier_id
-                    )
+                    ), User.id, Supplier.user_id)
 
                     if filter_args and len(filter_args) > 0:
                         chart_query = chart_query.filter(*filter_args).group_by(Purchase.supplier_id).order_by(desc('total_purchases')).limit(5).all()
@@ -1135,12 +1142,12 @@ def get_charts(db, current_user, charts_ids=[], filter_args=[]):
                 elif chart_id == 'less_purchases_suppliers':
 
                     # chart 5 (type of this charts matters later when have alot of suppliers and purchases will define who suppliers not work with him alot)
-                    chart_query = db.session.query(
+                    chart_query = inv(db.session.query(
                         Supplier.name,
                         func.sum(Purchase.quantity).label('total_purchases')
                     ).join(
                         Purchase, Supplier.id==Purchase.supplier_id
-                    )
+                    ), User.id, Supplier.user_id)
 
                     if filter_args and len(filter_args) > 0:
                         chart_query = chart_query.filter(*filter_args).group_by(Purchase.supplier_id).order_by(asc('total_purchases')).limit(5).all()
@@ -1163,12 +1170,12 @@ def get_charts(db, current_user, charts_ids=[], filter_args=[]):
                 elif chart_id == 'suppliers_purchases':
     
                     # chart 6
-                    chart_query = db.session.query(
+                    chart_query = inv(db.session.query(
                         Supplier.name,
                         func.sum(Purchase.quantity).label('total_purchases')
                     ).join(
                         Purchase, Supplier.id==Purchase.supplier_id
-                    )
+                    ), User.id, Supplier.user_id)
 
                     if filter_args and len(filter_args) > 0:
                         chart_query = chart_query.filter(*filter_args).group_by(Purchase.supplier_id).order_by(desc('total_purchases')).all()
@@ -1191,14 +1198,14 @@ def get_charts(db, current_user, charts_ids=[], filter_args=[]):
                 elif chart_id == 'orders_yearly_performance':
                 
                     # chart 7
-                    chart_query = db.session.query(
+                    chart_query = inv(db.session.query(
                         extract('year', Order.date),
                         func.sum(Order.quantity).label('total_orders')
                     ).join(
                         Listing, Order.listing_id==Listing.id
                     ).join(
                         Catalogue, Listing.catalogue_id==Catalogue.id
-                    )
+                    ), User.id, Catalogue.user_id)
 
                     if filter_args and len(filter_args) > 0:
                         chart_query = chart_query.filter(*filter_args).group_by(extract('year', Order.date)).order_by(asc('total_orders')).all()
@@ -1283,10 +1290,12 @@ def get_charts(db, current_user, charts_ids=[], filter_args=[]):
                 elif chart_id == 'purchases_yearly_performance':
                 
                     # chart 8 (Remaning monthly with ajax select for month)
-                    chart_query = db.session.query(
+                    chart_query = inv(db.session.query(
                         extract('year', Purchase.date),
                         func.sum(Purchase.quantity).label('total_purchases')
-                    )
+                    ).join(
+                        Listing, Purchase.listing_id==Listing.id
+                    ), User.dashboard_id, Listing.dashboard_id)
 
                     if filter_args and len(filter_args) > 0:
                         chart_query = chart_query.filter(*filter_args).group_by(extract('year', Purchase.date)).order_by(asc('total_purchases')).all()
@@ -1428,7 +1437,7 @@ def upload_catalogues(offers_data, current_user):
     try:        
         result = {'total': len(offers_data), 'uploaded': 0, 'updated': 0, 'not_changed': 0, 'luploaded': 0, 'lupdated': 0, 'lnot_changed': 0, 'new_categories': 0}
         # create platform for best buy if not exist
-        best_buy_platform = Platform.query.filter_by(name='bestbuy').first()
+        best_buy_platform = inv(Platform.query.filter_by(name='bestbuy'), User.dashboard_id, Platform.dashboard_id).first()
         if not best_buy_platform:
             best_buy_platform = Platform(dashboard_id=current_user.dashboard.id, name='bestbuy')
             best_buy_platform.insert()
@@ -1462,13 +1471,13 @@ def upload_catalogues(offers_data, current_user):
                 discount_start_date = mysql_strdate(offer['discount']['start_date']) if 'discount' in offer and isinstance(offer['discount'], dict) and 'start_date' in offer['discount'] else None
                 discount_end_date = mysql_strdate(offer['discount']['end_date']) if 'discount' in offer and isinstance(offer['discount'], dict) and 'end_date' in offer['discount'] else None
 
-                selected_category = Category.query.filter_by(code=category_code).first()
+                selected_category = inv(Category.query.filter_by(code=category_code), User.dashboard_id, Category.dashboard_id).first()
                 if not selected_category:
                     selected_category = Category(dashboard_id=current_user.dashboard.id, code=category_code, label=category_label, level=0, parent_code='')
                     selected_category.insert()
                     result['new_categories'] += 1
 
-                selected_catalogue = Catalogue.query.filter_by(sku=product_sku).first()
+                selected_catalogue = inv(Catalogue.query.filter_by(sku=product_sku), User.id, Catalogue.user_id).first()
                 not_changed = False
                 if selected_catalogue:
                     update_require = False
@@ -1522,10 +1531,10 @@ def upload_catalogues(offers_data, current_user):
                     result['uploaded'] += 1
 
                 # check if listing exist in same platform
-                selected_listing = Listing.query.filter_by(
+                selected_listing = inv(Listing.query.filter_by(
                     catalogue_id=selected_catalogue.id,
                     sku=selected_catalogue.sku, platform_id=best_buy_platform.id
-                ).first()
+                ), User.dashboard_id, Listing.dashboard_id).first()
 
                 if selected_listing:
                     update_require2 = False
@@ -1604,7 +1613,7 @@ def upload_orders(orders, current_user, db):
         
         user_dashboard = current_user.dashboard
 
-        best_buy_platform = Platform.query.filter_by(name='bestbuy').first()
+        best_buy_platform = inv(Platform.query.filter_by(name='bestbuy'), User.dashboard_id, Platform.dashboard_id).first()
         if not best_buy_platform:
             best_buy_platform = Platform(dashboard_id=current_user.dashboard.id, name='bestbuy')
             best_buy_platform.insert()
@@ -1625,7 +1634,7 @@ def upload_orders(orders, current_user, db):
                 order_quantity = int_or_none(quantity)
 
                 # to import an order you must first have listing and catalogue for it in same platform (catalogue_id not none so if listing there must be parent catalogue)
-                target_listing = Listing.query.filter_by(offer_id=offer_id, platform_id=best_buy_platform.id).first()
+                target_listing = inv(Listing.query.filter_by(offer_id=offer_id, platform_id=best_buy_platform.id), User.dashboard_id, Listing.dashboard_id).first()
                 if target_listing:
 
                     # check if quantity accept new order (Later can improved calcas for refunded, dates! but dates crtical as if no real action done by user to provide order will lead into invalid calcuation)
@@ -1690,11 +1699,11 @@ def upload_orders(orders, current_user, db):
                     total_price = order['total_price'] if 'total_price' in order else None
                     order_state = order['order_state'] if 'order_state' in order else None
     
-                    new_order = db.session.query(Order).join(Listing, Order.listing_id==Listing.id).filter(
+                    new_order = inv(db.session.query(Order).join(Listing, Order.listing_id==Listing.id).filter(
                         Listing.platform_id == best_buy_platform.id,
                         Order.order_id != None,
                         Order.order_id == order_id,
-                    ).first()
+                    ), User.dashboard_id, Listing.dashboard_id).first()
     
                     if new_order:
                         # update existing order data
@@ -1799,9 +1808,8 @@ def upload_orders(orders, current_user, db):
                                 new_order.order_state = order_state
                                 update_require = True
 
-                            
                             for order_tax in taxes:
-                                order_tax_exist = OrderTaxes.query.filter_by(order_id=new_order.id, type='order', code=order_tax['code']).first()
+                                order_tax_exist = inv(db.session.query(OrderTaxes).join(Order, OrderTaxes.order_id==Order.id).join(Listing, Order.listing_id==Listing.id).filter(OrderTaxes.order_id==new_order.id, OrderTaxes.type=='order', OrderTaxes.code==order_tax['code']), User.dashboard_id, Listing.dashboard_id).first()
                                 if not order_tax_exist:
                                     # insert order tax if not exist
                                     new_order.taxes.append(OrderTaxes(type='order', amount=order_tax['amount'], code=order_tax['code']))
@@ -1814,7 +1822,7 @@ def upload_orders(orders, current_user, db):
                                         order_tax_exist.update()
 
                             for shipping_tax in shipping_taxes:
-                                shipping_tax_exist = OrderTaxes.query.filter_by(order_id=new_order.id, type='shipping', code=shipping_tax['code']).first()
+                                shipping_tax_exist = inv(db.session.query(OrderTaxes).join(Order, OrderTaxes.order_id==Order.id).join(Listing, Order.listing_id==Listing.id).filter(OrderTaxes.order_id==new_order.id, OrderTaxes.type=='shipping', OrderTaxes.code==shipping_tax['code']), User.dashboard_id, Listing.dashboard_id).first()
                                 if not shipping_tax_exist:
                                     # insert order tax if not exist
                                     new_order.taxes.append(OrderTaxes(type='shipping', amount=shipping_tax['amount'], code=shipping_tax['code']))
@@ -2200,14 +2208,14 @@ def get_orders_and_shippings(form):
     except Exception as e:
         raise e
 
-def update_order_taxes(form, target_order):
+def update_order_taxes(form, target_order, db):
     try:
         data =get_orders_and_shippings(form)
         order_taxes = data['order_taxes']
         shipping_taxes = data['shipping_taxes']
         # this short code return edited and new objects and used to get removed current rows ids
         order_taxes_allrows = [
-            {'current': OrderTaxes.query.filter_by(id=taxobj['id'], order_id=target_order.id).one_or_none(), 'new': {'code': taxobj['code'], 'amount': taxobj['amount']}} if OrderTaxes.query.filter(OrderTaxes.id==taxobj['id'], OrderTaxes.order_id==target_order.id).one_or_none() else 
+            {'current': inv(db.session.query(OrderTaxes).join(Order, OrderTaxes.order_id==Order.id).join(Listing, Order.listing_id==Listing.id).filter(OrderTaxes.id==taxobj['id'], OrderTaxes.order_id==target_order.id), User.dashboard_id, Listing.dashboard_id).one_or_none(), 'new': {'code': taxobj['code'], 'amount': taxobj['amount']}} if inv(db.session.query(OrderTaxes).join(Order, OrderTaxes.order_id==Order.id).join(Listing, Order.listing_id==Listing.id).filter(OrderTaxes.id==taxobj['id'], OrderTaxes.order_id==target_order.id), User.dashboard_id, Listing.dashboard_id).one_or_none() else 
             OrderTaxes(order_id=target_order.id, code=taxobj['code'], amount=float_or_zero(taxobj['amount']), type=taxobj['type'])
             for taxobj in [*order_taxes, *shipping_taxes]
         ]
@@ -2230,7 +2238,8 @@ def update_order_taxes(form, target_order):
 
         # get removed rows, current order rows that have id not in the updated rows ids submited by user
         removed = []
-        removed_rows = OrderTaxes.query.filter(OrderTaxes.order_id==target_order.id, OrderTaxes.id.notin_(submited_ids)).all()
+        
+        removed_rows = inv(db.session.query(OrderTaxes).join(Order, OrderTaxes.order_id==Order.id).join(Listing, Order.listing_id==Listing.id).filter(OrderTaxes.order_id==target_order.id, OrderTaxes.id.notin_(submited_ids)), User.dashboard_id, Listing.dashboard_id).all()
         for removed_ordertax in removed_rows:
             removed.append(removed_ordertax.code)
             removed_ordertax.delete()
@@ -2559,4 +2568,3 @@ def user_have_permissions(app_permissions, permissions=[]):
     except:
         print("error from user_have_permissions {}".format(sys.exc_info()))
         return False
-    

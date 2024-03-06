@@ -11,6 +11,21 @@
             <a href="{{url_for('auth.signup')}}" class="w-50 border text-center p-3 text-decoration-none cursor-pointer hover_shadow bg-primary text-white">Signup</a>
         </div>
         <div class="col-sm-12 border row p-3">
+
+        <!-- toggle to display private inventory extra fields -->
+        <div class="col-sm-12 row m-0 p-0">
+            <div class="col-sm-12 row m-0 p-0 rounded header_bg">
+              <div class="col-sm-12 p-3 text-center mt-3">Select the type of inventory you will join?</div>
+              <div class="col-sm-12 mx-auto mb-3 d-flex justify-content-start align-items-center">
+                <div class="w-50 p-2 rounded text-center">
+                  <button id="public_btn" class="w-100 btn btn-success" data-action="public" onclick="toggleForm(event)">Public Inventory </button>
+                </div>
+                <div class="w-50 p-2 rounded text-center">
+                  <button id="private_btn" class="w-100 btn btn-outline-secondary" data-action="private" onclick="toggleForm(event)">Private Inventory</button>
+                </div>
+              </div>
+            </div>
+        </div>
         <form action="{{url_for('auth.submit_signup')}}" method="post" enctype="multipart/form-data" class="col-sm-6 p-3 mx-auto shadow mt-3 mb-3">
             {{ form.hidden_tag() }}
             <div class="p-1 form-group">
@@ -75,9 +90,67 @@
                 </ul>
                 {% endif %}
             </div>
+
+
+            <div class="p-1 form-group{% if form.email.errors %} shadow-danger{% endif %}">
+                {{ form.inventory_code.label }}
+                {{ form.inventory_code(class='form-control', placeholder='Enter Inventory Code') }}
+  
+                {% if form.inventory_code.errors %}
+                <ul class="errors bg-danger text-white">
+                    {% for error in form.inventory_code.errors %}
+                        <li class="p-1 mb-1">{{ error }}</li>
+                    {% endfor %}
+                </ul>
+                {% endif %}
+            </div>
+
+            <div class="p-1 form-group{% if form.email.errors %} shadow-danger{% endif %}" id="inventory_pass" style="display:none;">
+                {{ form.join_password.label }}
+                {{ form.join_password(class='form-control', placeholder='Enter Inventory Password') }}
+  
+                {% if form.join_password.errors %}
+                <ul class="errors bg-danger text-white">
+                    {% for error in form.join_password.errors %}
+                        <li class="p-1 mb-1">{{ error }}</li>
+                    {% endfor %}
+                </ul>
+                {% endif %}
+            </div>
+            {{form.is_private(style='display:none')}}
+
             <button type="submit" class="btn btn-primary btn-block">Signup</button>
         </form>
         </div>
     </div>
 </div>
 {% endblock body %}
+
+{% block page_scripts %}
+<script>
+    function toggleForm(e) {
+        const publicBtn = $("#public_btn");
+        const privateBtn = $("#private_btn");
+        if ( publicBtn.length && privateBtn.length && e && $(e.currentTarget).length && $(e.currentTarget).attr('data-action')){
+            const nextAction = $(e.currentTarget).attr('data-action');
+            if (nextAction == 'private') {
+                publicBtn.removeClass('btn-success');
+                publicBtn.addClass('btn-outline-success');
+
+                privateBtn.removeClass('btn-outline-secondary');
+                privateBtn.addClass('btn-secondary');
+                $("#inventory_pass").show('fast');
+                $("#is_private").prop('checked', true);
+            } else {
+                privateBtn.removeClass('btn-secondary');
+                privateBtn.addClass('btn-outline-secondary');
+
+                publicBtn.removeClass('btn-outline-success');
+                publicBtn.addClass('btn-success');
+                $("#inventory_pass").hide('slow');
+                $("#is_private").prop('checked', false);
+            }
+        }
+    }
+</script>
+{% endblock %}

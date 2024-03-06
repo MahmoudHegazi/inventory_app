@@ -722,20 +722,23 @@ function fillEditForm(triggerSelector='', formSelector='', modalSelector='', dat
     triggerSelector
     ){
       
+      
     // dynamic check make sure each prop on (dataAttr which main will used props) from exist on input id (this will end function setup on page will not add the event also and this loop run one time only on first load page)
     for (let prop in dataAttrs){
       if (!inputIds.hasOwnProperty(prop) || !String(dataAttrs[prop]).trim() || !String(inputIds[prop]).trim() || !$(inputIds[prop]).length){
+        console.log(`${prop} is invalid or not exist arugment`);
         return false;
       }
     }
-    
+
 
     $(triggerSelector).on('click', (event)=>{
+
       if ($(event.currentTarget).length && $(event.currentTarget).attr('data-url')){
         // dynamic check exsting of data-attr and it's input
         for (let prop in dataAttrs){
-          if (!$(event.currentTarget).attr(dataAttrs[prop])){
-            console.log(`Must define all provide dataAttr on target elm, undefined:${prop} -> ${dataAttrs[prop]}`);
+          if (typeof $(event.currentTarget).attr(dataAttrs[prop]) === 'undefined' || $(event.currentTarget).attr(dataAttrs[prop]) === false){
+            console.log(`Must define all provide dataAttr on target elm, undefined: ${prop} -> ${dataAttrs[prop]}`);
             return false;
           }
         }
@@ -755,6 +758,8 @@ function fillEditForm(triggerSelector='', formSelector='', modalSelector='', dat
             inputToFilled.val(setVal);
           }
         }
+
+        
         $(formSelector).attr('action', $(event.currentTarget).attr('data-url'));
       } else {
         console.log("can not get target or missing data-url");

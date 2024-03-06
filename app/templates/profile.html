@@ -16,8 +16,9 @@
           <div class="row m-0 w-100 p-2">
             <div id="user_details" class="col-sm-12 border border-secondary rounded shadow p-3 break_word mb-2 hover_darkcyan active_darkcyan switcher_link" data-target="#details_component">User Details</div>
             <div id="user_credentials" class="col-sm-12 border border-secondary rounded shadow p-3 break_word mb-2 hover_darkcyan switcher_link" data-target="#credentials_component">User Credentials</div>
-            <div id="user_manager" class="col-sm-12 border border-secondary rounded shadow p-3 break_word mb-2 hover_darkcyan switcher_link" data-target="#manager_component">Manage Users</div>
-            {% if current_user.isAdmin() %}
+            {% if current_user.is_super() %}
+            <div id="users" class="col-sm-12 border border-secondary rounded shadow p-3 break_word mb-2 hover_darkcyan switcher_link" data-target="#manager_component">Users</div>
+            <div id="inventories" class="col-sm-12 border border-secondary rounded shadow p-3 break_word mb-2 hover_darkcyan switcher_link" data-target="#inventories_component">Inventories</div>
             <div id="api" class="col-sm-12 border border-secondary rounded shadow p-3 break_word mb-2 hover_darkcyan switcher_link" data-target="#api_component">API</div>
             {% endif %}
           </div>
@@ -147,61 +148,438 @@
             <!-- User Information End -->
 
             <!-- Manage Users -->
-
-                <div class="container effect_components" id="manager_component" style="display:none;">
-                  <div class="container">
-                    <div class="mt-1 mb-2 d-flex justify-content-between align-items-center">
-                      <h4>Manage Users</h4>
-                      <div>
-                        <!-- Important buttons and links -->
-                      </div>
-                    </div>
+            {% if current_user.isAdmin() %}
+            <div class="container effect_components" id="manager_component" style="display:none;">
+              <div class="container">
+                <div class="mt-1 mb-2 d-flex justify-content-between align-items-center">
+                  <h4>Manage Users</h4>
+                  <div>
+                    <!-- Important buttons and links -->
                   </div>
-
-                  {% if current_user.isAdmin() %}
-                  <!-- manage users forms -->
-                  <div class="w-100 p-2 mt-2 border_darkgrey">
-                    <div>
-                      <h5 class="text-center">Create New User</h5>
-                    </div>
-                    <div class="row m-0">
-                      <!-- create user form start -->
-                      <div class="col-sm-12 border mb-2 p-2">
-                          {% if add_user and add_user.name is defined and add_user.uname is defined and add_user.pwd is defined and add_user.pwd_confirm is defined and add_user.email is defined %}
-                          <form id="add_user_form" method="post" action="{{url_for('auth.admin_add_user')}}">
-                              {{add_user.csrf_token(id='csrf_token_add_user')}}
-                              <div class="form-group">
-                                {{add_user.name.label}}
-                                {{add_user.name(class='form-control', placeholder='Name')}}
-                              </div>
-                              <div class="form-group">
-                                {{add_user.uname.label}}
-                                {{add_user.uname(class='form-control', placeholder='Username', title="Must be Unqiue")}}
-                              </div>
-                              <div class="form-group">
-                                {{add_user.pwd.label}}
-                                {{add_user.pwd(class='form-control', placeholder='Enter Password', autocomplete='new-password')}}
-                              </div>
-                              <div class="form-group">
-                                {{add_user.pwd_confirm.label}}
-                                {{add_user.pwd_confirm(class='form-control', placeholder='Confirm Password')}}
-                              </div>
-                              <div class="form-group">
-                                {{add_user.email.label}}
-                                {{add_user.email(class='form-control', placeholder='Email')}}
-                              </div>
-                              {{add_user.add(class='btn btn-success btn-block btn-sm')}}
-                          </form>
-                          {% else %}
-                          <div class="alert alert-danger">Unable to Display Add New User form right now.</div>
-                          {% endif %}
-                      </div>
-                    </div>
-                  </div>
-                  <!-- Manage user forms end -->
                 </div>
-            <!-- Manage Users end -->
+              </div>
+
+              {% if current_user.isAdmin() %}
+              <!-- manage users forms -->
+              <div class="container fluid">
+                <!-- create user form -->
+                <div class="w-100 p-2 mt-2 border_darkgrey">
+                  <div>
+                    <h5 class="text-center">Create New User</h5>
+                  </div>
+                  <div class="row m-0">                    
+                    <div class="col-sm-12 border mb-2 p-2">
+                        {% if add_user and add_user.name is defined and add_user.uname is defined and add_user.pwd is defined and add_user.pwd_confirm is defined and add_user.email is defined %}
+                        <form id="add_user_form" method="post" action="{{url_for('main.admin_add_user')}}">
+                            {{add_user.csrf_token(id='csrf_token_add_user')}}
+                            <div class="form-group">
+                              {{add_user.name.label}}
+                              {{add_user.name(class='form-control', placeholder='Name')}}
+                            </div>
+                            <div class="form-group">
+                              {{add_user.uname.label}}
+                              {{add_user.uname(class='form-control', placeholder='Username', title="Must be Unqiue")}}
+                            </div>
+                            <div class="form-group">
+                              {{add_user.pwd.label}}
+                              {{add_user.pwd(class='form-control', placeholder='Enter Password', autocomplete='new-password')}}
+                            </div>
+                            <div class="form-group">
+                              {{add_user.pwd_confirm.label}}
+                              {{add_user.pwd_confirm(class='form-control', placeholder='Confirm Password')}}
+                            </div>
+                            <div class="form-group">
+                              {{add_user.email.label}}
+                              {{add_user.email(class='form-control', placeholder='Email')}}
+                            </div>
+                            {{add_user.add(class='btn btn-success btn-block btn-sm')}}
+                        </form>
+                        {% else %}
+                        <div class="alert alert-danger">Unable to Display Add New User form right now.</div>
+                        {% endif %}
+                    </div>
+                  </div>
+                </div>
+                <!-- create user form end -->
+
+                <!-- make admin -->
+                <div class="w-100 p-2 mt-2 border_darkgrey" title="this form add new role for users to make them super users or inventories admins">
+                  <div>
+                    <h5 class="text-center">Manage Inventory Admins</h5>
+                  </div>
+                  <div class="row m-0">                    
+                    <div class="col-sm-12 border mb-2 p-2">
+                        {% if make_admin is defined and make_admin.user is defined %}
+                        <form id="mka_user_form" method="post" action="{{url_for('main.manage_super_users')}}">
+                            {{make_admin.csrf_token(id='csrf_token_mka_user')}}
+                            <div class="form-group">
+                              {{make_admin.user.label}}
+                              {{make_admin.user(class='form-control')}}
+                            </div>
+                            <div class="form-group">
+                              {{make_admin.action.label}}
+                              {{make_admin.action(class='form-control')}}
+                            </div>
+                            
+                            {{make_admin.update(class='btn btn-success btn-block btn-sm')}}
+                        </form>
+                        {% else %}
+                        <div class="alert alert-danger">Unable to Display Make Admin User form right now.</div>
+                        {% endif %}
+                    </div>
+                  </div>
+                </div>
+                <!-- make admin end -->
+              </div>
+              <!-- Manage user forms end -->
+              {% endif %}
+
+            </div>
             {% endif %}
+            <!-- Manage Users end -->
+
+            {% if current_user.is_super() %}
+            <!-- Manage Inventories -->
+            <div class="container effect_components" id="inventories_component" style="display:none;">
+              <div class="container">
+                <div class="mt-1 mb-2 d-flex justify-content-between align-items-center">
+                  <h4>Manage Inventories</h4>
+                  <div>
+                    <!-- Important buttons and links -->
+                  </div>
+                </div>
+              </div>
+
+              {% if current_user.isAdmin() %}
+              <!-- add new inventory forms -->
+              <div class="w-100 p-2 mt-2 border_darkgrey pb-4">
+                <div>
+                  <h5 class="text-center">Create New Inventory</h5>
+                </div>
+                <div class="row m-0">
+                  {% if add_inventory is defined %}
+                  <form class="col-sm-12 onetime" id="add_inv_form" method="post" action="{{url_for('main.add_inventory')}}">
+                    {{add_inventory.csrf_token(id='csrf_token_addinv')}}
+                    <div class="form-group">
+                      {{ add_inventory.a_name.label() }}
+                      {{ add_inventory.a_name(class='form-control', placeholder='Inventory name') }}
+                    </div>
+                    <div class="form-group">
+                      {{ add_inventory.a_max_pending.label() }}
+                      {{ add_inventory.a_max_pending(class='form-control', placeholder='Max Pending Requests', title='control performance and free the usernames that not used using this number by limit number of pending users') }}
+                    </div>                    
+                    <div class="form-check">
+                      <label class="form-check-label">
+                        {{ add_inventory.a_active(class='form-check-input') }} <span>{{add_inventory.a_active.label.text}}</span>
+                      </label>
+                    </div>
+                    <div class="form-check">
+                      <label class="form-check-label">
+                        {{ add_inventory.a_exportable(class='form-check-input') }} <span>{{add_inventory.a_exportable.label.text}}</span>
+                      </label>
+                    </div>
+                    <div class="form-check">
+                      <label class="form-check-label">
+                        {{ add_inventory.a_deletable(class='form-check-input') }} <span>{{add_inventory.a_deletable.label.text}}</span>
+                      </label>
+                    </div>
+                    <div class="form-check">
+                      <label class="form-check-label">
+                        {{ add_inventory.a_private(class='form-check-input', onchange='toggleDisplayPrivate(event, ".private_inputs1")', data_private='.private_inputs1') }} 
+                        <span>{{add_inventory.a_private.label.text}}</span>
+                      </label>
+                    </div>
+                    <div class="private_inputs1" style="display:none;">
+                      <div class="form-group mt-2">
+                        {{ add_inventory.joinpass.label() }}
+                        {{ add_inventory.joinpass(class='form-control private_inputs1', placeholder='Inventory Register Password') }}
+                      </div>
+                      <div class="form-group mt-2">
+                        {{ add_inventory.pass_salat.label() }}
+                        {{ add_inventory.pass_salat(class='form-control private_inputs1', placeholder='OneTime Secuirty Key') }}
+                      </div>
+                    </div>
+                    {{add_inventory.add_inv(class='btn btn-success btn-block mt-2')}}
+                  </form>
+                  {% else %}
+                    <div class="alert alert-danger">Unable to Add inventory form right now.</div>
+                  {% endif %}
+                </div>
+              </div>
+              <!-- add new inventory forms end -->
+
+              <!-- admin inventories all -->
+              <div class="container border_darkgrey pb-4" title="this is all inventories in system you as super admin of this app can manage and delete inventories">
+                <div class="w-100 mt-2">
+                  <div>
+                    <h5 class="text-center">Super Admin Inventories</h5>
+                  </div>
+                </div>
+                <div class="container-fluid">
+                  <!-- Change user inventory form -->
+                  {% if change_uadmin %}
+                  <form action="{{url_for('main.admin_change_inv')}}" method="post">
+                      {{change_uadmin.csrf_token(id='change_admin_userinv')}}
+                      <!-- Change user inventory form -->
+                      <div class="my-4 row">
+                        <div class="col-sm-12">
+                          <!-- Add User to inventory form -->
+                          <div class="w-50 mx-auto form-group text-center border border-secondary rounded" style="background:aliceblue !important;color: black !important;" title="Change inventory of all users.">
+                            <label><sub>Change user inventory:</sub></label>
+                            {{change_uadmin.user(class='form-control mt-1 text-center')}}
+                            {{change_uadmin.inv(class='form-control mt-1 text-center')}}
+                          </div>
+                          <div class="w-50 mx-auto">
+                            {{change_uadmin.change(class='btn btn-primary btn-block')}}
+                          </div>
+                        </div>
+                      </div>
+                  </form>
+                  {% endif %}
+                  <!-- Change user inventory form -->
+                  {% for admin_inv in admin_inventories %}
+                  {% set asignup_requests = admin_inv.user_requests() %}
+                  {% set atotal_requests = asignup_requests|length %}
+                  {% if atotal_requests <= 20 %}{% set arequests_alert = 'badge-success' %}{% elif atotal_requests > 20 and atotal_requests <= 40 %}{% set arequests_alert = 'badge-warning' %}{% else %}{% set arequests_alert = 'badge-danger' %}{% endif %}
+                  {% if loop.index % 3 == 0 %}{% set bgcolor = 'dodgerblue' %}{% elif loop.index % 2 == 0 %}{% set bgcolor = 'darksalmon' %}{% elif loop.index % 1 == 0 %}{% set bgcolor = 'cornflowerblue' %}{% endif %}
+                  
+                  <div class="w-100 my-2" id="parentau_{{admin_inv.id}}">
+                    <div class="m-0 my-2 p-2 border_darkgrey d-flex justify-content-start align-items-center rounded">
+                        <div>
+                          <span class="badge {{arequests_alert}}" style="border-radius: 50% !important; min-width:18px !important;" title="Color refelects how many users wait on hold green is good, red is bad">{{asignup_requests|length}}</span>
+                          <button class="btn btn-sm btn-light mr-2 collapse_btn1" data-current="close" title="View Users Requests" href="#collapse_au_{{admin_inv.id}}" data-toggle="collapse"><i class="fa fa-arrow-down"></i></button>{{admin_inv.name}}</div>
+                        <div class="ml-auto">
+                          <button class="btn btn-info btn-sm view_data" title="Inventory details" data-requests="{{admin_inv.total_requests()}}" data-action="{{url_for('main.view_joinpass')}}" data-inv="{{admin_inv.id}}" data-name="{{admin_inv.name}}" data-code="{{admin_inv.code}}" data-maxpending="{{admin_inv.max_pending}}" data-users="{{admin_inv.total_users()}}" data-addedby-name="{{admin_inv.admin.uname}}" data-target="#viewInvFormModal" data-toggle="modal"><i class="fa fa-eye"></i></button>
+                          <button class="btn btn-warning btn-sm aupdate_inventory_btn" data-inv="{{admin_inv.id}}" data-joinpass="{{admin_inv.join_pass}}" data-salat="{{admin_inv.salat}}" data-exportable="{{admin_inv.exportable}}" data-addedby="{{admin_inv.added_by}}" data-maxpending="{{admin_inv.max_pending}}" data-deletable="{{admin_inv.deletable}}" data-active="{{admin_inv.active}}" data-private="{{admin_inv.private}}" data-name="{{admin_inv.name}}" data-url="{{url_for('main.update_inventory', inventory_id=admin_inv.id, lvl=2)}}" data-target="#adminUpdateInvFormModal" data-toggle="modal"><i class="fa fa-edit"></i></button>
+                          <button class="btn btn-danger btn-sm wtform_modal_deletebtn" data-inv-id="{{admin_inv.id}}" data-url="{{url_for('main.delete_inventory', inventory_id=admin_inv.id)}}" data-target="#RemoveInvFormModal" data-toggle="modal"><i class="fa fa-trash"></i></button>
+                        </div>
+                    </div>
+                    <!-- users join requests -->
+                    <div id="collapse_au_{{admin_inv.id}}" class="collapse border border-info lightgreen_shadow rounded p-2 text-white" data-parent="#parentau_{{admin_inv.id}}" 
+                      style="background: {{bgcolor}};">
+                      <div class="p-2">
+                        {% for au in asignup_requests %}
+                        <div class="lightgreen_shadow my-2 mb-3 d-flex justify-content-start align-items-center p-2 bg-white text-dark rounded">
+                          <div class="w-50 d-flex justify-content-start align-items-center">{{au[1]}}</div>
+                          <div class="w-50 d-flex justify-content-end align-items-center">
+                            <button class="btn btn-success btn-sm wtform_modal_deletebtn mr-1" data-user="{{au[0]}}" data-toggle="modal" data-target="#ApproveInvUsrFormModal" data-url="{{url_for('main.approve_user', user_id=au[0])}}">Approve</button>
+                            <button class="btn btn-danger btn-sm wtform_modal_deletebtn" data-user="{{au[0]}}" data-toggle="modal" data-target="#RemoveInvUsrFormModal" data-url="{{url_for('main.remove_user', user_id=au[0])}}">Delete</button>
+                          </div>
+                        </div>
+                        {% endfor %}
+                      </div>
+
+                      <hr style="height: 2px;background: floralwhite;">
+                      <!-- Display Inventory Users -->
+                      {% if admin_inv.users|length > 0 %}
+                      <div class="my-3 container">
+                          <h3>Inventory Users:</h3>
+                          <div class="shadow p-3 rounded bg-white">
+                            {% for inv_user in admin_inv.users %}
+                            <span class="badge badge-primary">{{inv_user.uname}}</span>
+                            {% endfor %}
+                          </div>
+                      </div>
+                      {% endif %}
+                      <!-- Display Inventory Users -->
+
+                    </div>
+                    <!-- end join requests -->
+                  </div>
+                  {% endfor %}
+                </div>
+              </div>
+              <!-- admin script -->
+              <script>
+                document.addEventListener("DOMContentLoaded", (event) => {
+
+                    const checkBoxInvA = (setVal, inputToFilled)=>{
+                      if ($(inputToFilled).length){
+                          const lowerVal = String(setVal).trim().toLocaleLowerCase();
+                          if (lowerVal === 'true'){
+                            $(inputToFilled).prop('checked', true);
+                            if ($(inputToFilled).attr('id') === 'au_private' && $(inputToFilled).attr('data-private') && $($(inputToFilled).attr('data-private')).length) {
+                              $($(inputToFilled).attr('data-private')).show('fast');
+                            }
+                          } else {
+                            $(inputToFilled).prop('checked', false);
+                            if ($(inputToFilled).attr('id') === 'au_private' && $(inputToFilled).attr('data-private') && $($(inputToFilled).attr('data-private')).length) {
+                              $($(inputToFilled).attr('data-private')).hide('fast');
+                            }
+                          }
+                      }
+                    };
+                    const unCheckBoxInvA = (inputToFilled)=>{
+                      if ($(inputToFilled).length){
+                        $(inputToFilled).prop('checked', false);
+                        if ($(inputToFilled).attr('id') === 'au_private' && $(inputToFilled).attr('data-private') && $($(inputToFilled).attr('data-private')).length) {
+                          $($(inputToFilled).attr('data-private')).hide();
+                        }
+                      }
+                    };
+
+                    const selectInputOpen = (setVal, inputToFilled)=>{
+                      if ($(inputToFilled).length){
+                        $(inputToFilled).val(setVal).change();
+                      }
+                    };
+                    const selectInputClose = (inputToFilled)=>{
+                      if ($(inputToFilled).length){
+                        $(inputToFilled).val("");
+                        const firstOpt = $(inputToFilled).find("option");
+                        if (firstOpt.length){
+                          firstOpt.eq(0).attr('selected', 'selected').change();
+                        }
+                      }
+                    };
+                    
+                    fillEditForm(triggerSelector = '.aupdate_inventory_btn', formSelector = '#aupdate_inv_form', modalSelector = '#adminUpdateInvFormModal', {
+                        id: 'data-inv',
+                        name: 'data-name',
+                        active: 'data-active',
+                        private: 'data-private',
+                        exportable: 'data-exportable',
+                        deletable: 'data-deletable',
+                        addedBy: 'data-addedby',
+                        joinpass: 'data-joinpass',
+                        salat: 'data-salat',
+                        maxPending: 'data-maxpending'
+                    }, inputIds = {
+                        id: '#au_inventory_id',
+                        name: '#au_name',
+                        active: '#au_active',
+                        private: '#au_private',
+                        exportable: '#au_exportable',
+                        deletable: '#au_deletable',
+                        addedBy: '#au_addedby',
+                        joinpass: '#au_joinpass',
+                        salat: '#au_pass_salat',
+                        maxPending: '#max_pending_update'
+                    }, customTypes = {
+                        active: {
+                          open: checkBoxInvA,
+                          close: unCheckBoxInvA
+                        },
+                        private: {
+                          open: checkBoxInvA,
+                          close: unCheckBoxInvA
+                        },
+                        exportable: {
+                          open: checkBoxInvA,
+                          close: unCheckBoxInvA
+                        },
+                        deletable: {
+                          open: checkBoxInvA,
+                          close: unCheckBoxInvA
+                        },
+                        addedBy: {
+                          open: selectInputOpen,
+                          close: selectInputClose
+                        }
+                    }
+                    );
+                });
+              </script>
+              {% endif %}
+
+              <!-- inventory admin inventories -->
+              <div class="container border_darkgrey pb-4" title="this all inventories assigned to you or you can manage it">
+                <div class="w-100 mt-2">
+                  <div>
+                    <h5 class="text-center">Your Inventories</h5>
+                  </div>
+                </div>
+                <div class="container-fluid">
+                  {% if change_invadmin %}
+                  <form action="{{url_for('main.change_inv')}}" method="post">
+                      {{change_invadmin.csrf_token(id='change_userinv')}}
+                      <!-- Change user inventory form -->
+                      <div class="my-4 row">
+                        <div class="col-sm-12">
+                          <!-- Add User to inventory form -->
+                          <div class="w-50 mx-auto form-group text-center border border-secondary rounded" style="background:aliceblue !important;color: black !important;" title="Change inventory of your users.">
+                            <label><sub>Change user inventory:</sub></label>
+                            {{change_invadmin.user(class='form-control mt-1 text-center')}}
+                            {{change_invadmin.inv(class='form-control mt-1 text-center')}}
+                          </div>
+                          <div class="w-50 mx-auto">
+                            {{change_invadmin.change(class='btn btn-primary btn-block')}}
+                          </div>
+                        </div>
+                      </div>
+                      <!-- Change user inventory form -->
+                  </form>
+                  {% endif %}
+
+                  <!-- Change user inventory form -->
+                  {% for inv in inventories %}
+                  {% set signup_requests = inv.user_requests() %}
+                  {% set total_requests = signup_requests|length %}
+                  {% if total_requests <= 20 %}{% set requests_alert = 'badge-success' %}{% elif total_requests > 20 and total_requests <= 40 %}{% set requests_alert = 'badge-warning' %}{% else %}{% set requests_alert = 'badge-danger' %}{% endif %}
+                  <div class="w-100 my-2" id="parent_{{inv.id}}">
+                    <div class="m-0 my-2 p-2 border_darkgrey d-flex justify-content-start align-items-center">
+                        <div>
+                          <span class="badge {{requests_alert}}" style="border-radius: 50% !important; min-width:18px !important;" title="Color refelects how many users wait on hold green is good, red is bad">{{signup_requests|length}}</span>
+                          <button class="btn btn-sm btn-light mr-2 collapse_btn1" data-current="close" title="View Users Requests" href="#collapse_{{inv.id}}" data-toggle="collapse"><i class="fa fa-arrow-down"></i></button>{{inv.name}}</div>
+                        <div class="ml-auto">
+                          <button class="btn btn-info btn-sm view_data" title="Inventory details" data-requests="{{inv.total_requests()}}" data-action="{{url_for('main.view_joinpass')}}" data-inv="{{inv.id}}" data-name="{{inv.name}}" data-code="{{inv.code}}" data-users="{{inv.total_users()}}" data-maxpending="{{inv.max_pending}}" data-addedby-name="{{inv.admin.uname}}" data-target="#viewInvFormModal" data-toggle="modal"><i class="fa fa-eye"></i></button>
+                          <button class="btn btn-warning btn-sm update_inventory_btn" data-inv="{{inv.id}}" data-joinpass="{{inv.join_pass}}" data-salat="{{inv.salat}}" data-active="{{inv.active}}" data-private="{{inv.private}}" data-name="{{inv.name}}" data-url="{{url_for('main.update_inventory', inventory_id=inv.id, lvl=1)}}" data-target="#UpdateInvFormModal" data-toggle="modal"><i class="fa fa-edit"></i></button>
+                          {% if inv.deletable %}
+                          <button class="btn btn-danger btn-sm wtform_modal_deletebtn" data-inv-id="{{inv.id}}" data-url="{{url_for('main.delete_inventory', inventory_id=inv.id)}}" data-target="#RemoveInvFormModal" data-toggle="modal"><i class="fa fa-trash"></i></button>
+                          {% endif %}
+                        </div>
+                    </div>  
+
+                    <!-- users join requests -->
+                    <div id="collapse_{{inv.id}}" class="collapse border border-secondary rounded p-2 lightgreen_shadow" data-parent="#parent_{{inv.id}}">
+                      <div class="p-2">
+                        {% for u in signup_requests %}
+                        <div class="mt-2 mb-3 d-flex justify-content-start align-items-center p-2 lightgreen_shadow rounded">
+                          <div class="w-50 d-flex justify-content-start align-items-center">{{u[1]}}</div>
+                          <div class="w-50 d-flex justify-content-end align-items-center">
+                            <button class="btn btn-success btn-sm wtform_modal_deletebtn" data-user="{{u[0]}}" data-toggle="modal" data-target="#ApproveInvUsrFormModal" data-url="{{url_for('main.approve_user', user_id=u[0])}}">Approve</button>
+                            <button class="btn btn-danger btn-sm wtform_modal_deletebtn" data-user="{{u[0]}}" data-toggle="modal" data-target="#RemoveInvUsrFormModal" data-url="{{url_for('main.remove_user', user_id=u[0])}}">Delete</button>
+                          </div>
+                        </div>
+                        {% endfor %}
+                      </div>
+                      <hr style="background: black;">
+                      <!-- Display Inventory Users -->
+                      {% if inv.users|length > 0 %}
+                      <div class="my-3 container">
+                          <h3>Inventory Users:</h3>
+                          <div class="shadow p-3 rounded">
+                            {% for inv_user in inv.users %}
+                            <span class="badge badge-primary">{{inv_user.uname}}</span>
+                            {% endfor %}
+                          </div>
+                      </div>
+                      {% endif %}
+                      <!-- Display Inventory Users -->
+                    </div>
+                    <!-- end join requests -->
+                  </div>
+                  {% endfor %}
+                </div>
+              </div>
+              {% set all_pending_requests = current_user.admin_requests_alert() %}
+              {% if all_pending_requests > 10 %}
+              <script>
+                /* admin alert */
+                $(document).ready(()=>{
+                  if ($("#number_of_requests").length && $("form#warning_inv_form").length) {
+                    $("#number_of_requests").text(`{{all_pending_requests}}`);
+                    $('#WarningInvFormModal').modal('show');
+                  }
+                });
+              </script>
+              {% endif %}
+              
+            </div>
+            <!-- Manage Inventories end -->
+            {% endif %}
+
+                
             <!-- API-->
             <div class="container effect_components" id="api_component" style="display:none;">
               {% if ourapi_requests_limit and ourapi_keys_max %}
@@ -227,7 +605,7 @@
                           <div class="key_cont w-100 border border-dark rounded p-1">
                               {% if key.is_expired() %}
                               <div style="background:#ce3333;display:none !important;" class="expired_keys border border-dark rounded p-2 d-flex justify-content-between align-items-center">
-                                <img class="repeated_image expire" src="{{url_for('static', filename='assets/images/expired_icon2.png')}}" height="40" style="">
+                                <img class="repeated_image expire" src="{{url_for('static', filename='assets/images/expired_icon2.png')}}" height="40">
                                 {% if renew_key and renew_key.renew is defined %}
                                 <!-- for make sure every key only submited throgh it's form not 1 form for all keys so never later pass wtforms using diffrent not expired key -->
                                 <form class="w-75" id="renew_form_{{loop.index}}" method="post" action="{{url_for('main.renew_key', id=key.id)}}">
@@ -237,7 +615,7 @@
                                 {% else %}
                                 <div class="alert alert-danger">Unable to Display Update Renew form right now.</div>
                                 {% endif %}
-                                <img class="repeated_image expire" src="{{url_for('static', filename='assets/images/expired_icon3.png')}}" height="40" style="">
+                                <img class="repeated_image expire" src="{{url_for('static', filename='assets/images/expired_icon3.png')}}" height="40">
                               </div>
                               {% endif %}
                               <div class="row m-0 w-100">
@@ -333,8 +711,68 @@
       {% endif %}
     </div>
   </div>
+
+  <div class="modal fade" id="viewInvFormModal">
+    <div class="modal-dialog">
+      <div class="modal-content">
+        <!-- Modal Header -->
+        <div class="modal-header">
+          <h4 class="modal-title h4_fancy fancy_title p-2 mx-auto border border-light rounded shadow" id="inv_title"></h4>
+          <button type="button" class="close" data-dismiss="modal">&times;</button>
+        </div>
+        <!-- Modal body -->
+        <div class="modal-body" id="inv_body">
+          <div class="mb-2" id="inv_view_errors">
+
+          </div>
+          <div class="row p-3">
+            <div class="col-sm-12 shadow my-2 p-2 d-flex" style="min-height:54px;">
+              <div class="w-25 d-flex justify-content-start align-items-center fancy_title">Name: </div>
+              <div class="w-75 d-flex justify-content-start align-items-center p-1" id="inv_name"></div>
+            </div>
+            <div class="col-sm-12 shadow my-2 p-2 d-flex" style="min-height:54px;">
+              <div class="w-25 d-flex justify-content-start align-items-center fancy_title">Admin: </div>
+              <div class="w-75 d-flex justify-content-start align-items-center p-1" id="admin_uname"></div>
+            </div>
+            <div class="col-sm-12 shadow my-2 p-2 d-flex" style="min-height:54px;">
+              <div class="w-25 d-flex justify-content-start align-items-center fancy_title">Code: </div>
+              <div class="w-75 d-flex justify-content-start align-items-center p-1" id="inv_code">12345</div>
+            </div>
+            <div class="col-sm-12 shadow my-2 p-2 d-flex" style="min-height:54px;">
+              <div class="w-25 d-flex justify-content-start align-items-center fancy_title">Join Pass: </div>
+              <div class="row m-0 w-75">
+                <div class="col-sm-8 p-1 d-flex justify-content-start align-items-center" id="inv_joinpass"></div>
+                <div class="col-sm-4 d-flex justify-content-end p-1 d-flex">
+                  <button class="btn btn-secondary btn-sm" style="font-size: 12px;margin-top: 1;" id="get_joinpass">
+                    <i class="fa fa-eye"></i>
+                  </button>
+                </div>
+              </div>
+            </div>
+            <div class="col-sm-12 shadow my-2 p-2 d-flex" style="min-height:54px;">
+              <div class="w-25 d-flex justify-content-start align-items-center fancy_title">Total Users: </div>
+              <div class="w-75 d-flex justify-content-start align-items-center p-1" id="inv_users"></div>
+            </div>
+            <div class="col-sm-12 shadow my-2 p-2 d-flex" style="min-height:54px;" title="The total number of users waiting to be approved to join the inventory">
+              <div class="w-25 d-flex justify-content-start align-items-center fancy_title">Total Requests: </div>
+              <div class="w-75 d-flex justify-content-start align-items-center p-1" id="inv_requests"></div>
+            </div>
+            <div class="col-sm-12 shadow my-2 p-2 d-flex" style="min-height:54px;">
+              <div class="w-25 d-flex justify-content-start align-items-center fancy_title" title="How many users not approved can be on on hold before block signup requests of this inventory until the admin make action with this not approved users or respond to system action">Max Pending: </div>
+              <div class="w-75 d-flex justify-content-start align-items-center p-1" id="inv_maxpending"></div>
+            </div>
+          </div>
+        </div>
+        <!-- Modal footer -->
+        <div class="modal-footer">
+          <button type="button" class="btn btn-primary" data-dismiss="modal">Close</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   {% from 'forms.html' import profile_forms %}
-  {{ profile_forms(add_key=add_key, delete_key=delete_key, update_key=update_key, white_list=white_list, black_list=black_list) }}
+  {{ profile_forms(add_key=add_key, delete_key=delete_key, update_key=update_key, white_list=white_list, black_list=black_list, update_inventory=update_inventory, remove_inventory=remove_inventory, aupdate_inv=aupdate_inv, approve_form=approve_form, remove_form=remove_form, requests_warning=requests_warning) }}
 
 {% endblock %}
 {% block page_scripts %}
@@ -342,20 +780,80 @@
 // noEffects = true;
 //$('#deleteCatalogueModal').on('shown.bs.modal', ()=>{toggleLoadingCircle(false, 'block');});
 
-deleteWtformsModalProccess(dataAttId='data-key-id', formId='remove_key_form', idInputId='remove_key_id', modalId='RemoveKeyFormModal');
+document.addEventListener("DOMContentLoaded", (event) => {
 
+    deleteWtformsModalProccess(dataAttId='data-key-id', formId='remove_key_form', idInputId='remove_key_id', modalId='RemoveKeyFormModal');
+    
+    deleteWtformsModalProccess(dataAttId='data-inv-id', formId='remove_inv_form', idInputId='inventory_remove_id', modalId='RemoveInvFormModal');
+    
 
-fillEditForm(triggerSelector = '.update_ourapi_key', formSelector = '#update_key_form', modalSelector = '#UpdateKeyFormModal', {
-    id: 'data-key-id',
-    limit: 'data-key-limit',
-    expiration_date: 'data-key-expiration_date'
-}, inputIds = {
-    id: '#update_key_id',
-    limit: '#update_key_limit',
-    expiration_date: '#expiration_date_update'
+    deleteWtformsModalProccess(dataAttId='data-user', formId='approve_invuser_form', idInputId='approve_uid', modalId='ApproveInvUsrFormModal');
+    deleteWtformsModalProccess(dataAttId='data-user', formId='remove_invuser_form', idInputId='remove_uid', modalId='RemoveInvUsrFormModal');
+
+    
+    
+    fillEditForm(triggerSelector = '.update_ourapi_key', formSelector = '#update_key_form', modalSelector = '#UpdateKeyFormModal', {
+        id: 'data-key-id',
+        limit: 'data-key-limit',
+        expiration_date: 'data-key-expiration_date'
+    }, inputIds = {
+        id: '#update_key_id',
+        limit: '#update_key_limit',
+        expiration_date: '#expiration_date_update'
+    });
+    
+    
+    
+    const checkBoxInv = (setVal, inputToFilled)=>{
+      if ($(inputToFilled).length){
+          const lowerVal = String(setVal).trim().toLocaleLowerCase();
+          if (lowerVal === 'true'){
+            $(inputToFilled).prop('checked', true);
+            if ($(inputToFilled).attr('id') === 'u_private' && $(inputToFilled).attr('data-private') && $($(inputToFilled).attr('data-private')).length) {
+              $($(inputToFilled).attr('data-private')).show('fast');
+            }
+          } else {
+            $(inputToFilled).prop('checked', false);
+            if ($(inputToFilled).attr('id') === 'u_private' && $(inputToFilled).attr('data-private') && $($(inputToFilled).attr('data-private')).length) {
+              $($(inputToFilled).attr('data-private')).hide('fast');
+            }
+          }
+      }
+    };
+    const unCheckBoxInv = (inputToFilled)=>{
+      if ($(inputToFilled).length){
+        $(inputToFilled).prop('checked', false);
+        if ($(inputToFilled).attr('id') === 'u_private' && $(inputToFilled).attr('data-private') && $($(inputToFilled).attr('data-private')).length) {
+          $($(inputToFilled).attr('data-private')).hide();
+        }
+      }
+    };
+    fillEditForm(triggerSelector = '.update_inventory_btn', formSelector = '#update_inv_form', modalSelector = '#UpdateInvFormModal', {
+        id: 'data-inv',
+        name: 'data-name',
+        active: 'data-active',
+        private: 'data-private',
+        joinpass: 'data-joinpass',
+        salat: 'data-salat'
+    }, inputIds = {
+        id: '#u_inventory_id',
+        name: '#u_name',
+        active: '#u_active',
+        private: '#u_private',
+        joinpass: '#u_joinpass',
+        salat: '#u_pass_salat'
+    }, customTypes = {
+        active: {
+          open: checkBoxInv,
+          close: unCheckBoxInv
+        },
+        private: {
+          open: checkBoxInv,
+          close: unCheckBoxInv
+        }
+    }
+    );
 });
-
-
 
 const componentsMap = {
     user_details: {
@@ -366,15 +864,20 @@ const componentsMap = {
         link_elm: '#user_credentials',
         data_target: '#credentials_component'
     },
-    user_manager: {
-        link_elm: '#user_manager',
+    users: {
+        link_elm: '#users',
         data_target: '#manager_component'
     },
     api: {
         link_elm: '#api',
         data_target: '#api_component'
+    },
+    inventories: {
+        link_elm: '#inventories',
+        data_target: '#inventories_component'
     }
 };
+
 function getMoveToComponentParams(){
   
   const moveToComponent = getQueryParm('movetocomponent');
@@ -396,7 +899,7 @@ function getMoveToComponentParams(){
 function componentsSwitcherComponent(){
   if ($(".switcher_link").length){
     const moveToComponent = function(e=null, link_elm=null, data_target=null){
-      if ( (e === null && data_target && link_elm) || (e && $(e.target).length && $(e.target).attr('data-target') && $($(e.target).attr('data-target')).length)){
+      if ( (e === null && data_target && link_elm && $(data_target).length && $(link_elm).length) || (e && $(e.target).length && $(e.target).attr('data-target') && $($(e.target).attr('data-target')).length)){
         // called coniditional based nested if shortcut (performance)
         const dataTarget = (e === null && data_target) ? data_target : $(e.target).attr('data-target');
         const linkElm = (e === null && link_elm) ? $(link_elm) : $(e.target);
@@ -409,7 +912,6 @@ function componentsSwitcherComponent(){
         newActive.show('fast', null, ()=>{
             newLink.addClass("active_darkcyan");
         });
-
       }
     };
     $(".switcher_link").on('click', moveToComponent);
@@ -470,6 +972,109 @@ $(document).ready(function(){
   $(".switch_components_links").on('click', siwtchComponent);
 });
 
+
+/* toggle display private inventory inputs (later will add feature like 2 auth factor required with email etc or facebook only aut2 signup advanced controls if got users) or mobile, like zaiper part 1 only not nested actions */
+function toggleDisplayPrivate(e, privateSelectors){
+  if (e && $(e.currentTarget).length && privateSelectors && $(privateSelectors).length){
+    if ($(e.currentTarget).is(':checked')) {
+      $(privateSelectors).show('fast');
+    } else {
+      $(privateSelectors).hide('fast');
+    }
+  }
+}
+
+function ToggleDisplayInvModal() {
+  if ($("#viewInvFormModal").length && $(".view_data").length && $("#get_joinpass").length) {
+      const displayInvDetails = (e)=>{
+          if (
+            e && $(e.currentTarget).length && $(e.currentTarget).attr('data-inv') &&
+            $(e.currentTarget).attr('data-name') && $(e.currentTarget).attr('data-code') &&
+            $(e.currentTarget).attr('data-action') && $(e.currentTarget).attr('data-addedby-name') &&
+            $("#inv_title").length && $("#inv_name").length && $("#inv_code").length && 
+            $("#inv_joinpass").length && $("#inv_users").length && $("#get_joinpass").length && $("#inv_view_errors").length &&
+            $("#inv_requests").length && $("#admin_uname").length && $("#inv_maxpending").length
+            ) {
+              try {
+                  $("#get_joinpass").show('fast');
+                  const invId = $(e.currentTarget).attr('data-inv');
+                  const invName = $(e.currentTarget).attr('data-name');
+                  const invCode = $(e.currentTarget).attr('data-code');
+                  const totalUsers = $(e.currentTarget).attr('data-users') ? $(e.currentTarget).attr('data-users') : 0;
+                  const totalJoinRequests = $(e.currentTarget).attr('data-users') ? $(e.currentTarget).attr('data-requests') : 0;
+                  const maxPendingNumb = $(e.currentTarget).attr('data-maxpending') ? $(e.currentTarget).attr('data-maxpending') : 0;
+                  const actionUrl = $(e.currentTarget).attr('data-action');
+                  const passElm = $("#inv_joinpass");
+                  $("#inv_title").text(invName);
+                  $("#inv_name").text(invName);
+                  $("#inv_code").text(invCode);
+                  $("#inv_users").text(totalUsers);
+                  $("#inv_requests").text(totalJoinRequests);
+                  $("#admin_uname").text($(e.currentTarget).attr('data-addedby-name'));
+                  $("#inv_maxpending").text(maxPendingNumb);
+
+                  $("#get_joinpass").on('click', async ()=>{
+                    $("#get_joinpass").hide('fast');
+                    passElm.html('<i class="fa fa-spinner fa-spin"></i>');
+                    const data = await postData(actionUrl, {inv: invId});
+                    if (data && data.code === 200 && data.hasOwnProperty('val')){
+                      passElm.text(data.val);
+                      $("#get_joinpass").unbind('click');
+                    } else {
+                      const erroMsg = data && data.message ? data.message : 'Unknown error unable to load password.';
+                      $("#inv_view_errors") = `
+                      <div class="alert alert-danger alert-dismissible">
+                        <button type="button" class="close" data-dismiss="alert">&times;</button>
+                        <strong>Error!</strong> ${erroMsg}
+                      </div>`;
+                      passElm.html('');
+                      $("#get_joinpass").show('fast');
+                      
+                    }
+                  });
+              } catch (error) {
+                $("#inv_view_errors") = `
+                      <div class="alert alert-danger alert-dismissible">
+                        <button type="button" class="close" data-dismiss="alert">&times;</button>
+                        <strong>Error!</strong> Unable to process your request right now please check connection and try again
+                      </div>`;
+                passElm.html('');
+                $("#get_joinpass").show('fast');
+              }
+          }
+      };
+      $("#viewInvFormModal").on('hidden.bs.modal', () => {
+        if ($("#inv_title").length){
+          $("#inv_title").text("");
+        }
+        if ($("#inv_name").length){
+          $("#inv_name").text("");
+        }
+        if ($("#inv_code").length){
+          $("#inv_code").text("");
+        }
+        if ($("#inv_joinpass").length){
+          $("#inv_joinpass").text("");
+        }
+        if ($("#inv_users").length){
+          $("#inv_users").text("");
+        }
+        if ($("#get_joinpass").length){
+          $("#get_joinpass").hide();
+          $("#get_joinpass").unbind('click');
+        }
+      });
+      $(".view_data").on('click', displayInvDetails);
+  }
+}
+ToggleDisplayInvModal();
+
+// not duplicate form submit manual js solution clicks
+$("form").on('submit', (e)=>{
+  $("form [type='submit']").remove();
+});
+
+
 /* ux */
 Promise.all(
   Array.from(document.querySelectorAll(".repeated_image")).filter(
@@ -481,6 +1086,8 @@ Promise.all(
           $(".expired_keys").slideDown('fast');
         }
 );
+
+
 
 
 </script>

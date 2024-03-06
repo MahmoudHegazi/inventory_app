@@ -43,6 +43,14 @@ class SignupForm(FlaskForm):
     pwd_confirm = PasswordField('Password Confirm', 
                                 validators=[InputRequired(), 
                                             Length(min=8, max=255)])
+    
+    inventory_code = StringField('Inventory Code', validators=[InputRequired(),
+                                            Length(min=1, max=255)])
+    
+    join_password = PasswordField('Inventory Join Password', validators=[optional(),
+                                            Length(min=1, max=255)])
+    is_private = BooleanField('private', default=False, render_kw={'style': 'display:none;'})
+
     signup = SubmitField('Signup')
 
 
@@ -536,3 +544,88 @@ class addNewUserForm(FlaskForm):
         except:
             raise ValidationError("Unable to validate Email right now.")
 
+
+class addInventoryForm(FlaskForm):
+    a_name = StringField('Name',validators=[InputRequired(), Length(min=1, max=255)])
+    a_max_pending = IntegerField('Max Pending Requests Limit', id='amax_pending_update', validators=[Length(min=1)])
+    a_active = BooleanField('active',validators=[], default=True)
+    a_private = BooleanField('private',validators=[], default=False)
+    a_exportable = BooleanField('exportable',validators=[], default=True)
+    a_deletable = BooleanField('deletable',validators=[], default=True)
+    joinpass = PasswordField('Join Password (Optional)', id='a_joinpass', validators=[optional()], 
+                            render_kw={
+                                    'title': 'Add an extra layer of security Enter the required password for private inventory user logins. The inventory must be private for the password to be applied.',
+                                    'style': 'display:none;',
+                                    'autocomplete': 'off'
+                                }
+                            )
+    pass_salat = StringField('One Time Secert Keyword (Optional)', id="a_pass_salat", render_kw={
+        'title': 'Keyword required to generate strong password'
+        })
+    add_inv = SubmitField('add')
+
+class updateInventoryForm(FlaskForm):
+    inventory_id = HiddenField(id='u_inventory_id', validators=[InputRequired()])
+    name = StringField('Name', id='u_name', validators=[InputRequired(), Length(min=1, max=255)])
+    active = BooleanField('active', id='u_active', validators=[])
+    private = BooleanField('private', id='u_private', validators=[])
+    joinpass = PasswordField('Join Password (Optional)', id='u_joinpass', validators=[optional()],
+                            render_kw={
+                                    'title': 'Add an extra layer of security Enter the required password for private inventory user logins. The inventory must be private for the password to be applied.',
+                                    'style': 'display:none;',
+                                    'autocomplete': 'off'
+                                }
+                            )
+    
+    pass_salat = StringField('One Time Secert Keyword (Optional)', id="u_pass_salat", render_kw={'title': 'Keyword required to generate strong password'})
+    update_inventory = SubmitField('update', id='u_update_inventory')
+
+class adminUpdateInventoryForm(FlaskForm):
+    inventory_id = HiddenField(id='au_inventory_id', validators=[InputRequired()])
+    max_pending = IntegerField('Max Pending Requests Limit', id='max_pending_update')
+    name = StringField('Name', id='au_name', validators=[InputRequired(), Length(min=1, max=255)])
+    active = BooleanField('active', id='au_active', validators=[])
+    private = BooleanField('private', id='au_private', validators=[])
+    exportable = BooleanField('exportable', id='au_exportable', validators=[])
+    deletable = BooleanField('deletable', id='au_deletable', validators=[])
+    added_by = SelectField('Select Inventory Admin', id='au_addedby',  choices=[], coerce=int, validators=[InputRequired()])
+    joinpass = PasswordField('Join Password (Optional)', id='au_joinpass', validators=[optional()],
+                            render_kw={
+                                    'title': 'Add an extra layer of security Enter the required password for private inventory user logins. The inventory must be private for the password to be applied.',
+                                    'style': 'display:none;',
+                                    'autocomplete': 'off'
+                                }
+                            )
+    pass_salat = StringField('One Time Secert Keyword (Optional)', id="au_pass_salat", render_kw={'title': 'Keyword required to generate strong password'})
+    update_inventory = SubmitField('update')
+
+class deleteInventoriesForm(FlaskForm):
+    inventory_remove_id = HiddenField(validators=[InputRequired()])
+    delete_inventory = SubmitField('delete', id="inventories_delete")
+
+class makeInvAdmin(FlaskForm):
+    user = SelectField('Select User: ', id='mka_user',  choices=[], coerce=int, validators=[InputRequired()])
+    action = SelectField('Make Admin: ', id='mka_action',  choices=[(1, 'No'), (2, 'Yes')], coerce=int, validators=[InputRequired()])
+    update = SubmitField('Update User', id='mka_update')
+
+
+class approveUserForm(FlaskForm):
+    user_id = HiddenField(id='approve_uid', validators=[InputRequired()])
+    approve = SubmitField('Approve User', id='approve_user')
+
+class removeUserForm(FlaskForm):
+    user_id = HiddenField(id='remove_uid', validators=[InputRequired()])
+    remove = SubmitField('Remove User', id='remove_user')
+
+class warningToManyUsers(FlaskForm):
+    submit = SubmitField('Clear Data', id='warning_submit')
+
+class adminChangeUserInv(FlaskForm):
+    user = SelectField('Select User: ', id='c_uinv_admin',  choices=[], validators=[InputRequired()])
+    inv = SelectField('Select Inventory: ', id='c_inv_admin',  choices=[], validators=[InputRequired()])
+    change = SubmitField('Change Inventory', id='admin_change_submit')
+
+class invAdminChangeUserInv(FlaskForm):
+    user = SelectField('Select User: ', id='c_uinv_invadmin',  choices=[], validators=[InputRequired()])
+    inv = SelectField('Select Inventory: ', id='c_inv_invadmin',  choices=[], validators=[InputRequired()])
+    change = SubmitField('Change Inventory', id='invadmin_change_submit')

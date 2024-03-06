@@ -2,6 +2,7 @@ import datetime
 import sys
 import decimal
 import enum
+import secrets
 #from sqlalchemy.types import TypeDecorator
 from sqlalchemy import desc, asc
 from sqlalchemy.orm import relationship, backref
@@ -13,7 +14,7 @@ from app import db
 from flask_login import UserMixin
 from sqlalchemy.orm.attributes import get_history
 from dateutil.relativedelta import *
-
+from datetime import timedelta
 Base = declarative_base()
 
 
@@ -23,6 +24,93 @@ class AllowedPermissions(enum.Enum):
     add = 'add'
     update = 'update'
     delete = 'delete'
+
+
+class Inventory(db.Model):
+    __tablename__ = 'inventory'
+    id = db.Column(db.Integer, primary_key=True, nullable=False, autoincrement=True)
+    code = db.Column(db.String(255), nullable=False, unique=True)
+    name = db.Column(db.String(255), nullable=False, default=None)
+    join_pass = db.Column(db.String(255), nullable=False, default='')
+    salat = db.Column(db.String(255), nullable=False, default='')
+    max_pending = db.Column(db.Integer, nullable=False, default=50)
+    private = db.Column(db.Boolean, nullable=False, default=False)
+    active = db.Column(db.Boolean, nullable=False, default=True)
+    exportable = db.Column(db.Boolean, nullable=False, default=True)
+    deletable = db.Column(db.Boolean, nullable=False, default=True)
+    added_by = db.Column(db.Integer, db.ForeignKey('user.id', ondelete="CASCADE", onupdate="CASCADE"), nullable=False)
+    created_date = db.Column(DateTime, nullable=False, default=datetime.datetime.utcnow)
+    updated_date = db.Column(DateTime, nullable=True, default=None, onupdate=datetime.datetime.utcnow)
+    admin = db.relationship("User", backref="inv", foreign_keys=[added_by])
+    #users = db.relationship("User", foreign_keys=[User.inventory_id])
+
+    def __init__(self, added_by, name, join_pass='', salat='', max_pending=50, active=True, private=False, exportable=True, deletable=True):
+        self.code = self.generate_code()
+        self.name = name
+        self.join_pass = join_pass
+        self.salat = salat
+        self.max_pending = max_pending
+        self.active = active
+        self.private = private
+        self.exportable = exportable
+        self.deletable = deletable
+        self.added_by = added_by
+
+    def insert(self):
+        db.session.add(self)
+        db.session.commit()
+
+    def update(self):
+        db.session.commit()
+
+    def delete(self):
+        db.session.delete(self)
+        db.session.commit()
+
+    def generate_code(self):
+        code = secrets.token_urlsafe(3)
+        try:
+            if not self.query.filter_by(code=code).first():
+                return code
+            else:
+                unique_found = False
+                for i in range(2000):
+                    code = secrets.token_urlsafe(3)
+                    if not self.query.filter_by(code=code).first():
+                        return code
+                    else:
+                        continue
+                if not unique_found:
+                    code = None
+                    # instead of return None and also prevent by sql, here know error
+                    raise ValueError('Unable to generate unique code for inventory.')
+            return None
+        except Exception as e:
+            raise e
+
+    def total_users(self):
+        return db.session.query(func.count(User.id)).join(Inventory, User.inventory_id==Inventory.id).filter(User.inventory_id==self.id, User.approved==True).scalar()
+    
+    def total_requests(self):
+        return db.session.query(func.count(User.id)).join(Inventory, User.inventory_id==Inventory.id).filter(User.inventory_id==self.id, User.approved==False).scalar()
+    
+    def user_requests(self):
+        return db.session.query(User.id, User.uname).join(Inventory, User.inventory_id==Inventory.id).filter(User.inventory_id==self.id, User.approved==False).all()
+    
+    def format(self):
+        return {
+        'id': self.id,
+        'code': self.code,
+        'name': self.name,
+        'max_pending': self.max_pending,
+        'private': self.private,
+        'active': self.active,
+        'exportable': self.exportable,
+        'deletable': self.deletable,
+        'added_by': self.added_by,
+        'created_date': self.created_date,
+        'updated_date': self.updated_date
+        }
 
 
 ################################ ---------- Tables for Authentication (Start) ---------------- #########################
@@ -88,16 +176,22 @@ class User(UserMixin, db.Model):
     created_date = db.Column(db.DateTime, nullable=False, default=datetime.datetime.utcnow)
     updated_date = db.Column(db.DateTime, nullable=True, default=None, onupdate=datetime.datetime.utcnow)    
     dashboard_id = db.Column(db.Integer, db.ForeignKey('dashboard.id', ondelete="CASCADE", onupdate="CASCADE"), nullable=False, unique=True)
+    inventory_id = db.Column(db.Integer, db.ForeignKey('inventory.id', ondelete="SET NULL", onupdate="CASCADE"), nullable=True, default=None)
+
     api_keys = db.relationship("OurApiKeys", backref="user", cascade="all, delete", passive_deletes=True)
     suppliers = db.relationship("Supplier", backref="user", cascade="all, delete", passive_deletes=True)
     roles = db.relationship("UserRoles", backref="user", cascade="all, delete", passive_deletes=True)
     meta = db.relationship("UserMeta", back_populates='user', cascade="all, delete", passive_deletes=True)
     catalogues = db.relationship('Catalogue', backref='user', cascade="all, delete", lazy='dynamic', passive_deletes=True)
     keys_logs = db.relationship("ApiKeysLogs", backref="user", cascade="all, delete", passive_deletes=True)
+    company = db.relationship("Inventory", foreign_keys=[inventory_id], backref='users')
 
-    def __init__(self, name, uname, email, upass, dashboard_id=None, image='default_user.png', approved=True):
+    def __init__(self, name, uname, email, upass, dashboard_id=None, inventory_id=None, image='default_user.png', approved=True):
         if dashboard_id:
             self.dashboard_id = dashboard_id
+        if inventory_id:
+            self.inventory_id = inventory_id
+
         self.name = name
         self.uname = uname
         self.email = email
@@ -118,10 +212,38 @@ class User(UserMixin, db.Model):
             return True
         else:
             return False
-        
+
+    def is_super(self):
+        # use superuser for auto say is super for all roles that is superuser first one for performance
+        issuper = False
+        for urole in self.roles:
+            if urole.role.superuser == True:
+                issuper = True
+                break
+        return issuper
+    
+    def isInventoryAdmin(self):
+        return True if db.session.query(UserRoles
+            ).join(Role, UserRoles.role_id==Role.id
+            ).filter(UserRoles.user_id==self.id, Role.name=='inventory_admin').first() else False
+    
     def get_roles(self):
         return db.session.query(Role).join(UserRoles, UserRoles.role_id==Role.id).join(User, UserRoles.user_id==User.id).filter(Role.system==False, UserRoles.user_id==self.id).all()
     
+    def admin_requests_alert(self):
+        current_time = datetime.datetime.utcnow()
+        two_month_ago = current_time - timedelta(weeks=8)
+        return db.session.query(func.count(User.id)).join(
+                    Inventory, User.inventory_id==Inventory.id
+                    ).join(
+                        UserRoles, UserRoles.user_id==User.id
+                        ).join(
+                            Role, UserRoles.role_id==Role.id
+                            ).filter(
+                                User.approved==False, Inventory.added_by==self.id,
+                                User.created_date<two_month_ago
+                            ).scalar()
+
     
     def insert(self):
         db.session.add(self)
@@ -136,6 +258,7 @@ class User(UserMixin, db.Model):
 
     def getRoles(self):
         return [userrole.role.name for userrole in self.roles]
+
 
     def __repr__(self):
         return f'User: ID: {self.id}, Username: {self.uname}'
@@ -436,6 +559,7 @@ class Catalogue(db.Model): # catelouge
     condition_id = db.Column(db.Integer, db.ForeignKey('condition.id', ondelete="SET NULL", onupdate="CASCADE"), nullable=True, default=None)
     listings = db.relationship("Listing", backref="catalogue", cascade="all, delete", passive_deletes=True, order_by='Listing.platform_id.asc()')
     locations = db.relationship("CatalogueLocations", backref='catalogue', cascade="all, delete", passive_deletes=True)
+    meta = db.relationship("CatalogueMeta", backref='catalogue', cascade="all, delete", passive_deletes=True)
 
     def __init__(self, sku, user_id, product_name=None, product_description=None, brand=None, category_id=None, price=0.00, sale_price=0.00, quantity=0, product_model=None, upc=None, condition_id=None, reference_type=None, barcode=None):
         self.sku = sku
@@ -1038,7 +1162,45 @@ class CatalogueLocationsBins(db.Model):
         'created_date': self.created_date,
         'updated_date': self.updated_date
         }
+    
 
+class CatalogueMeta(db.Model):
+    __tablename__ = 'catalogue_meta'
+    id = db.Column(db.Integer, primary_key=True, nullable=False, autoincrement=True)
+    key = db.Column(db.String(255), nullable=False)
+    value = db.Column(db.String(255), nullable=True, default=None)
+    catalogue_id = db.Column(db.Integer, db.ForeignKey('catalogue.id', ondelete="CASCADE", onupdate="CASCADE"), nullable=False)
+    created_date = db.Column(DateTime, nullable=False, default=datetime.datetime.utcnow)
+    updated_date = db.Column(DateTime, nullable=True, default=None, onupdate=datetime.datetime.utcnow)
+    
+    def __init__(self, catalogue_id, key, value):
+        self.catalogue_id = catalogue_id 
+        self.key = key
+        self.value = value
+        
+    def insert(self):
+        db.session.add(self)
+        db.session.commit()
+
+    def update(self):
+        db.session.commit()
+
+    def delete(self):
+        db.session.delete(self)
+        db.session.commit()
+
+    def format(self):
+        return {
+        'id': self.id,
+        'catalogue_id': self.catalogue_id,
+        'key': self.key,
+        'value': self.value,
+        'created_date': self.created_date,
+        'updated_date': self.updated_date
+        }
+
+
+    
 ################################ ---------- Tables for Dashboard Warehouse Locations (End) ---------------- #########################   
 def get_expiration_date(expiration_date):
     valid_expiry = False

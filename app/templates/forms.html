@@ -1441,7 +1441,8 @@
 </div>
 {% endmacro %}
 
-{% macro profile_forms(add_key, delete_key, update_key, white_list, black_list) %}
+{% macro profile_forms(add_key, delete_key, update_key, white_list, black_list, update_inventory, remove_inventory, aupdate_inv, approve_form, remove_form, requests_warning) %}
+{% if add_key %}
 <div class="modal fade" id="AddKeyFormModal">
   <div class="modal-dialog">
     <div class="modal-content">
@@ -1477,7 +1478,9 @@
     </div>
   </div>
 </div>
+{% endif %}
 
+{% if delete_key %}
 <div class="modal fade" id="RemoveKeyFormModal">
   <div class="modal-dialog">
     <div class="modal-content">
@@ -1488,7 +1491,7 @@
       </div>
       <!-- Modal body -->
       <div class="modal-body">
-        {% if delete_key and delete_key is defined %}
+        {% if delete_key is defined %}
         <p>Are you sure want delete that key ?</p>
         <form id="remove_key_form" method="post" action="">
           {{delete_key.csrf_token(id='csrf_token_removekey')}}
@@ -1496,7 +1499,7 @@
           {{delete_key.remove_key(class='btn btn-danger btn-block')}}
         </form>
         {% else %}
-          <div class="alert alert-danger">Unable to Display Add key form right now.</div>
+          <div class="alert alert-danger">Unable to Display Delete key form right now.</div>
         {% endif %}
       </div>
       <!-- Modal footer -->
@@ -1506,7 +1509,9 @@
     </div>
   </div>
 </div>
+{% endif %}
 
+{% if update_key %}
 <div class="modal fade" id="UpdateKeyFormModal">
   <div class="modal-dialog">
     <div class="modal-content">
@@ -1517,7 +1522,7 @@
       </div>
       <!-- Modal body -->
       <div class="modal-body">
-        {% if update_key and update_key is defined %}
+        {% if update_key is defined %}
         <form id="update_key_form" method="post" action="">
           {{update_key.csrf_token(id='csrf_token_updatekey')}}
           {{update_key.update_key_id()}}
@@ -1543,8 +1548,9 @@
     </div>
   </div>
 </div>
+{% endif %}
 
-
+{% if white_list %}
 <div class="modal fade" id="AdvancedFormModal">
   <div class="modal-dialog">
     <div class="modal-content">
@@ -1560,7 +1566,7 @@
           <button class="switch_components_links col-sm-6 bg-dark p-1 text-center text-white btn rounded" id="black_list_btn" data-target="#add_black_component"><span>Black List</span></button>
         </div>
         <div class="switch_components active_component" id="add_white_component">
-          {% if white_list and white_list.white_ips is defined and white_list.add_ips is defined %}
+          {% if white_list.white_ips is defined and white_list.add_ips is defined %}
           <form id="add_white_form" method="post" action="{{url_for('main.add_key')}}">
             {{white_list.csrf_token(id='csrf_token_addwhite')}}
             <div class="form-group p-2 bg-success text-white">
@@ -1596,4 +1602,252 @@
     </div>
   </div>
 </div>
+{% endif %}
+
+{% if update_inventory %}
+<div class="modal fade" id="UpdateInvFormModal">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <!-- Modal Header -->
+      <div class="modal-header">
+        <h4 class="modal-title">Update Inventory</h4>
+        <button type="button" class="close" data-dismiss="modal">&times;</button>
+      </div>
+      <!-- Modal body -->
+      <div class="modal-body">
+        {% if update_inventory is defined %}
+        <form id="update_inv_form" method="post" action="">
+          {{update_inventory.csrf_token(id='csrf_token_updateinv')}}
+          {{update_inventory.inventory_id()}}
+          <div class="form-group">
+            {{ update_inventory.name.label() }}
+            {{ update_inventory.name(class='form-control') }}
+          </div>
+          <div class="form-group">
+            <div class="form-check">
+              <label class="form-check-label">{{ update_inventory.active(class='form-check-input') }} <span>{{update_inventory.active.label.text}}</span></label>
+            </div>
+            <div class="form-check">
+              <label class="form-check-label">{{ update_inventory.private(class='form-check-input', onchange='toggleDisplayPrivate(event, ".private_inputs2")', data_private='.private_inputs2') }} 
+                <span>{{update_inventory.private.label.text}}</span>
+              </label>
+            </div>
+          </div>
+          <div class="private_inputs2" style="display:none;">
+            <div class="form-group">
+              {{ update_inventory.joinpass.label() }}
+              {{ update_inventory.joinpass(class='form-control private_inputs2', placeholder='Inventory Register Password') }}
+            </div>
+            <div class="form-group">
+              {{ update_inventory.pass_salat.label() }}
+              {{ update_inventory.pass_salat(class='form-control private_inputs2', placeholder='OneTime Secuirty Key') }}
+            </div>
+          </div>
+          {{update_inventory.update_inventory(class='btn btn-success btn-block')}}
+        </form>
+        {% else %}
+          <div class="alert alert-danger">Unable to Display Update inventory form right now.</div>
+        {% endif %}
+      </div>
+      <!-- Modal footer -->
+      <div class="modal-footer">
+        <button type="button" class="btn btn-primary" data-dismiss="modal">Cancel</button>
+      </div>
+    </div>
+  </div>
+</div>
+{% endif %}
+
+{% if aupdate_inv %}
+<!-- Admin only form -->
+<div class="modal fade" id="adminUpdateInvFormModal">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <!-- Modal Header -->
+      <div class="modal-header">
+        <h4 class="modal-title">Admin Update Inventory</h4>
+        <button type="button" class="close" data-dismiss="modal">&times;</button>
+      </div>
+      <!-- Modal body -->
+      <div class="modal-body">
+        {% if aupdate_inv is defined %}
+        <form id="aupdate_inv_form" method="post" action="">
+          {{aupdate_inv.csrf_token(id='csrf_token_aupdateinv')}}
+          {{aupdate_inv.inventory_id()}}
+          <div class="form-group">
+            {{ aupdate_inv.name.label() }}
+            {{ aupdate_inv.name(class='form-control') }}
+          </div>
+          <div class="form-group">
+            {{ aupdate_inv.added_by.label() }}
+            {{ aupdate_inv.added_by(class='form-control') }}
+          </div>
+          <div class="form-group">
+            {{ aupdate_inv.max_pending.label() }}
+            {{ aupdate_inv.max_pending(class='form-control', title='Max number of users can wait on hold until approved') }}
+          </div>
+          <div class="form-group">
+            <div class="form-check">
+              <label class="form-check-label">{{ aupdate_inv.active(class='form-check-input') }} <span>{{aupdate_inv.active.label.text}}</span></label>
+            </div>
+            <div class="form-check">
+              <label class="form-check-label">{{ aupdate_inv.exportable(class='form-check-input') }} <span>{{aupdate_inv.exportable.label.text}}</span></label>
+            </div>
+            <div class="form-check">
+              <label class="form-check-label">{{ aupdate_inv.deletable(class='form-check-input') }} <span>{{aupdate_inv.deletable.label.text}}</span></label>
+            </div>
+            <div class="form-check">
+              <label class="form-check-label">{{ aupdate_inv.private(class='form-check-input', onchange='toggleDisplayPrivate(event, ".private_inputs3")', data_private='.private_inputs3') }} 
+                <span>{{aupdate_inv.private.label.text}}</span>
+              </label>
+            </div>
+          </div>
+          <div class="private_inputs3" style="display:none;">
+            <div class="form-group">
+              {{ aupdate_inv.joinpass.label() }}
+              {{ aupdate_inv.joinpass(class='form-control private_inputs3', placeholder='Inventory Register Password') }}
+            </div>
+            <div class="form-group">
+              {{ aupdate_inv.pass_salat.label() }}
+              {{ aupdate_inv.pass_salat(class='form-control private_inputs3', placeholder='OneTime Secuirty Key') }}
+            </div>
+          </div>
+          {{aupdate_inv.update_inventory(class='btn btn-success btn-block')}}
+        </form>
+        {% else %}
+          <div class="alert alert-danger">Unable to Display Update Admin inventory form right now.</div>
+        {% endif %}
+      </div>
+      <!-- Modal footer -->
+      <div class="modal-footer">
+        <button type="button" class="btn btn-primary" data-dismiss="modal">Cancel</button>
+      </div>
+    </div>
+  </div>
+</div>
+{% endif %}
+
+{% if remove_inventory %}
+<div class="modal fade" id="RemoveInvFormModal">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <!-- Modal Header -->
+      <div class="modal-header">
+        <h4 class="modal-title">Remove Inventory</h4>
+        <button type="button" class="close" data-dismiss="modal">&times;</button>
+      </div>
+      <!-- Modal body -->
+      <div class="modal-body">
+        {% if remove_inventory is defined %}
+        <p>Are you sure want delete that inventory ?</p>
+        <form id="remove_inv_form" method="post" action="">
+          {{remove_inventory.csrf_token(id='csrf_token_removeinv')}}
+          {{remove_inventory.inventory_remove_id()}}
+          {{remove_inventory.delete_inventory(class='btn btn-danger btn-block')}}
+        </form>
+        {% else %}
+          <div class="alert alert-danger">Unable to Display Delete inventory form right now.</div>
+        {% endif %}
+      </div>
+      <!-- Modal footer -->
+      <div class="modal-footer">
+        <button type="button" class="btn btn-primary" data-dismiss="modal">Cancel</button>
+      </div>
+    </div>
+  </div>
+</div>
+{% endif %}
+
+{% if approve_form %}
+<div class="modal fade" id="ApproveInvUsrFormModal">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <!-- Modal Header -->
+      <div class="modal-header">
+        <h4 class="modal-title">Approve Inventory User</h4>
+        <button type="button" class="close" data-dismiss="modal">&times;</button>
+      </div>
+      <!-- Modal body -->
+      <div class="modal-body">
+        {% if approve_form %}
+        <p>Are you sure want approve that user ?</p>
+        <form id="approve_invuser_form" method="post" action="">
+          {{approve_form.csrf_token(id='csrf_token_approveinv')}}
+          {{approve_form.user_id()}}
+          {{approve_form.approve(class='btn btn-success btn-block')}}
+        </form>
+        {% else %}
+          <div class="alert alert-danger">Unable to Approve inventory user form right now.</div>
+        {% endif %}
+      </div>
+      <!-- Modal footer -->
+      <div class="modal-footer">
+        <button type="button" class="btn btn-primary" data-dismiss="modal">Cancel</button>
+      </div>
+    </div>
+  </div>
+</div>
+{% endif %}
+
+{% if remove_form %}
+<div class="modal fade" id="RemoveInvUsrFormModal">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <!-- Modal Header -->
+      <div class="modal-header">
+        <h4 class="modal-title">Remove Inventory User</h4>
+        <button type="button" class="close" data-dismiss="modal">&times;</button>
+      </div>
+      <!-- Modal body -->
+      <div class="modal-body">
+        {% if remove_form %}
+        <p>Are you sure want delete that user ?</p>
+        <form id="remove_invuser_form" method="post" action="">
+          {{remove_form.csrf_token(id='csrf_token_removeusrinv')}}
+          {{remove_form.user_id()}}
+          {{remove_form.remove(class='btn btn-danger btn-block')}}
+        </form>
+        {% else %}
+          <div class="alert alert-danger">Unable to Display remove inventory users form right now.</div>
+        {% endif %}
+      </div>
+      <!-- Modal footer -->
+      <div class="modal-footer">
+        <button type="button" class="btn btn-primary" data-dismiss="modal">Cancel</button>
+      </div>
+    </div>
+  </div>
+</div>
+{% endif %}
+
+{% if requests_warning %}
+<div class="modal fade" id="WarningInvFormModal">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <!-- Modal Header -->
+      <div class="modal-header">
+        <h4 class="modal-title">!Warning</h4>
+        <button type="button" class="close" data-dismiss="modal">&times;</button>
+      </div>
+      <!-- Modal body -->
+      <div class="modal-body">
+        {% if requests_warning is defined %}
+        <p>Please Note there are <span id="number_of_requests"></span> requests that not approved? Do you want to remove user registration requests that haven't been approved for more than a two month ago?</p>
+        <form id="warning_inv_form" method="post" action="{{url_for('main.remove_old_pending')}}">
+          {{requests_warning.csrf_token(id='csrf_token_warninginv')}}
+          {{requests_warning.submit(class='btn btn-primary btn-block')}}
+        </form>
+        {% else %}
+          <div class="alert alert-danger">Unable to Display Warning form right now.</div>
+        {% endif %}
+      </div>
+      <!-- Modal footer -->
+      <div class="modal-footer">
+        <button type="button" class="btn btn-danger" data-dismiss="modal">No I will Do Manual</button>
+      </div>
+    </div>
+  </div>
+</div>
+{% endif %}
+
 {% endmacro %}

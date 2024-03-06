@@ -1,11 +1,12 @@
 import sys
 import os
 import datetime
+import cryptocode
 from flask import Blueprint, session, render_template, request, redirect, url_for, flash, current_app
 from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.utils import secure_filename
 from flask_login import login_user, logout_user, current_user
-from .models import User, Role, UserRoles, Dashboard
+from .models import User, Role, UserRoles, Dashboard, Inventory
 from .forms import SignupForm, LoginForm, addNewUserForm
 from . import login_manager, bcrypt, app, db, VendorReadAction, vendor_needs
 from markupsafe import escape
@@ -50,8 +51,11 @@ def login():
             if form.validate_on_submit():
                 user = User.query.filter_by(uname=form.username.data).one_or_none()
                 if user is not None and bcrypt.check_password_hash(user.upass, form.pwd.data):
-                    flash('Welcome: {}'.format(escape(user.name)), 'success')
-                    success_login = True
+                    if user.approved:
+                        flash('Welcome: {}'.format(escape(user.name)), 'success')
+                        success_login = True
+                    else:
+                        flash('The status of your registration request is still pending, please wait for the administrator to approve your request.', 'danger')
                 else:
                     flash('Please check your login details and try again.', 'danger')
             else:
@@ -98,29 +102,62 @@ def submit_signup():
 
         form = SignupForm()
         if form.validate_on_submit():
-            user_exist = User.query.filter_by(uname=form.username.data).one_or_none()
-            email_exist = User.query.filter_by(email=form.email.data).one_or_none()
-            if user_exist is None and email_exist is None:
-                user_dashboard = Dashboard()
-                user_dashboard.insert()
-                new_user = User(name=form.name.data, uname=form.username.data, upass=bcrypt.generate_password_hash(form.pwd.data), email=form.email.data, dashboard_id=user_dashboard.id)
-                new_user.insert()
-                # create new vendor default role for the user
-                new_user_role = UserRoles(user_id=new_user.id, role_id=vendor_role.id)
-                new_user_role.insert()
-                flash('Successfully Created New User, Please Login', 'success')
-                valid_form = True
+            valid_inventory = False
+
+            is_private = True if form.is_private.data == True else False
+            # dynamic get right inv also tricky
+            inventory = Inventory.query.filter_by(code=form.inventory_code.data, active=True, private=is_private).one_or_none()
+            if inventory:
+                if inventory.total_requests() <= inventory.max_pending:
+                    # if there pass not empty
+                    if inventory.join_pass:
+                        # if user enter pass
+                        if form.join_password.data:
+                            salat = inventory.salat if inventory.salat else ""
+                            decoded = cryptocode.decrypt(inventory.join_pass, salat)
+
+                            # if encrypted not False and equal to join
+                            if decoded and form.join_password.data == decoded:
+                                valid_inventory = True
+                    else:
+                        # if join pass empty and user enter no pass or it public must be string
+                        if inventory.join_pass == '' and inventory.join_pass == form.join_password.data:
+                            valid_inventory = True
+    
+                    if valid_inventory:
+                        user_exist = User.query.filter_by(uname=form.username.data).one_or_none()
+                        email_exist = User.query.filter_by(email=form.email.data).one_or_none()
+                        if user_exist is None and email_exist is None:
+                            user_dashboard = Dashboard()
+                            user_dashboard.insert()
+                            new_user = User(name=form.name.data, uname=form.username.data, upass=bcrypt.generate_password_hash(form.pwd.data), email=form.email.data, dashboard_id=user_dashboard.id, inventory_id=inventory.id, approved=False)
+                            new_user.insert()
+                            # create new vendor default role for the user (can create temp role and delete when accept so access small page save even if login)
+                            new_user_role = UserRoles(user_id=new_user.id, role_id=vendor_role.id)
+                            new_user_role.insert()
+                            flash('Successfully Created New User, Please Login', 'success')
+                            valid_form = True
+                        else:
+                            if user_exist is not None:
+                                form.username.errors.append('Username is taken, please try something else.')
+                            
+                            if email_exist is not None:
+                                form.email.errors.append('Email is taken, please try something else.')
+                            
+                            valid_form = False
+                    else:
+                        # tricky message also for inactive act like not exist so protect signup and requesrs
+                        form.inventory_code.errors.append('Inventory not found.')
+                        valid_form = False
+                else:
+                    # tricky message also for inactive act like not exist so protect signup and requesrs
+                    form.inventory_code.errors.append('Inventory cannot accept new onhold users, please ask your admin to approve or deny old users requests which will prevent Inventory from receiving further registration requests, and then try to sign up again.t.')
+                    valid_form = False
             else:
-                if user_exist is not None:
-                    form.username.errors.append('Username is taken, please try something else.')
-                
-                if email_exist is not None:
-                    form.email.errors.append('Email is taken, please try something else.')                
-                
+                form.inventory_code.errors.append('Inventory not found.')
                 valid_form = False
         else:
             valid_form = False
-        
         
     except Exception as e:
         print('System Error: {} , info: {}'.format(e, sys.exc_info()))
@@ -134,6 +171,7 @@ def submit_signup():
             return redirect(url_for('auth.signup'))
         else:
             return render_template('signup.html', form=form)
+
 
 @auth.route('/logout', methods=['GET'])
 def logout():
@@ -151,59 +189,3 @@ def logout():
     session.pop('import_orders_report', None)
 
     return redirect(url_for('auth.login'))
-
-
-# Create users admin 
-@auth.route('/add_user', methods=['POST'])
-def admin_add_user():
-    try:
-        # check if vendor role found else create it
-        vendor_role = Role.query.filter_by(name='vendor').one_or_none()
-        if vendor_role is None:
-            vendor_role = Role(name='vendor')
-            vendor_role.insert()
-
-        form = addNewUserForm()
-        if form.validate_on_submit():
-            user_exist = User.query.filter_by(uname=form.uname.data).one_or_none()
-            email_exist = User.query.filter_by(email=form.email.data).one_or_none()
-            if user_exist is None and email_exist is None:
-
-                # this add all user relational tables all togther or fail togther and also 1 commit
-                user_dashboard = Dashboard()
-                new_user = User(
-                    name=form.name.data, 
-                    uname=form.uname.data,
-                    upass=bcrypt.generate_password_hash(form.pwd.data),
-                    email=form.email.data
-                    )
-                # create new vendor default role for the user
-                new_user.roles.append(UserRoles(role_id=vendor_role.id))
-                user_dashboard.user = new_user
-                user_dashboard.insert()
-
-                flash('Successfully Created New User', 'success')
-            else:
-                flashes = []
-                if user_exist is not None:
-                    flashes.append('Username is taken, please try something else.')
-                
-                if email_exist is not None:
-                    flashes.append('Email is taken, please try something else.') 
-                
-                if len(flashes) > 0:
-                    flash(','.join(flashes), 'danger')
-
-        else:
-            for label, errors in form.errors.items():
-                if label == 'csrf_token':
-                    flash('Form Expired Please try again', 'danger')
-                else:
-                    flash('{}:{}'.format(label, ','.join(errors)), 'danger')
-        
-    except Exception as e:
-        print('System Error: {} , info: {}'.format(e, sys.exc_info()))
-        flash('Unable to create new users right now, please try again later.', 'danger')
-
-    finally:
-        return redirect(url_for('main.profile'))

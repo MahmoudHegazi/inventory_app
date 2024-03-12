@@ -3177,7 +3177,7 @@ def delete_category(category_id):
     else:
         flash("You do not have permissions to delete category.", 'danger')
         return redirect(url_for('routes.setup'))
-    
+
 @routes.route('/categories/delete', methods=['POST'])
 @login_required
 @vendor_permission.require(http_exception=403)
@@ -3195,12 +3195,12 @@ def delete_categories():
                         total_removed += 1
                     flash('Successfully deleted ({}) categories.'.format(total_removed), 'success')
                 else:
-                    flash('Unable to delete Categories, please reload page', 'danger')
+                    flash('Unable to delete categories, please reload page', 'danger')
             else:
                 flash('No Categories Selected', 'warning')
         except Exception as e:
             print('System Error: {}'.format(sys.exc_info()))
-            flash('Unknown error unable to delete category', 'danger')
+            flash('Unknown error unable to delete categories', 'danger')
         finally:
             return redirect(url_for('routes.setup'))
     else:

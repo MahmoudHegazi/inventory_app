@@ -1501,6 +1501,157 @@ function siwtchComponent(e=null, link_elm=null, data_target=null){
   }
 }
 
+// delete some rows component
+function deleteSomeRowsComponent(contSelector = '', modalId = '', formSelector = '', actionContSelector = '', someInputsSelector = '', reprsContSelector = '', actionPrefex = '', append = true, actionClasses = '', actionBtnClasses='', actionTxt = '') {
+  // global scobed within component variables (private variables as well no accsed or able use)
+  const actionConts = contSelector && $(contSelector).length ? $(contSelector) : null;
+  const modalElm = modalId && $(modalId).length ? $(modalId) : null;
+  const formInput = formSelector && $(formSelector).length ? $(formSelector) : null;
+  const actionContElm = actionContSelector && $(actionContSelector).length ? $(actionContSelector) : null;
+  const deleteSomeInput = someInputsSelector && $(someInputsSelector).length ? $(someInputsSelector) : null;
+  const reprsCont = reprsContSelector && $(reprsContSelector).length ? $(reprsContSelector) : null;
+  
+  // notification and prevent no check again and message for make sure function ready
+  if (!actionConts || !modalElm || !formInput || !actionContElm || !deleteSomeInput) {
+          const requireds = {
+                  actionConts,
+                  modalElm,
+                  formInput,
+                  actionContElm,
+                  deleteSomeInput
+          };
+          for (prop in requireds) {
+                  if (!requireds[prop]) {
+                          console.log(`Missing ${prop}`);
+                  }
+          }
+          return false;
+  }
+  // one time insert new create checkbox
+  const actionSelector = `elms_${actionPrefex}`;
+  const actionBtnId = `delete_sum_${actionPrefex}`;
+  const labelSelector = `delete_label_${actionPrefex}`;
+  const toggleSelectAllId = `toggle_all_${actionPrefex}`;
+  const deleteAllTxt = 'Delete All';
+  let formAction = '';
+  if ($(actionContElm).attr('data-action')){
+    formAction = $(actionContElm).attr('data-action');
+  } else {
+    console.log("data-action attr is required");
+    return false;
+  }
+  
+  $(actionContElm).append(`
+    <button type="button" id="${actionBtnId}" class="btn btn-danger btn-sm" data-toggle="modal" data-target="${modalId}" style="display:none;">Delete Selected</button>
+    <button type="button" id="${toggleSelectAllId}" class="btn btn-secondary btn-sm ${actionBtnClasses}">${deleteAllTxt}</button>
+    `);
+  // insert checkbox inputs data-repr
+  for (let ContI = 0; ContI < $(actionConts).length; ContI++) {
+          const actionCont = actionConts[ContI];
+          if ($(actionCont).attr("data-id")) {
+                  const titleAttr = actionTxt ? `title="${actionTxt}"` : '';
+                  const reprUsed = $(actionCont).attr("data-repr") ? `data-repr="${$(actionCont).attr("data-repr")}"` : '';
+                  const deleteRowId = $(actionCont).attr("data-id");
+                  const elmTxt = `
+          <label class="form-check-label ${actionClasses} ${labelSelector}" ${titleAttr}>
+            <input type="checkbox" class="form-check-input ${actionSelector}" value="${deleteRowId}" ${reprUsed} />
+          </label>`;
+                  if (append) {
+                          $(actionCont).append(elmTxt);
+                  } else {
+                          $(actionCont).prepend(elmTxt);
+                  }
+          } else {
+                  $(`.${labelSelector}`).remove();
+                  console.log(`Found elm not have data-id required attr at index ${ContI}`);
+                  return false;
+          }
+  }
+  const boxesClass = `.${actionSelector}`;
+  $(boxesClass).on("change", () => {
+          if ($(`${boxesClass}:checkbox:checked`).length) {
+                  if ($(`#${actionBtnId}`).is(":hidden")) {
+                          // some times already previous element checked so no need show
+                          $(`#${actionBtnId}`).show('fast');
+                          $(`#${toggleSelectAllId}`).attr("data-select", "true");
+                          $(`#${toggleSelectAllId}`).text("Undo Select");
+                  }
+          } else {
+                  // only hide will done when last element selected and done 1time
+                  $(`#${actionBtnId}`).hide('fast');
+                  
+                  $(`#${toggleSelectAllId}`).removeAttr("data-select");
+                  $(`#${toggleSelectAllId}`).text(deleteAllTxt);
+          }
+  });
+  
+  if (!$(`#${toggleSelectAllId}`).length || !$(`#${actionBtnId}`).length){
+    console.log("delete all or delete select buttons not created");
+    return false;
+  }
+  
+  const clickDeleteSelected = ()=>{
+    const checkedIds = Array.from($(`${boxesClass}:checkbox:checked`)).map((elm)=>{return $(elm).val() && String($(elm).val()).trim() ? $(elm).val() : false;});
+    // return only false found
+    const invalidIds = checkedIds.filter((elmVal)=>{ return !elmVal; });
+
+
+    if (invalidIds.length > 0){
+      console.log("invalid ids or empty are found");
+      return false;
+    }
+    if (!$(formInput).length && !$(deleteSomeInput).length){
+      console.log("Missing required elements formInput, deleteSomeInput");
+      return false;
+    }
+
+    
+    $(formInput).attr('action', formAction);
+    $(deleteSomeInput).val(checkedIds.join(','));
+    
+    // display optional items will deleted
+    if (reprsCont && $(reprsCont).length){
+       // optional repr on any not on all even (return any true found)
+       const reprsElmsTxt = Array.from($(`${boxesClass}:checkbox:checked[data-repr]`)).map((elm)=>{return $(elm).attr('data-repr') && String($(elm).attr('data-repr')).trim() ? `<div class="m-0">${$(elm).attr('data-repr')}</div>` : false;}).filter((elmVal)=>{ return elmVal; }).join('');
+       if (reprsElmsTxt){
+          $(reprsCont).html(reprsElmsTxt);
+       }
+    }
+    
+    return true;
+  };
+  // select all checkbox toggle
+  $(`#${toggleSelectAllId}`).on("click", ()=>{
+ 
+    if ($(`#${toggleSelectAllId}`).attr("data-select")){
+      // unselect
+      $(`#${toggleSelectAllId}`).removeAttr("data-select");
+      $(`${boxesClass}:checkbox`).prop("checked", false);
+      $(`#${toggleSelectAllId}`).text(deleteAllTxt);
+      $(`#${actionBtnId}`).hide('fast');
+    } else {
+      // select
+      $(`#${toggleSelectAllId}`).attr("data-select", "true");
+      $(`${boxesClass}:checkbox`).prop("checked", true);
+      $(`#${toggleSelectAllId}`).text("Undo Select");
+      // alot benfit and also required not only for performance unlike trigger but for make sure open after all checked not first trigger
+      clickDeleteSelected();
+      $(modalElm).modal('show');
+    }
+  });
+  
+  // on click before show modal excuted one time
+  $(`#${actionBtnId}`).on("click", clickDeleteSelected);
+
+  // on modal close excuted on time (not the cb)
+  $(modalElm).on('hide.bs.modal', function(e) {
+    $(formInput).attr('action', '');
+    $(deleteSomeInput).val('');
+    $(reprsCont).html('');
+  });
+}
+
+
 $(document).ready(async function(){
     applyHoverEffect();
 });

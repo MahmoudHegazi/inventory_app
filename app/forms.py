@@ -378,6 +378,10 @@ class importCategoriesAPIForm(FlaskForm):
     api_key = StringField('SHOP KEY', validators=[InputRequired(), Length(max=500)], render_kw={'title': 'You can get that key from your marketplace, in the API section'})
     import_data = SubmitField('Import Data')
 
+class removeSomeCategoriesForm(FlaskForm):
+    categories_ids = StringField(validators=[InputRequired()], id='remove_cats_ids', render_kw={'display': 'none'})
+    delete = SubmitField('Delete', id='delete_some_categories')
+
 # Condition forms
 class addConditionForm(FlaskForm):
     name_add = StringField('Name', id='condition_name_add', validators=[InputRequired(), Length(max=255)])
@@ -547,7 +551,7 @@ class addNewUserForm(FlaskForm):
 
 class addInventoryForm(FlaskForm):
     a_name = StringField('Name',validators=[InputRequired(), Length(min=1, max=255)])
-    a_max_pending = IntegerField('Max Pending Requests Limit', id='amax_pending_update', validators=[Length(min=1)])
+    a_max_pending = IntegerField('Max Pending Requests Limit', id='amax_pending_update', validators=[InputRequired()])
     a_active = BooleanField('active',validators=[], default=True)
     a_private = BooleanField('private',validators=[], default=False)
     a_exportable = BooleanField('exportable',validators=[], default=True)

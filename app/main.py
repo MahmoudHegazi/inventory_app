@@ -1566,7 +1566,7 @@ def add_inventory():
                     new_inventory.insert()
                     flash('Successfully Created New Inventory', 'success')
                 else:
-                    flash('Can not add Inventory, Category with same name [{}] already exist'.format(form.name.data), 'danger')
+                    flash('Can not add Inventory, Category with same name [{}] already exist'.format(form.a_name.data), 'danger')
             else:
                 for field, errors in form.errors.items():
                     if field == 'csrf_token':
@@ -1578,7 +1578,6 @@ def add_inventory():
         except Exception as e:
             print('System Error: {}'.format(sys.exc_info()))
             flash('Unknown Error unable to create new inventory', 'danger')
-            raise e
         finally:
             return redirect(url_for('main.profile', movetocomponent='inventories'))
     else:

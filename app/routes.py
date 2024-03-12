@@ -2558,6 +2558,7 @@ def setup():
             add_category = addCategoryForm()
             edit_category = editCategoryForm()
             delete_category = removeCategoryForm()
+            delete_categories = removeSomeCategoriesForm()
 
             add_condition = addConditionForm()
             edit_condition = editConditionForm()
@@ -2575,7 +2576,12 @@ def setup():
             # check if user have bestbuy_metas created for remanaing and max per request for current user  (note if global app config numbers changed next time user will try import data will require to setup again the api and auto update the global config number only if required update)
             bestbuy_installed = bestbuy_ready()
             return render_template('setup.html', dashboard=current_user.dashboard, platforms=platforms, locations=locations, conditions=conditions, categories=categories,
-                                   add_platform=add_platform, edit_platform=edit_platform, delete_platform=delete_platform, add_location=add_location, edit_location=edit_location, delete_location=delete_location, add_bin=add_bin, edit_bin=edit_bin, delete_bin=delete_bin, add_category=add_category, edit_category=edit_category, delete_category=delete_category, add_condition=add_condition, edit_condition=edit_condition, remove_condition=remove_condition, import_categories=import_categories, setup_bestbuy=setup_bestbuy, bestbuy_installed=bestbuy_installed)
+                                   add_platform=add_platform, edit_platform=edit_platform, delete_platform=delete_platform,
+                                   add_location=add_location, edit_location=edit_location, delete_location=delete_location,
+                                   add_bin=add_bin, edit_bin=edit_bin, delete_bin=delete_bin, add_category=add_category,
+                                   edit_category=edit_category, delete_category=delete_category, add_condition=add_condition,
+                                   edit_condition=edit_condition, remove_condition=remove_condition, import_categories=import_categories,
+                                   setup_bestbuy=setup_bestbuy, bestbuy_installed=bestbuy_installed, delete_categories=delete_categories)
         else:
             flash("You do not have permissions access setup page.", 'danger')
             return redirect(url_for('routes.index'))
@@ -3170,6 +3176,35 @@ def delete_category(category_id):
             return redirect(url_for('routes.setup'))
     else:
         flash("You do not have permissions to delete category.", 'danger')
+        return redirect(url_for('routes.setup'))
+    
+@routes.route('/categories/delete', methods=['POST'])
+@login_required
+@vendor_permission.require(http_exception=403)
+def delete_categories():
+    can = user_have_permissions(app_permissions, permissions=['delete'])
+    if can:
+        try:
+            form = removeSomeCategoriesForm()
+            target_categories = Category.query.filter(Category.id.in_(form.categories_ids.data.split(','))).all()
+            if len(target_categories) > 0:
+                if form.validate_on_submit():
+                    total_removed = 0
+                    for target_cat in target_categories:
+                        target_cat.delete()
+                        total_removed += 1
+                    flash('Successfully deleted ({}) categories.'.format(total_removed), 'success')
+                else:
+                    flash('Unable to delete Categories, please reload page', 'danger')
+            else:
+                flash('No Categories Selected', 'warning')
+        except Exception as e:
+            print('System Error: {}'.format(sys.exc_info()))
+            flash('Unknown error unable to delete category', 'danger')
+        finally:
+            return redirect(url_for('routes.setup'))
+    else:
+        flash("You do not have permissions to delete categories.", 'danger')
         return redirect(url_for('routes.setup'))
 
 """

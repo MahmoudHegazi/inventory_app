@@ -123,6 +123,7 @@
           <div class="div border shadow rounded p-2">
             <h5 class="mt-2 mb-3"><span>Categories ({{categories|length}}): </span>
             <div style="float:right;max-width:fit-content;" class="d-flex justify-content-around align-items-center">
+              <div id="delete_some_cont" data-action="{{url_for('routes.delete_categories')}}" style="max-width: fit-content;"></div>
               {% if bestbuy_installed %}
               <button type="button" data-toggle="modal" data-target="#importCategoriesModal" class="btn btn-info btn-sm mr-1">Import from API</button>
               {% else %}
@@ -135,7 +136,7 @@
               <!-- categories -->
               {% for category in categories %}
               <div class="col-sm-12 row shadow mb-2">
-                <div class="col-sm-6">
+                <div class="col-sm-6 d-flex justify-content-start check_categories" data-id="{{category.id}}" data-repr="{{category.label}}">
                   <p style="word-break: break-word;">{{category.code}} : {{category.label}}</p>
                 </div>                
                 <div class="col-sm-6 text-right">
@@ -180,7 +181,7 @@
 </div>
 {{platforms_data}}
 {% from 'forms.html' import setup_forms %}
-{{ setup_forms(add_platform=add_platform, edit_platform=edit_platform, delete_platform=delete_platform, add_location=add_location, edit_location=edit_location, delete_location=delete_location, add_bin=add_bin, edit_bin=edit_bin, delete_bin=delete_bin, add_category=add_category, edit_category=edit_category, delete_category=delete_category, add_condition=add_condition, edit_condition=edit_condition, remove_condition=remove_condition, import_categories=import_categories, setup_bestbuy=setup_bestbuy) }}
+{{ setup_forms(add_platform=add_platform, edit_platform=edit_platform, delete_platform=delete_platform, add_location=add_location, edit_location=edit_location, delete_location=delete_location, add_bin=add_bin, edit_bin=edit_bin, delete_bin=delete_bin, add_category=add_category, edit_category=edit_category, delete_category=delete_category, add_condition=add_condition, edit_condition=edit_condition, remove_condition=remove_condition, import_categories=import_categories, setup_bestbuy=setup_bestbuy, delete_categories=delete_categories) }}
 {% endblock %}
 
 {% block page_scripts %}
@@ -216,6 +217,12 @@ fillEditForm(triggerSelector='.edit_condition', formSelector='#edit_condition_fo
   id: '#condition_id_edit',
   name: '#condition_name_edit'
 });
+
+// delete some cateogires component add
+deleteSomeRowsComponent('.check_categories', '#deleteCategoriesModal', '#deletesome_form', '#delete_some_cont',
+'#remove_cats_ids', '#ddelete_categories', 'dcategories', false, 'ml-2', 'mr-1', 'select to delete multiple cateogires'
+);
+
 
 // display platform listings
 const platformObjs = {};

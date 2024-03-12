@@ -881,7 +881,7 @@
 </div>
 {% endmacro %}
 
-{% macro setup_forms(add_platform, edit_platform, delete_platform, add_location, edit_location, delete_location, add_bin, edit_bin, delete_bin, add_category, edit_category, delete_category, add_condition, edit_condition, remove_condition, import_categories, setup_bestbuy) %}
+{% macro setup_forms(add_platform, edit_platform, delete_platform, add_location, edit_location, delete_location, add_bin, edit_bin, delete_bin, add_category, edit_category, delete_category, add_condition, edit_condition, remove_condition, import_categories, setup_bestbuy, delete_categories) %}
 <div class="modal fade" id="addPlatformModal">
   <div class="modal-dialog">
     <div class="modal-content">
@@ -1279,6 +1279,44 @@
     </div>
   </div>
 </div>
+
+<div class="modal" id="deleteCategoriesModal">
+  <div class="modal-dialog">
+    <div class="modal-content">
+    
+      <!-- Modal Header -->
+      <div class="modal-header">
+        <h4 class="modal-title">Delete Categories</h4>
+        <button type="button" class="close" data-dismiss="modal">&times;</button>
+      </div>
+      
+      <!-- Modal body -->
+      <div class="modal-body">
+        {% if delete_categories %}
+        <form id="deletesome_form" method="post" action="">
+          <div class="p-2 mb-2 rounded shadow">
+            <h5 class="badge badge-info" style="text-wrap: wrap; text-align: left;">Are you sure you want delete the following items:</h5>
+            <div style="max-height:500px!important;overflow:auto!important;" id="ddelete_categories">  
+            </div>
+          </div>
+          {{delete_categories.categories_ids(style='display:none;')}}
+          {{delete_categories.hidden_tag()}}
+          {{delete_categories.delete(class='btn btn-danger')}}
+        </form>
+        {% else %}
+        <div class="alert alert-danger">Unable to Display Remove Categories form right now.</div>
+        {% endif %}
+      </div>
+      
+      <!-- Modal footer -->
+      <div class="modal-footer">
+        <button type="button" class="btn btn-primary" data-dismiss="modal">Cancel</button>
+      </div>
+      
+    </div>
+  </div>
+</div>
+
 
 <!-- conditions -->
 <div class="modal fade" id="addConditionModal">

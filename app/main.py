@@ -14,7 +14,7 @@ get_export_data, get_charts, get_excel_rows, get_sheet_row_locations, chunks, ap
 bestbuy_ready, get_remaining_requests, get_requests_before_1minute, upload_orders, calc_orders_result, updateDashboardListings,\
 updateDashboardOrders, import_orders, order_ids_chunks, download_order_image, get_errors_message, generate_ourapi_key,\
 get_activity_dateobjs, complete_activity_date, get_charts_data, get_hashed_sqlalchemycol, ExportSqlalchemyFilter, get_unencrypted_cols,\
-get_sqlalchemy_filters, get_ordered_dicts, handle_crud_action, user_have_permissions, inv
+get_sqlalchemy_filters, get_ordered_dicts, handle_crud_action, user_have_permissions, inv, insert_locs_bins
 from flask_login import login_required, current_user
 import flask_excel
 import pyexcel
@@ -30,6 +30,8 @@ from sqlalchemy import select
 
 
 main = Blueprint('main', __name__, template_folder='templates', static_folder='static')
+
+
 
 @main.route('/import_catalogues_excel', methods=['POST', 'GET'])
 @login_required
@@ -66,10 +68,12 @@ def import_catalogues_excel():
                 if mapped_catalogues['success']:
 
                     for row_index in range(len(mapped_catalogues['db_rows'])):
-
+                        
                         db_row = mapped_catalogues['db_rows'][row_index]
                         # get locations name list of current row to insert db warehouse locations if not exist in edit and insert
+
                         row_locations = get_sheet_row_locations(mapped_catalogues, row_index)
+
                         
                         # as both provided category_code and category_label in excel file create the category if not exist
                         categoryCode = db_row['category_code']
@@ -129,41 +133,22 @@ def import_catalogues_excel():
                                             setattr(catalogue_exist, key, value)
                                             catalogue_exist.update()
                                         
+                                        insert_locs_bins(row_locations, catalogue_exist, current_user.dashboard.id, db)
+
                                         uploaded_skus.append(db_row['sku'])
                                     else:
                                         invalid_rows.append(row_info)
 
-                                    for sheet_location_name in row_locations:
-                                        db_location = inv(WarehouseLocations.query.filter_by(name=sheet_location_name), User.dashboard_id, WarehouseLocations.dashboard_id).first()
-                                        if not db_location:
-                                            db_location = WarehouseLocations(name=sheet_location_name, dashboard_id=current_user.dashboard.id)
-                                            db_location.insert()
-                                        
-                                        catalogue_loc= inv(db.session.query(CatalogueLocations).join(
-                                            Catalogue, CatalogueLocations.catalogue_id==Catalogue.id
-                                        ), User.id, Catalogue.user_id).filter(
-                                            CatalogueLocations.catalogue_id==catalogue_exist.id, CatalogueLocations.location_id==db_location.id
-                                        ).first()
-                                        
-                                        if not catalogue_loc:
-                                            catalogue_exist.locations.append(CatalogueLocations(location_id=db_location.id))
-                                            catalogue_exist.update()
                                 else:         
-                                    newCatalogue = Catalogue(user_id=current_user.id, **db_row)                      
-                                    
+                                    newCatalogue = Catalogue(user_id=current_user.id, **db_row)
+
+                                    newCatalogue.insert()
+
+                                    # insert catalogue locations if not exist create locations
+                                    insert_locs_bins(row_locations, newCatalogue, current_user.dashboard.id, db)
 
                                     uploaded_skus.append(db_row['sku'])
 
-                                    # insert catalogue locations if not exist create locations
-                                    for sheet_location_name in row_locations:
-                                        db_location = inv(WarehouseLocations.query.filter_by(name=sheet_location_name), User.dashboard_id, WarehouseLocations.dashboard_id).first()
-                                        if not db_location:
-                                            db_location = WarehouseLocations(name=sheet_location_name, dashboard_id=current_user.dashboard.id)                                        
-                                            db_location.insert()
-                                        newCatalogue.locations.append(CatalogueLocations(location_id=db_location.id))
-
-                                    newCatalogue.insert()
-                                    
                             except Exception as theerror:
                                 # sometimes this error encoding is can not passed to print so ignore issues for it or ignore print it and enogh exc_info
                                 # if error it broke the next rows rollback and continue

@@ -439,95 +439,52 @@ def edit_catalogue(catalogue_id):
                     if target_catalogue.upc != form.upc.data:
                         target_catalogue.upc = form.upc.data
 
-                    # location updates missing 
-                    # CatalogueLocationsBins.query.filter(location_id==cuurent_catalogue_location.location_id,bin_id=current_bin_in)
-                    user_warehouse_locations_ids = form.warehouse_locations.data
-                    user_locations_bin_ids = form.locations_bins.data
 
-                    # loop of user catalogue locations (handle delete old not used)
-                    for old_selected_loc_id in selected_locs_ids:
-                        # check if old loc id exist in the new array sent after sumbit form else delete it
-                        if old_selected_loc_id in user_warehouse_locations_ids:
-                            # if user selected same location id, need check if bins of current location in loop still used or user remove it after submit form
-                           
-                            not_changed_location = inv(db.session.query(CatalogueLocations).join(
-                                Catalogue, CatalogueLocations.catalogue_id==Catalogue.id
-                            ), User.id, Catalogue.user_id).filter(
-                                CatalogueLocations.location_id==old_selected_loc_id, CatalogueLocations.catalogue_id==target_catalogue.id
-                            ).one_or_none()
+                    ################ Update locations and bins (!technique 2 arrays changes!) (one of top performance if compared prev version) #####################
+                    # get old existing data arrays
+                    catalogue_locs = target_catalogue.locations
+                    locs_bins = []
+                    for catalogue_loc in catalogue_locs:
+                        locs_bins = [*locs_bins, *[catalogue_bin for catalogue_bin in catalogue_loc.bins]]
 
-                            if not_changed_location:                            
-                                for old_bin in not_changed_location.bins:
-                                    # if current user old bin id in the sent list from form conitnue else delete this old bin as user not selected it anymore
-                                    if old_bin.bin_id in user_locations_bin_ids:
-                                        continue
-                                    else:
-                                        old_bin.delete()
-                            else:
-                                continue
-                        else:
-                            # delete location if it was old location of catalogue but not sent in the new array
-                            
-                            removed_loc = inv(db.session.query(CatalogueLocations).join(
-                                Catalogue, CatalogueLocations.catalogue_id==Catalogue.id
-                            ), User.id, Catalogue.user_id).filter(
-                                CatalogueLocations.location_id==old_selected_loc_id, CatalogueLocations.catalogue_id==target_catalogue.id
-                            ).one_or_none()
-
-                            if removed_loc:
-                                removed_loc.delete()
-
-                    # handle new inserts
-
-                    # insert all new locations from locations ids list sent from user
-
-                    for user_loc_id in user_warehouse_locations_ids:
-
-                        location_exist = inv(db.session.query(CatalogueLocations).join(
-                                Catalogue, CatalogueLocations.catalogue_id==Catalogue.id
-                            ), User.id, Catalogue.user_id).filter(
-                                CatalogueLocations.location_id==user_loc_id, CatalogueLocations.catalogue_id==target_catalogue.id
-                            ).one_or_none()
-                        if location_exist is not None:
-                            continue
-                        else:
-                            # user added new loc                        
-                            new_inserted_catalogue_loc = CatalogueLocations(location_id=user_loc_id)                        
-                            target_catalogue.locations.append(new_inserted_catalogue_loc)
-                    # after add all transit catalogue locations update catalogue.locations once also handle if exist
-                    target_catalogue.update()
                     
-                    # handle all new bins inserts (as before it I added all can locations always must found location when query it to append new bin)
-                    all_catalogue_locations_ids = [catalogue_loc.id for catalogue_loc in target_catalogue.locations]
-                                    
-                    for user_bin_id in user_locations_bin_ids:                    
-                        # this solve the very hard problem as technquie I used must secured professional and detected as I sent to js all avail bins ids ignoring their parnt locations so must in insert validate and detect the location of the selected bin
-                        # this query says is there CatalogueLocationsBins recored that bin id same as bin_id sent from user form, and also its location id for location owned by target catalogue locations (the previous step make sure new locations inserted in beging to target_catalogue before insert bins so new selected location valid must be found)
+                    # old is delete (both location and bins)
+                    warhouse_delete = list(filter(lambda c_warloc:c_warloc.warehouse_location.id not in form.warehouse_locations.data, catalogue_locs))
+                    bins_delete = list(filter(lambda locbin:locbin.bin.id not in form.locations_bins.data, locs_bins))
 
-                        bin_exist = inv(db.session.query(CatalogueLocationsBins).join(
-                                CatalogueLocations, CatalogueLocationsBins.location_id==CatalogueLocations.id
-                            ).join(
-                                Catalogue, CatalogueLocations.catalogue_id==Catalogue.id
-                            ), User.id, Catalogue.user_id).filter(
-                                CatalogueLocationsBins.bin_id==user_bin_id, CatalogueLocationsBins.location_id.in_(all_catalogue_locations_ids)
-                            ).first()
-                        
-                        if bin_exist is not None:
-                            # if bin already exist not continue
-                            continue
-                        else:
-                            # here user selected new bin that need to be inserted
-                            target_bin = inv(db.session.query(LocationBins).join(WarehouseLocations, LocationBins.location_id==WarehouseLocations.id).filter(LocationBins.id==user_bin_id), User.dashboard_id, WarehouseLocations.dashboard_id).one_or_none()
+                    # data in new list and not in old get unqiue warehouse_locations to add
+                    warehouse_add = inv(db.session.query(WarehouseLocations).filter(
+                            WarehouseLocations.id.in_(list(filter(lambda recived_warloc:recived_warloc not in [cwl.warehouse_location.id for cwl in catalogue_locs], form.warehouse_locations.data)))
+                            ), User.dashboard_id, WarehouseLocations.dashboard_id).all()
+                    
+                    # delete boths locs and bins
+                    for wareto_delete in warhouse_delete:
+                        wareto_delete.delete()
 
+                    for binto_delete in bins_delete:
+                        binto_delete.delete()
 
-                            # get and validate submited bin and confirm its parent dashboardid same as user dashboard_id
-                            if target_bin is not None and target_bin.warehouse_location.dashboard_id == current_user.dashboard.id:
-                                catalogue_location = inv(db.session.query(CatalogueLocations).join(Catalogue, CatalogueLocations.catalogue_id==Catalogue.id).filter(CatalogueLocations.catalogue_id==target_catalogue.id, CatalogueLocations.location_id==target_bin.warehouse_location.id), User.id, Catalogue.user_id).one_or_none()
-                                if catalogue_location is not None:
-                                    new_bin = CatalogueLocationsBins(bin_id=target_bin.id)                                
-                                    catalogue_location.bins.append(new_bin)
-                                    catalogue_location.update()
+                    # add catalogus locations
+                    for warto_add in warehouse_add:
+                        target_catalogue.locations.append(CatalogueLocations(location_id=warto_add.id))
 
+                    # update changes all and aswell insert all catalogue locations if any new with some bins
+                    target_catalogue.update()
+
+                    # get new bins to be added and the CatalogueLocation include same location bin, must done after add all CatalogueLocations so all CatalogueLocations can be found!
+                    cloc_bins_add = inv(db.session.query(CatalogueLocations.id, LocationBins.id).join(
+                        CatalogueLocations, CatalogueLocations.location_id==LocationBins.location_id
+                        ).join(
+                            WarehouseLocations, LocationBins.location_id==WarehouseLocations.id
+                            ).filter(
+                                LocationBins.id.in_(list(filter(lambda x:True if x not in [lc.bin.id for lc in locs_bins] else False, form.locations_bins.data)))
+                                ), User.dashboard_id, WarehouseLocations.dashboard_id).all()
+
+                    
+                    for cloc_bin_add in cloc_bins_add:
+                        CatalogueLocationsBins(location_id=cloc_bin_add[0], bin_id=cloc_bin_add[1]).insert()
+                    
+                    ################ Update locations and bins (!technique 2 arrays changes!) end #####################
                     flash('Successfully updated catalogue data', 'success')
                     success = True
                 else:
@@ -537,7 +494,7 @@ def edit_catalogue(catalogue_id):
             except Exception as e:
                 print('System Error: {}'.format(sys.exc_info()))
                 # update event will done after success = True, so incase error in that event set success to False 
-                success = None        
+                success = None
 
             finally:
                 if success == True:           
@@ -2803,7 +2760,6 @@ def delete_location(location_id):
     else:
         flash("You do not have permissions to delete location.", 'danger')
         return redirect(url_for('routes.setup'))
-
 
 
 ###########################  Warehouse Locations Bins  ##############################

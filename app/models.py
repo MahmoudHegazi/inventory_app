@@ -1100,7 +1100,7 @@ class LocationBins(db.Model):
         'location_id': self.location_id,
         'created_date': self.created_date,
         'updated_date': self.updated_date
-        }
+        } 
 
 
 
@@ -1111,7 +1111,13 @@ class CatalogueLocations(db.Model):
     location_id = db.Column(db.Integer, db.ForeignKey('warehouse_locations.id', ondelete="CASCADE", onupdate="CASCADE"), nullable=False)
     created_date = db.Column(DateTime, nullable=False, default=datetime.datetime.utcnow)
     updated_date = db.Column(DateTime, nullable=True, default=None, onupdate=datetime.datetime.utcnow)
-    bins = db.relationship("CatalogueLocationsBins", backref="catalogue_locations", cascade="all, delete", passive_deletes=True)
+    bins = db.relationship("CatalogueLocationsBins", backref="catalogue_location", cascade="all, delete", passive_deletes=True)
+
+    def __init__(self, location_id, catalogue_id=None):
+        self.location_id = location_id
+        # some times use append to insert locations bins, incase not use it can accept direct insert
+        if catalogue_id:
+            self.catalogue_id = catalogue_id
 
     def insert(self):
         db.session.add(self)
@@ -1142,6 +1148,11 @@ class CatalogueLocationsBins(db.Model):
     bin_id = db.Column(db.Integer, db.ForeignKey('location_bins.id', ondelete="CASCADE", onupdate="CASCADE"), nullable=True)
     created_date = db.Column(DateTime, nullable=False, default=datetime.datetime.utcnow)
     updated_date = db.Column(DateTime, nullable=True, default=None, onupdate=datetime.datetime.utcnow)
+
+
+    def __init__(self, location_id, bin_id):
+        self.location_id = location_id 
+        self.bin_id = bin_id
 
     def insert(self):
         db.session.add(self)

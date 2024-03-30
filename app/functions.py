@@ -67,6 +67,33 @@ def valid_catalogues(excel_array):
     except Exception as e:
         print('System Error valid_catalogues: {}'.format(sys.exc_info()))
         raise e
+
+# method used to convert imported catalogue string it can changed based way will import so no effect main function
+def get_locations_bins(locations_bins_str=''):
+    result = []
+    locations_bins = locations_bins_str.strip().split('|')
+    for location_bins in locations_bins:
+        location_bins = location_bins.strip()
+        # import only valid locations and bins
+        if location_bins != '' and ':' in location_bins:
+            location_and_bins = location_bins.split(':')
+            location = location_and_bins[0].strip()
+            if location:
+                #db_rows_locations
+                loc_obj = {'location': location, 'bins': []}
+                bins = location_and_bins[1].strip().split(',')
+                for bin in bins:
+                    bin = bin.strip()
+                    if bin:
+                        loc_obj['bins'].append(bin)
+                    else:
+                        continue
+                result.append(loc_obj)
+            else:
+                continue
+        else:
+            continue
+    return result
     
 #{ "sku",  "product_name",  "product_description",  "brand",  "category_code",  "price",  "sale_price",  "quantity",  "product_model",  "condition",  "upc",  "location", }
 def get_mapped_catalogues_dicts(excel_array):
@@ -89,10 +116,8 @@ def get_mapped_catalogues_dicts(excel_array):
             "upc": -1,
             "location": -1
             }
-            
             db_rows = []
             db_rows_locations = []
-            db_rows_bins = []
             for i in range(len(excel_array)):
                 current_row = excel_array[i]
                 if i == 0:
@@ -126,8 +151,8 @@ def get_mapped_catalogues_dicts(excel_array):
                     }
                     db_rows.append(db_row)
                     # location relational data array
-                    db_rows_locations.append(current_row[catalogues_columns['location']])
-                    
+                    db_rows_locations.append(get_locations_bins(current_row[catalogues_columns['location']]))
+
             return {'success': True, 'message': '', 'db_rows': db_rows, 'db_rows_locations': db_rows_locations}
         else:
             return catalogues_valid
@@ -507,11 +532,13 @@ def get_export_data(db, flask_excel, current_user_id, table_name, columns, opera
             export_data.append(response['column_names'])
 
             for item in response['data']:
-                locations_arr = []
+                locations_data = []
                 # easy can export bins too if needed
                 for cat_location in item.locations:
-                    locations_arr.append(str(cat_location.warehouse_location.name))
-                locations = ','.join(locations_arr)
+                    locations_data.append('{}:{}'.format(cat_location.warehouse_location.name, ','.join([bin.bin.name for bin in cat_location.bins])))
+                # locations and bins loc:bin1_bin2_bin3, loc2:
+                locations = '| '.join(locations_data)
+
                 categoryCode = item.category.code if item.category else ''
                 categoryLabel = item.category.label if item.category else ''
                 # set null on delete of condition, so there sometimes null conditions in cataluge instead of delete catalogues of that condition
@@ -1349,33 +1376,65 @@ def get_excel_rows(request, field_name=''):
         raise ValueError('can not import file unknown encoded used try convert it to xlsx')
     
     return imported_rows
-# get zero, one, or multiple locations names from string return list
-def get_locations_arr(locations_string):
-    locations_string = str(locations_string)
-    row_locations = []
-    try:
-        if ',' in locations_string:
-            row_locations = locations_string.split(",")
-        else:
-            row_locations.append(locations_string)
-    except Exception as e:
-        print('Error from get_locations_arr {}'.format(sys.exc_info()))
-    return row_locations
+
 
 def get_sheet_row_locations(mapped_catalogues_dict, row_index):
     row_locations = []
     try:
         # insert catalogue locations if not exist create locations
         if 'db_rows_locations' in mapped_catalogues_dict and len(mapped_catalogues_dict['db_rows_locations']) > row_index:
-            
-            sheet_location_str = mapped_catalogues_dict['db_rows_locations'][row_index]                                    
-            # add 0, one or multiple db locations from excel
-            row_locations = get_locations_arr(sheet_location_str)
+            row_locations = mapped_catalogues_dict['db_rows_locations'][row_index]
     except Exception as e:
         print("Error in get_sheet_locations row index: {}, error_info: {}".format(row_index, sys.exc_info()))
     return row_locations
 
+def insert_locs_bins(row_locations, catalogue_exist, dashboad_id, db):
+    inserted = False
+    for loc_obj in row_locations:
+        if 'location' in loc_obj and 'bins' in loc_obj:
+            db_location = inv(WarehouseLocations.query.filter_by(name=loc_obj['location']), User.dashboard_id, WarehouseLocations.dashboard_id).first()
+            
+            if not db_location:
+                db_location = WarehouseLocations(name=loc_obj['location'], dashboard_id=dashboad_id)
+                db_location.insert()
+                inserted = True
 
+            catalogue_loc= inv(db.session.query(CatalogueLocations).join(
+                Catalogue, CatalogueLocations.catalogue_id==Catalogue.id
+            ).filter(
+                CatalogueLocations.catalogue_id==catalogue_exist.id, CatalogueLocations.location_id==db_location.id
+            ), User.id, Catalogue.user_id).first()
+            
+            if not catalogue_loc:
+                catalogue_loc = CatalogueLocations(location_id=db_location.id, catalogue_id=catalogue_exist.id)
+                catalogue_loc.insert()
+                inserted = True
+            
+            for bin_name in loc_obj['bins']:
+                locbin = inv(db.session.query(LocationBins).join(
+                        WarehouseLocations, LocationBins.location_id==WarehouseLocations.id
+                    ).filter(
+                        LocationBins.name==bin_name, LocationBins.location_id==db_location.id
+                    ), User.dashboard_id, WarehouseLocations.dashboard_id).first()
+                
+                if not locbin:
+                    locbin = LocationBins(bin_name, location_id=db_location.id)
+                    locbin.insert()
+                    inserted = True
+                
+
+                catalogue_loc_bin = inv(db.session.query(CatalogueLocationsBins).join(
+                    CatalogueLocations, CatalogueLocationsBins.location_id==CatalogueLocations.id
+                ).join(
+                    Catalogue, CatalogueLocations.catalogue_id==Catalogue.id
+                ).filter(
+                    CatalogueLocationsBins.bin_id==locbin.id, CatalogueLocationsBins.location_id==catalogue_loc.id
+                ), User.id, Catalogue.user_id).first()
+
+                if not catalogue_loc_bin:
+                    CatalogueLocationsBins(catalogue_loc.id, locbin.id).insert()
+                    inserted = True
+    return inserted
 """
 (About this regex used): this regex says, string must start with english character or number, and followed by any of english characters or numbers or - and must end by english characters or number only and not \n --- note $ diffrent than \Z, \Z means match exact what given and not ignore the \n so if string end with \n will considered not matched, $ will ignore the \n becuase it dynamic handle both re.MULTILINE and normal first match so $ will match anything the string end with before the new line, ---note: []+ here means continue to the end like we say some pattern until end of match + new pattern--in this example ^[a-z0-9]+ means take any character or number until you reach of end where no more characters or numbers, then move to next pattern part which look for any character or number or - until end, using + important incase search here first + can ignored as next pattern part will match any number or character, but if ignored this will match only first char and leave rest for next part (+)!! it near equal to , or and start with part and part etc---match unlike find and search, this not search for example test\Z in string hello test match require pattern to begning part of string you can not say re.match("test\Z",txt) this invalid as missing hello\s or the pattern equal to it \w+ , [a-z]+ .* , etc 
 """

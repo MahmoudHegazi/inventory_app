@@ -2249,7 +2249,7 @@ def view_purchase_supplier(supplier_id, purchase_id):
             target_purchase = inv(db.session.query(
                 Purchase
             ).join(
-                Supplier, Purchase.supplier_id, Supplier.id
+                Supplier, Purchase.supplier_id == Supplier.id
             ).filter(
                 Purchase.id == purchase_id,
                 Supplier.id == supplier_id
@@ -2263,6 +2263,7 @@ def view_purchase_supplier(supplier_id, purchase_id):
             print('System Error: {}'.format(sys.exc_info()))
             flash('Unknown error unable to display Purchase with id: {}'.format(purchase_id), 'danger')
             success = False
+            raise e
         finally:
             if success == True:
                 
@@ -2365,7 +2366,7 @@ def edit_purchase_supplier(supplier_id, purchase_id):
             target_purchase = inv(db.session.query(
                 Purchase
             ).join(
-                Supplier, Purchase.supplier_id, Supplier.id
+                Supplier, Purchase.supplier_id == Supplier.id
             ).filter(
                 Purchase.id == purchase_id
             ), User.id, Supplier.user_id).one_or_none()
@@ -2387,6 +2388,7 @@ def edit_purchase_supplier(supplier_id, purchase_id):
         if request.method == 'POST':
             success = True
             try:
+                quantity_changed = False
                 if form.validate_on_submit():
                     valid_ids = int(form.listing_id.data) in [listing.id for listing in user_listings] and int(form.supplier_id.data) in [supplier.id for supplier in inv(Supplier.query, User.id, Supplier.user_id).all()]
                     selected_listing = inv(Listing.query.filter_by(id=form.listing_id.data), User.dashboard_id, Listing.dashboard_id).one_or_none()
@@ -2480,7 +2482,7 @@ def delete_purchase_supplier(supplier_id, purchase_id):
             target_purchase = inv(db.session.query(
                 Purchase
             ).join(
-                Supplier, Purchase.supplier_id, Supplier.id
+                Supplier, Purchase.supplier_id == Supplier.id
             ).filter(
                 Purchase.id == purchase_id
             ), User.id, Supplier.user_id).one_or_none()

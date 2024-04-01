@@ -35,7 +35,7 @@ main = Blueprint('main', __name__, template_folder='templates', static_folder='s
 
 @main.route('/import_catalogues_excel', methods=['POST', 'GET'])
 @login_required
-@vendor_permission.require()
+@vendor_permission.require(http_exception=403)
 def import_catalogues_excel():
     can = user_have_permissions(app_permissions, permissions=['add'])
     if can:
@@ -190,7 +190,7 @@ def import_catalogues_excel():
 # export listing
 @main.route('/export_listings', methods=['GET'])
 @login_required
-@vendor_permission.require()
+@vendor_permission.require(http_exception=403)
 def listing_export():
     try:
         can = user_have_permissions(app_permissions, permissions=['read'])
@@ -216,7 +216,7 @@ def listing_export():
 
 @main.route('/reports', methods=['POST', 'GET'])
 @login_required
-@vendor_permission.require()
+@vendor_permission.require(http_exception=403)
 def reports():
     try:
         can = user_have_permissions(app_permissions, permissions=['read'])
@@ -243,7 +243,7 @@ def reports():
 
 @main.route('/get_filter_columns', methods=['GET'])
 @login_required
-@vendor_permission.require()
+@vendor_permission.require(http_exception=403)
 def get_filter_columns():
     try:
         can = user_have_permissions(app_permissions, permissions=['read'])
@@ -265,7 +265,7 @@ def get_filter_columns():
 # full sqlalchemy dynamic export table data
 @main.route('/reports/export', methods=['POST'])
 @login_required
-@vendor_permission.require()
+@vendor_permission.require(http_exception=403)
 def reports_export():
     can = user_have_permissions(app_permissions, permissions=['read'])
     if can:
@@ -309,7 +309,7 @@ def reports_export():
 # this search function works with js search component dynamic for all app searchs
 @main.route('/search', methods=['GET', 'POST'])
 @login_required
-@vendor_permission.require()
+@vendor_permission.require(http_exception=403)
 def search():
     can = user_have_permissions(app_permissions, permissions=['read'])
     if can:
@@ -506,7 +506,7 @@ def search():
 # this search function works with js search component dynamic for all app searchs
 @main.route('/save_limit', methods=['POST'])
 @login_required
-@vendor_permission.require()
+@vendor_permission.require(http_exception=403)
 def savelimit():
     try:
         # confirm both side client and server number will set in session is valid integer
@@ -524,7 +524,7 @@ def savelimit():
 # setup bestbuy api connection, not save token only set metas for max and remaning user requests
 @main.route('/bestbuy_setup', methods=['POST', 'GET'])
 @login_required
-@vendor_permission.require()
+@vendor_permission.require(http_exception=403)
 def setup_bestbuy():
     redirects = {'setup': url_for('routes.setup'), 'listings': url_for('routes.listings'), 'orders': url_for('routes.orders')}
     redirect_url = url_for('routes.setup')
@@ -592,14 +592,14 @@ def setup_bestbuy():
 
 @main.route('/get_remaining_requests', methods=['POST', 'GET'])
 @login_required
-@vendor_permission.require()
+@vendor_permission.require(http_exception=403)
 def get_remaining_requests_func():
     return str(get_remaining_requests())
 
 # import categories using API (user securly provide API key)  (this main API endpoint for categories, so incase you first imported catalogues and it created the categories for you, any time you can back here to update the categories created (eg: to setup level and parent code, or incase in future label of category changed so this endpoint will handle the update also for you)) best practice if started with offers import, come here and import categories to have level and parent code if
 @main.route('/import_categories_api', methods=['POST', 'GET'])
 @login_required
-@vendor_permission.require()
+@vendor_permission.require(http_exception=403)
 def api_import_categories():
     can = user_have_permissions(app_permissions, permissions=['add'])
     if can:
@@ -695,7 +695,7 @@ def api_import_categories():
 # import categories using API (user securly provide API key)
 @main.route('/import_offers_api', methods=['POST', 'GET'])
 @login_required
-@vendor_permission.require()
+@vendor_permission.require(http_exception=403)
 def api_offers_import():
     can = user_have_permissions(app_permissions, permissions=['add'])
     if can:
@@ -818,7 +818,7 @@ def api_offers_import():
 
 @main.route('/test', methods=['POST', 'GET'])
 @login_required
-@vendor_permission.require()
+@vendor_permission.require(http_exception=403)
 def test():
     """
     # Order.query.all()
@@ -850,7 +850,7 @@ def test():
     
 @main.route('/import_orders_api', methods=['POST', 'GET'])
 @login_required
-@vendor_permission.require()
+@vendor_permission.require(http_exception=403)
 def api_import_orders():
     can = user_have_permissions(app_permissions, permissions=['add'])
     if can:
@@ -1027,7 +1027,7 @@ def generate_redirect(redirect_url):
 # this end point for catalogue if diffrent class use diffrent endpoint
 @main.route('/generate_barcode/<int:catalogue_id>', methods=['POST', 'GET'])
 @login_required
-@vendor_permission.require()
+@vendor_permission.require(http_exception=403)
 def generate_barcode(catalogue_id):
     can = user_have_permissions(app_permissions, permissions=['add'])
     if can:
@@ -1063,7 +1063,7 @@ def generate_barcode(catalogue_id):
 ################################### Profile ######################################
 @main.route('/profile', methods=['GET'])
 @login_required
-@vendor_permission.require()
+@vendor_permission.require(http_exception=403)
 def profile():
     can = user_have_permissions(app_permissions, permissions=['read'])
     if can:
@@ -1166,7 +1166,7 @@ def profile():
 
 @main.route('/proccess_chart_filters/<string:chart_id>', methods=['POST'])
 @login_required
-@vendor_permission.require()
+@vendor_permission.require(http_exception=403)
 def proccess_chart_filters(chart_id):
     can = user_have_permissions(app_permissions, permissions=['read'])
     if can:
@@ -1210,7 +1210,7 @@ def proccess_chart_filters(chart_id):
 ### charts avitvties
 @main.route('/proccess_chart_activity/<string:chart_id>', methods=['POST'])
 @login_required
-@vendor_permission.require()
+@vendor_permission.require(http_exception=403)
 def proccess_chart_activity(chart_id):
     can = user_have_permissions(app_permissions, permissions=['read'])
     if can:
@@ -1267,7 +1267,7 @@ def proccess_chart_activity(chart_id):
 # cancel all chart filters
 @main.route('/cancel_chart', methods=['POST'])
 @login_required
-@vendor_permission.require()
+@vendor_permission.require(http_exception=403)
 def cancel_chart():
     res = {'code': 400, 'message': 'Invalid Data.'}
     try:
@@ -1291,7 +1291,7 @@ def cancel_chart():
 # Create users admin
 @main.route('/add_user', methods=['POST'])
 @login_required
-@admin_permission.require()
+@admin_permission.require(http_exception=403)
 def admin_add_user():
     try:
         # check if vendor role found else create it
@@ -1343,7 +1343,7 @@ def admin_add_user():
     
 @main.route('/update_name', methods=['POST'])
 @login_required
-@vendor_permission.require()
+@vendor_permission.require(http_exception=403)
 def update_name():
     can = user_have_permissions(app_permissions, permissions=['update'])
     if can:
@@ -1369,7 +1369,7 @@ def update_name():
 
 @main.route('/update_email', methods=['POST'])
 @login_required
-@vendor_permission.require()
+@vendor_permission.require(http_exception=403)
 def update_email():
     can = user_have_permissions(app_permissions, permissions=['update'])
     if can:
@@ -1399,7 +1399,7 @@ def update_email():
 
 @main.route('/update_username', methods=['POST'])
 @login_required
-@vendor_permission.require()
+@vendor_permission.require(http_exception=403)
 def update_username():
     try:
         can = user_have_permissions(app_permissions, permissions=['update'])
@@ -1428,7 +1428,7 @@ def update_username():
 
 @main.route('/update_password', methods=['POST'])
 @login_required
-@vendor_permission.require()
+@vendor_permission.require(http_exception=403)
 def update_password():
     try:
         can = user_have_permissions(app_permissions, permissions=['update'])
@@ -1716,7 +1716,7 @@ def delete_inventory(inventory_id):
 
 @main.route('/view_joinpass', methods=['POST'])
 @login_required
-@inventory_admin_permission.require()
+@inventory_admin_permission.require(http_exception=403)
 def view_joinpass():
     data = {'code': 0}
     try:
@@ -1754,7 +1754,7 @@ def view_joinpass():
 
 @main.route('/approve_user/<int:user_id>', methods=['POST'])
 @login_required
-@inventory_admin_permission.require()
+@inventory_admin_permission.require(http_exception=403)
 def approve_user(user_id):
     can = user_have_permissions(app_permissions, permissions=['update'])
     if can:
@@ -1796,7 +1796,7 @@ def approve_user(user_id):
 
 @main.route('/remove_user/<int:user_id>', methods=['POST'])
 @login_required
-@inventory_admin_permission.require()
+@inventory_admin_permission.require(http_exception=403)
 def remove_user(user_id):
     can = user_have_permissions(app_permissions, permissions=['delete'])
     if can:
@@ -1835,7 +1835,7 @@ def remove_user(user_id):
 # Change inventory users
 @main.route('/change_inv', methods=['POST'])
 @login_required
-@inventory_admin_permission.require()
+@inventory_admin_permission.require(http_exception=403)
 def change_inv():
     try:
         can = user_have_permissions(app_permissions, permissions=['update'])
@@ -1872,7 +1872,7 @@ def change_inv():
 
 @main.route('/admin_change_inv', methods=['POST'])
 @login_required
-@admin_permission.require()
+@admin_permission.require(http_exception=403)
 def admin_change_inv():
     try:
         can = user_have_permissions(app_permissions, permissions=['update'])
@@ -1906,7 +1906,7 @@ def admin_change_inv():
 
 @main.route('/remove_old_pending', methods=['POST'])
 @login_required
-@admin_permission.require()
+@admin_permission.require(http_exception=403)
 def remove_old_pending():
     can = user_have_permissions(app_permissions, permissions=['delete'])
     if can:
@@ -1966,7 +1966,7 @@ def remove_old_pending():
 ###### ----- Profile API Keys ----- ######
 @main.route('/setup_ourapi', methods=['POST'])
 @login_required
-@vendor_permission.require()
+@vendor_permission.require(http_exception=403)
 def setup_ourapi():
     try:
         actions = 0
@@ -2001,7 +2001,7 @@ def setup_ourapi():
 
 @main.route('/add_key', methods=['POST', 'GET'])
 @login_required
-@vendor_permission.require()
+@vendor_permission.require(http_exception=403)
 def add_key():
     try:
         can = user_have_permissions(app_permissions, permissions=['add'])
@@ -2078,7 +2078,7 @@ def add_key():
 # note this means user will not able to delete API keys he added right now only admin or role in future with delete and its vendor
 @main.route('/remove_key/<int:id>', methods=['POST'])
 @login_required
-@vendor_permission.require()
+@vendor_permission.require(http_exception=403)
 def remove_key(id):
     try:
         # we can both outside and inside as nothing in expction can lead to leak of permssions but incase there is so must be outside like it wraper
@@ -2106,7 +2106,7 @@ def remove_key(id):
 
 @main.route('/update_key/<int:id>', methods=['POST'])
 @login_required
-@vendor_permission.require()
+@vendor_permission.require(http_exception=403)
 def update_key(id):
     try:
         can = user_have_permissions(app_permissions, permissions=['update'])
@@ -2180,7 +2180,7 @@ def update_key(id):
 
 @main.route('/renew_key/<int:id>', methods=['POST'])
 @login_required
-@vendor_permission.require()
+@vendor_permission.require(http_exception=403)
 def renew_key(id):
     try:
         form = renewKeyForm()

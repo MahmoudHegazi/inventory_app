@@ -30,8 +30,8 @@ app.config['BESTBUY_MAX'] = 100
 app.config['OURAPI_REQUESTS_LIMIT'] = 100
 app.config['OURAPI_KEYS_MAX'] = 10
 app.config['OURAPI_LIMIT'] = 100
-#app.config['SQLALCHEMY_DATABASE_URI'] = 'mysql://mr204h:Ilda2011@localhost/inventory123?charset=utf8mb4'
-app.config['SQLALCHEMY_DATABASE_URI'] = 'mysql://dbmasteruser:Success2023!@ls-78a3019a69abb8942e164ba31b7f79d941a5b928.cm1krsomo3zh.ca-central-1.rds.amazonaws.com/inventory123?charset=utf8mb4'
+app.config['SQLALCHEMY_DATABASE_URI'] = 'mysql://mr204h:Ilda2011@localhost/inventory123?charset=utf8mb4'
+#app.config['SQLALCHEMY_DATABASE_URI'] = 'mysql://dbmasteruser:Success2023!@ls-78a3019a69abb8942e164ba31b7f79d941a5b928.cm1krsomo3zh.ca-central-1.rds.amazonaws.com/inventory123?charset=utf8mb4'
 app.config['SECRET_KEY'] = 'AUubvglCWMc4pKZCc_H_kMJuapiMsMmHBUVuWI2VbjRzk589o1GmwBXZe-xkDoOFv-WCAXqQmbAKet4plF_-aB0'
 #app.config['SALAT'] = os.environ.get('SALAT')
 db = SQLAlchemy(app)

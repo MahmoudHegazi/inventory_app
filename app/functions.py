@@ -1411,6 +1411,8 @@ def insert_locs_bins(row_locations, catalogue_exist, dashboad_id, db):
                 inserted = True
             
             for bin_name in loc_obj['bins']:
+                bin_name = bin_name.strip()
+                
                 locbin = inv(db.session.query(LocationBins).join(
                         WarehouseLocations, LocationBins.location_id==WarehouseLocations.id
                     ).filter(

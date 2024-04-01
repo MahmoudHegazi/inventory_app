@@ -1654,6 +1654,13 @@ function deleteSomeRowsComponent(contSelector = '', modalId = '', formSelector =
 
 $(document).ready(async function(){
     applyHoverEffect();
+    $('form:not(".no_submit_hide")').on('submit', (e)=>{
+      const submitBtn = $(e.currentTarget).find('[type="submit"]').eq(0);
+      if (submitBtn.length) {
+        $(e.currentTarget).find('[type="submit"]').remove();
+        console.log('done');
+      }
+    });
 });
 
 

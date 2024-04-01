@@ -18,7 +18,7 @@ from flask_login import login_required, current_user
 from flask import request as flask_request
 from sqlalchemy import or_, and_, asc
 from functools import wraps
-
+from sqlalchemy import inspect
 
 from .functions import get_remaining_requests
 
@@ -439,37 +439,49 @@ def edit_catalogue(catalogue_id):
                     if target_catalogue.upc != form.upc.data:
                         target_catalogue.upc = form.upc.data
 
+                    # update changes all and aswell insert all catalogue locations if any new with some bins
+                    target_catalogue.update()
 
                     ################ Update locations and bins (!technique 2 arrays changes!) (one of top performance if compared prev version) #####################
-                    # get old existing data arrays
+                    # get old existing data arrays (data)
                     catalogue_locs = target_catalogue.locations
                     locs_bins = []
                     for catalogue_loc in catalogue_locs:
-                        locs_bins = [*locs_bins, *[catalogue_bin for catalogue_bin in catalogue_loc.bins]]
+                        locs_bins = [*locs_bins, *[catalogue_bin for catalogue_bin in catalogue_loc.bins]]              
 
-                    
+                    current_bins = [lc.bin.id for lc in locs_bins]
+
                     # old is delete (both location and bins)
-                    warhouse_delete = list(filter(lambda c_warloc:c_warloc.warehouse_location.id not in form.warehouse_locations.data, catalogue_locs))
-                    bins_delete = list(filter(lambda locbin:locbin.bin.id not in form.locations_bins.data, locs_bins))
-
-                    # data in new list and not in old get unqiue warehouse_locations to add
-                    warehouse_add = inv(db.session.query(WarehouseLocations).filter(
-                            WarehouseLocations.id.in_(list(filter(lambda recived_warloc:recived_warloc not in [cwl.warehouse_location.id for cwl in catalogue_locs], form.warehouse_locations.data)))
-                            ), User.dashboard_id, WarehouseLocations.dashboard_id).all()
+                    cataloguc_locs_delete = list(filter(lambda c_warloc:c_warloc.warehouse_location.id not in form.warehouse_locations.data, catalogue_locs))
                     
-                    # delete boths locs and bins
-                    for wareto_delete in warhouse_delete:
-                        wareto_delete.delete()
+                    deleted_catloguesids = [cloc.id for cloc in cataloguc_locs_delete]
+                    
+                    # (deletes) catalogue locations is parent of catalogue_loc_bins so if deleted then delete bins it will throw error as parent element and cascaded childs deleted already, so to make 0 error not only add warehouse delete after bins return only bins that parent not in catalogue locations will delete and leave only cascade better delete the data
+                    bins_delete = list(filter(
+                           lambda locbin:True 
+                           if locbin.bin.id not in form.locations_bins.data and locbin.catalogue_location.id not in deleted_catloguesids
+                           else False, locs_bins
+                        ))
 
+                    # (performance and cascade) also delete order of relationship database (delete child first) but here! delete only childs that parents will not deleted ex catalogueloc have 2 bins only remove 1 bin, so better performance for caseade delete instead one by one in loop
                     for binto_delete in bins_delete:
+                        # note sometimes user delete full warehouse as this none relation delete can use try (i decide better was_deleted and inspect instnse instead of try even if said error nothing happend)
                         binto_delete.delete()
 
+                    for catalogueloc_delete in cataloguc_locs_delete:
+                        catalogueloc_delete.delete()
+
+
+                    # (adds) data in new list and not in old get unqiue warehouse_locations to add
+                    warehouse_add = inv(db.session.query(WarehouseLocations).filter(
+                            WarehouseLocations.id.in_(list(filter(lambda recived_warloc:True if recived_warloc not in [cwl.warehouse_location.id for cwl in catalogue_locs] else False, form.warehouse_locations.data)))
+                            ), User.dashboard_id, WarehouseLocations.dashboard_id).all()
+                    
                     # add catalogus locations
                     for warto_add in warehouse_add:
-                        target_catalogue.locations.append(CatalogueLocations(location_id=warto_add.id))
+                        if not CatalogueLocations.query.filter_by(location_id=warto_add.id, catalogue_id=target_catalogue.id).first():
+                            CatalogueLocations(location_id=warto_add.id, catalogue_id=target_catalogue.id).insert()
 
-                    # update changes all and aswell insert all catalogue locations if any new with some bins
-                    target_catalogue.update()
 
                     # get new bins to be added and the CatalogueLocation include same location bin, must done after add all CatalogueLocations so all CatalogueLocations can be found!
                     cloc_bins_add = inv(db.session.query(CatalogueLocations.id, LocationBins.id).join(
@@ -477,13 +489,20 @@ def edit_catalogue(catalogue_id):
                         ).join(
                             WarehouseLocations, LocationBins.location_id==WarehouseLocations.id
                             ).filter(
-                                LocationBins.id.in_(list(filter(lambda x:True if x not in [lc.bin.id for lc in locs_bins] else False, form.locations_bins.data)))
+                                LocationBins.id.in_(list(filter(lambda x:True if x not in current_bins else False, form.locations_bins.data))),
+                                CatalogueLocations.catalogue_id==target_catalogue.id
                                 ), User.dashboard_id, WarehouseLocations.dashboard_id).all()
-
                     
                     for cloc_bin_add in cloc_bins_add:
-                        CatalogueLocationsBins(location_id=cloc_bin_add[0], bin_id=cloc_bin_add[1]).insert()
+                        if not CatalogueLocationsBins.query.filter_by(location_id=cloc_bin_add[0], bin_id=cloc_bin_add[1]).first():
+                            CatalogueLocationsBins(location_id=cloc_bin_add[0], bin_id=cloc_bin_add[1]).insert()
                     
+                    """ (this can verify if any data duplicated based on 2 columns (or infinty this not regular sql)) (but code not allow duplicate already)
+                    # hack sql (infinty group by and count) lol (that can verify if 1 or infity columns in same row are duplicated)
+                    ```SELECT COUNT(CONCAT(location_id, '-' , bin_id)), bin_id, CONCAT(location_id, '-' , bin_id) AS locbin 
+                    FROM inventory123.catalogue_locations_bins GROUP BY CONCAT(location_id, '-' , bin_id);```
+                    """
+
                     ################ Update locations and bins (!technique 2 arrays changes!) end #####################
                     flash('Successfully updated catalogue data', 'success')
                     success = True
@@ -2081,7 +2100,12 @@ def view_supplier(supplier_id):
             delete_purchase_form = removePurchaseForm()
             supplier = inv(Supplier.query.filter_by(id=supplier_id), User.id, Supplier.user_id).one_or_none()
             if supplier is not None:
-                purchases = inv(db.session.query(Purchase).join(Listing, Purchase.supplier_id==Supplier.id).filter(Purchase.supplier_id==supplier.id), User.id, Supplier.user_id).all()
+                purchases = inv(
+                    db.session.query(Purchase).join(
+                        Listing, Purchase.listing_id==Listing.id
+                        ).join(
+                        Supplier, Purchase.supplier_id==Supplier.id
+                        ).filter(Purchase.supplier_id==supplier.id), User.id, Supplier.user_id).all()
             else:
                 message = 'Unable to Find Supplier with id: {}, it maybe deleted.'.format(supplier_id)
                 success = False
@@ -2090,6 +2114,7 @@ def view_supplier(supplier_id):
             print('System Error: {}'.format(sys.exc_info()))
             message = 'Unknown error unable to display suppliers page'        
             success = False
+
         finally:
             if success == True:
                 return render_template('supplier.html', supplier=supplier, purchases=purchases,deleteform=deleteform,delete_purchase_form=delete_purchase_form)

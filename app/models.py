@@ -1115,7 +1115,7 @@ class CatalogueLocations(db.Model):
 
     def __init__(self, location_id, catalogue_id=None):
         self.location_id = location_id
-        # some times use append to insert locations bins, incase not use it can accept direct insert
+        # use with append not ass for assigen relation id auto assigned, here if not appened
         if catalogue_id:
             self.catalogue_id = catalogue_id
 

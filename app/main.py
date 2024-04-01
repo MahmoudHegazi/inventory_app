@@ -164,7 +164,7 @@ def import_catalogues_excel():
                     # response message with report what data uploaded and what have issues and where issues
                     total_ignored = len(duplicated_skus) + len(invalid_rows)
                     total_uploaded = len(mapped_catalogues['db_rows']) - total_ignored
-                    message = 'Successfully Imported Catalogues From Excel File, Total uploaded: {}, Total Ignored: {}, Empty Rows: {}, Duplicateds: [{}], invalids: [{}]'.format(total_uploaded, total_ignored,empty_rows, ','.join(duplicated_skus), ','.join(invalid_rows))
+                    message = 'Successfully Imported Catalogues From Excel File, Total processed: {}, Total Ignored: {}, Empty Rows: {}, Duplicateds: [{}], invalids: [{}]'.format(total_uploaded, total_ignored,empty_rows, ','.join(duplicated_skus), ','.join(invalid_rows))
                 else:
                     message = mapped_catalogues['message']
                     success = False

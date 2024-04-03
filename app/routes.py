@@ -2892,7 +2892,12 @@ def delete_bin(location_id, bin_id):
                 # there are cascade rule in sqlalchemy, and db can not found bin while its location deleted (!!! this high secuirty point)
                 target_location = inv(WarehouseLocations.query.filter_by(id=location_id), User.dashboard_id, WarehouseLocations.dashboard_id).one_or_none()
                 if target_location is not None:
-                    target_bin = inv(db.session.query(LocationBins).join(WarehouseLocations, LocationBins.location_id==WarehouseLocations.id).filter(LocationBins.id==bin_id, location_id==target_location.id), User.dashboard_id, WarehouseLocations.dashboard_id).one_or_none()
+                    target_bin = inv(db.session.query(LocationBins).join(
+                            WarehouseLocations, LocationBins.location_id==WarehouseLocations.id
+                        ).filter(
+                            LocationBins.id==bin_id, LocationBins.location_id==target_location.id
+                        ), User.dashboard_id, WarehouseLocations.dashboard_id).one_or_none()
+                    
                     if target_bin is not None:
                         target_bin.delete()
                         flash('Successfully deleted Bin', 'success')

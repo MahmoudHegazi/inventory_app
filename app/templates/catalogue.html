@@ -75,10 +75,10 @@
               <p class="overflow_within"><span class="badge badge-info">Product Name: </span><span class="p-1 shadow break_word"> {{catalogue.product_name}}</span></p>
             </div>
             <div class="col-sm-12">
-              <p class="overflow_within"><span class="badge badge-dark">Location: </span><span class="p-1 shadow break_word"> {{catalogue.location}}</span></p>
+              <p class="overflow_within"><span class="badge badge-dark">Brand: </span><span class="p-1 shadow break_word">{% if catalogue.brand %}{{catalogue.brand}}{% else %}N/A{% endif %}</span></p>
             </div>
             <div class="col-sm-12">
-              <p class="overflow_within"><span class="badge badge-info">Product Model: </span><span class="p-1 shadow break_word"> {{catalogue.product_model}}</span></p>
+              <p class="overflow_within"><span class="badge badge-info">Product Model: </span><span class="p-1 shadow break_word">{% if catalogue.product_model %}{{catalogue.product_model}}{% else %}N/A{% endif %}</span></p>
             </div>
             <div class="col-sm-12">
               <div class="overflow_within"><span class="badge badge-dark">Product Description: </span>
@@ -96,19 +96,19 @@
               </p>
             </div>
             <div class="col-sm-12">
-                <p class="overflow_within"><span class="badge badge-dark">Condition: </span><span class="p-1 shadow"> {{catalogue.condition.name}}</span></p>
+                <p class="overflow_within"><span class="badge badge-dark">Condition: </span><span class="p-1 shadow">{% if catalogue.condition %}{{catalogue.condition.name}}{% else %}N/A{% endif %}</span></p>
             </div>
             <div class="col-sm-12">
-              <p class="overflow_within"><span class="badge badge-info">Category Code: </span><span class="p-1 shadow">{% if catalogue.category %}{{catalogue.category.code}}{% endif %}</span></p>
+              <p class="overflow_within"><span class="badge badge-info">Category Code: </span><span class="p-1 shadow">{% if catalogue.category %}{{catalogue.category.code}}{% else %}N/A{% endif %}</span></p>
             </div>
             <div class="col-sm-12">
-              <p class="overflow_within"><span class="badge badge-dark">Category Label: </span><span class="p-1 shadow">{% if catalogue.category %}{{catalogue.category.label}}{% endif %}</span></p>
+              <p class="overflow_within"><span class="badge badge-dark">Category Label: </span><span class="p-1 shadow">{% if catalogue.category %}{{catalogue.category.label}}{% else %}N/A{% endif %}</span></p>
             </div>
             <div class="col-sm-12">
-              <p class="overflow_within"><span class="badge badge-info">Category Level: </span><span class="p-1 shadow">{% if catalogue.category %}{{catalogue.category.level}}{% endif %}</span></p>
+              <p class="overflow_within"><span class="badge badge-info">Category Level: </span><span class="p-1 shadow">{% if catalogue.category %}{{catalogue.category.level}}{% else %}N/A{% endif %}</span></p>
             </div>
             <div class="col-sm-12">
-              <p class="overflow_within"><span class="badge badge-dark">Category Parent Code: </span><span class="p-1 shadow">{% if catalogue.category %}{{catalogue.category.parent_code}}{% endif %}</span></p>
+              <p class="overflow_within"><span class="badge badge-dark">Category Parent Code: </span><span class="p-1 shadow">{% if catalogue.category %}{{catalogue.category.parent_code}}{% else %}N/A{% endif %}</span></p>
             </div>
             {% if catalogue.barcode %}
             <div class="col-sm-12">

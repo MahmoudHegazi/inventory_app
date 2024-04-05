@@ -40,122 +40,58 @@ def inv(query, userCol, joinUserCol):
     return query.join(User, userCol==joinUserCol).filter(User.inventory_id==current_user.inventory_id)
 
 
-#### main functions ####
-def valid_catalogues(excel_array):
-    try:
-        required_columns = [
-        "sku","product_name","product_description","brand","category_code","category","price","sale_price","quantity","product_model","condition","upc", "location"]
-        columns_missing = []
-        if len(excel_array) == 0:
-            return {'success': True, 'message': ''}
-        
-        headears = excel_array[0]
-        for required_column in required_columns:
-            required_column = str(required_column).strip().lower()
-            if required_column not in headears:
-                columns_missing.append(required_column)
-                message = 'Missing one or more required columns: {}'.format(','.join(columns_missing))
-                return {'success': False, 'message': message}
-        
-        arrays_len = len(headears)
-        for row in excel_array:
-            if len(row) != arrays_len:
-                message = 'one or more headings are misssing, please make sure all columns have a title no matter if there additional column, only every column must have a title'
-                return {'success': False, 'message': message}
-        
-        return {'success': True, 'message': ''}
-    except Exception as e:
-        print('System Error valid_catalogues: {}'.format(sys.exc_info()))
-        raise e
-
-# method used to convert imported catalogue string it can changed based way will import so no effect main function
-def get_locations_bins(locations_bins_str=''):
-    result = []
-    locations_bins = locations_bins_str.strip().split('|')
-    for location_bins in locations_bins:
-        location_bins = location_bins.strip()
-        # import only valid locations and bins
-        if location_bins != '' and ':' in location_bins:
-            location_and_bins = location_bins.split(':')
-            location = location_and_bins[0].strip()
-            if location:
-                #db_rows_locations
-                loc_obj = {'location': location, 'bins': []}
-                bins = location_and_bins[1].strip().split(',')
-                for bin in bins:
-                    bin = bin.strip()
-                    if bin:
-                        loc_obj['bins'].append(bin)
-                    else:
-                        continue
-                result.append(loc_obj)
-            else:
-                continue
-        else:
-            continue
-    return result
-    
+#### main functions ####    
 #{ "sku",  "product_name",  "product_description",  "brand",  "category_code",  "price",  "sale_price",  "quantity",  "product_model",  "condition",  "upc",  "location", }
-def get_mapped_catalogues_dicts(excel_array):
+def get_mapped_catalogues_dicts(excel_array=[]):
     try:
-        catalogues_valid = valid_catalogues(excel_array)
-        if catalogues_valid['success']:
-            # valid catagories confirms there must be this keys so no key must be -1 after the first row in loop
-            catalogues_columns = {
-            "sku": -1, 
-            "product_name": -1, 
-            "product_description": -1, 
-            "brand": -1, 
-            "category_code": -1,
-            "category": -1,
-            "price": -1, 
-            "sale_price": -1, 
-            "quantity": -1, 
-            "product_model": -1, 
-            "condition": -1, 
-            "upc": -1,
-            "location": -1
-            }
-            db_rows = []
-            db_rows_locations = []
-            for i in range(len(excel_array)):
-                current_row = excel_array[i]
-                if i == 0:
-                    # headings
-                    for headingIndex in range(len(current_row)):
-                        heading = str(current_row[headingIndex]).strip().lower()
-                        if heading in catalogues_columns:
-                            catalogues_columns[heading] = headingIndex
-                            continue
-                else:
-                    price_type = type(current_row[catalogues_columns['price']])
-                    sale_price_type = type(current_row[catalogues_columns['sale_price']])
-                    
-                    price_n = current_row[catalogues_columns['price']] if price_type is float or price_type is int else 0.00
-                    sale_price_n = current_row[catalogues_columns['sale_price']] if sale_price_type is float or sale_price_type is int else 0.00 
+        # valid catagories confirms there must be this keys so no key must be -1 after the first row in loop
+        catalogues_columns_l = ["sku", "product_name", "product_description", "brand", "category_code", "category", "price", "sale_price", "quantity", "product_model", "condition", "upc", "location", "bin"]
+        catalogues_columns = {}
+        db_rows = []
+        for i in range(len(excel_array)):
+            current_row = excel_array[i]
+            if i == 0:
+                # headings
+                for headingIndex in range(len(current_row)):
+                    heading = str(current_row[headingIndex]).strip().lower()
+                    if heading in catalogues_columns_l:
+                        catalogues_columns[heading] = headingIndex
+                        continue
+            else:
+                data = {
+                    'sku': current_row[catalogues_columns['sku']],
+                    'product_name': current_row[catalogues_columns['product_name']],
+                    'price': current_row[catalogues_columns['price']] if 'price' in catalogues_columns else None,
+                    'sale_price': current_row[catalogues_columns['sale_price']] if 'sale_price' in catalogues_columns else None,
+                    'product_description': current_row[catalogues_columns['product_description']] if 'product_description' in catalogues_columns else None,
+                    'brand': current_row[catalogues_columns['brand']] if 'brand' in catalogues_columns else None,
+                    'category_code': current_row[catalogues_columns['category_code']] if 'category_code' in catalogues_columns else None,
+                    'category': current_row[catalogues_columns['category']] if 'category' in catalogues_columns else None,
+                    'quantity': current_row[catalogues_columns['quantity']] if 'quantity' in catalogues_columns else None,
+                    'product_model': current_row[catalogues_columns['product_model']] if 'product_model' in catalogues_columns else None,
+                    'condition': current_row[catalogues_columns['condition']] if 'condition' in catalogues_columns else None,
+                    'upc': current_row[catalogues_columns['upc']] if 'upc' in catalogues_columns else None,
+                    'location': current_row[catalogues_columns['location']] if 'location' in catalogues_columns else None,
+                    'bin': current_row[catalogues_columns['bin']] if 'bin' in catalogues_columns else None
+                }
 
-                    """ fastest way can done to convert get_array to db sqlalchemy objects,index (dynamic mapping) by client's excel file uploaded, sku title in first column or in last ignore additonal columns for flexiblty just 1 loop (validation for ux) """
-                    db_row = {
-                    "sku": current_row[catalogues_columns['sku']], 
-                    "product_name": current_row[catalogues_columns['product_name']], 
-                    "product_description": current_row[catalogues_columns['product_description']], 
-                    "brand": current_row[catalogues_columns['brand']], 
-                    "category_code": current_row[catalogues_columns['category_code']],
-                    "category": current_row[catalogues_columns['category']],
-                    "price": price_n, 
-                    "sale_price": sale_price_n, 
-                    "quantity": current_row[catalogues_columns['quantity']], 
-                    "product_model": current_row[catalogues_columns['product_model']], 
-                    "condition": current_row[catalogues_columns['condition']], 
-                    "upc": current_row[catalogues_columns['upc']]
-                    }
-                    db_rows.append(db_row)
-                    # location relational data array
-                    db_rows_locations.append(get_locations_bins(current_row[catalogues_columns['location']]))
+                price_type = type(data['price']) if data['price'] is not None else None
+                sale_price_type = type(data['sale_price']) if data['sale_price'] is not None else None
 
-            return {'success': True, 'message': '', 'db_rows': db_rows, 'db_rows_locations': db_rows_locations}
-        else:
-            return catalogues_valid
+                if price_type is not None and not (price_type is float or price_type is int):
+                    data['price'] = 0.00
+                if sale_price_type is not None and not (sale_price_type is float or sale_price_type is int):
+                    data['sale_price'] = 0.00
+
+                """ fastest way can done to convert get_array to db sqlalchemy objects,index (dynamic mapping) by client's excel file uploaded, sku title in first column or in last ignore additonal columns for flexiblty just 1 loop (validation for ux) """
+                db_row = {}
+                for k, v in data.items():
+                    if v is not None:
+                        db_row[k] = v
+
+                db_rows.append(db_row)
+
+        return {'success': True, 'message': '', 'db_rows': db_rows}
            
     except Exception as e:
         print('System Error get_mapped_catalogues_dicts: {}'.format(sys.exc_info()))
@@ -528,26 +464,38 @@ def get_export_data(db, flask_excel, current_user_id, table_name, columns, opera
             # response['column_names'] = getAllowedColumns(column_names=Catalogue.__table__.columns.keys(), ignored_columns=['user_id', 'product_image', 'created_date', 'updated_date'])
             # response['column_names'] = [*response['column_names'], 'location']
 
-            response['column_names'] = ['id', 'sku', 'product_name', 'product_description', 'brand', 'category_code', 'category', 'price', 'sale_price', 'quantity', 'product_model', 'condition', 'upc', 'location']
+            response['column_names'] = ['id', 'sku', 'product_name', 'product_description', 'brand', 'category_code', 'category', 'price', 'sale_price', 'quantity', 'product_model', 'condition', 'upc', 'location', 'bin']
             export_data.append(response['column_names'])
-
+            
             for item in response['data']:
-                locations_data = []
+                objs = []
+                exported = []
                 # easy can export bins too if needed
                 for cat_location in item.locations:
-                    locations_data.append('{}:{}'.format(cat_location.warehouse_location.name, ','.join([bin.bin.name for bin in cat_location.bins])))
-                # locations and bins loc:bin1_bin2_bin3, loc2:
-                locations = '| '.join(locations_data)
+                    #locations_data.append('{}:{}'.format(cat_location.warehouse_location.name, ','.join([bin.bin.name for bin in cat_location.bins])))
+                    for bin in cat_location.bins:
+                        data = {'loc': cat_location.warehouse_location.name, 'bin': bin.bin.name, 'item': item}
+                        dataid = '{}_{}'.format(data['loc'], data['bin']) # make sure no duplicated bin+loc exported
+                        if dataid not in exported:
+                            exported.append(dataid)
+                            objs.append(data)
+                
+                # if no locations no objs appened so append current item only 1 time so both handled throgh same loop
+                if len(objs) == 0:
+                    objs.append({'loc': '', 'bin': '', 'item': item})
 
-                categoryCode = item.category.code if item.category else ''
-                categoryLabel = item.category.label if item.category else ''
-                # set null on delete of condition, so there sometimes null conditions in cataluge instead of delete catalogues of that condition
-                item_condition_name = item.condition.name if item.condition and item.condition.name else ''
-                export_data.append([
-                    item.id, item.sku, item.product_name, item.product_description,
-                    item.brand, categoryCode, categoryLabel, item.price, item.sale_price,
-                    item.quantity, item.product_model, item_condition_name, item.upc, locations
-                    ])
+                for obj in objs:
+                    categoryCode = obj['item'].category.code if obj['item'].category else ''
+                    categoryLabel = obj['item'].category.label if obj['item'].category else ''
+                    # set null on delete of condition, so there sometimes null conditions in cataluge instead of delete catalogues of that condition
+                    item_condition_name = obj['item'].condition.name if obj['item'].condition and obj['item'].condition.name else ''
+
+                    export_data.append([
+                        obj['item'].id, obj['item'].sku, obj['item'].product_name, obj['item'].product_description,
+                        obj['item'].brand, categoryCode, categoryLabel, obj['item'].price, obj['item'].sale_price,
+                        obj['item'].quantity, obj['item'].product_model, item_condition_name, obj['item'].upc, obj['loc'], obj['bin']
+                        ])
+                    
             # modfied array to return the addiontal relational data like locations or bins
             response['data'] = export_data
             
@@ -1377,65 +1325,55 @@ def get_excel_rows(request, field_name=''):
     
     return imported_rows
 
-
-def get_sheet_row_locations(mapped_catalogues_dict, row_index):
-    row_locations = []
-    try:
-        # insert catalogue locations if not exist create locations
-        if 'db_rows_locations' in mapped_catalogues_dict and len(mapped_catalogues_dict['db_rows_locations']) > row_index:
-            row_locations = mapped_catalogues_dict['db_rows_locations'][row_index]
-    except Exception as e:
-        print("Error in get_sheet_locations row index: {}, error_info: {}".format(row_index, sys.exc_info()))
-    return row_locations
-
-def insert_locs_bins(row_locations, catalogue_exist, dashboad_id, db):
+def insert_locs_bins(location, bin, catalogue_exist, dashboad_id, db):
     inserted = False
-    for loc_obj in row_locations:
-        if 'location' in loc_obj and 'bins' in loc_obj:
-            db_location = inv(WarehouseLocations.query.filter_by(name=loc_obj['location']), User.dashboard_id, WarehouseLocations.dashboard_id).first()
-            
-            if not db_location:
-                db_location = WarehouseLocations(name=loc_obj['location'], dashboard_id=dashboad_id)
-                db_location.insert()
-                inserted = True
+    if location:
+        loc = location.strip()
+        db_location = inv(WarehouseLocations.query.filter_by(name=loc), User.dashboard_id, WarehouseLocations.dashboard_id).first()
+        
+        if not db_location:
+            db_location = WarehouseLocations(name=loc, dashboard_id=dashboad_id)
+            db_location.insert()
+            inserted = True
 
-            catalogue_loc= inv(db.session.query(CatalogueLocations).join(
+        catalogue_loc= inv(db.session.query(CatalogueLocations).join(
+            Catalogue, CatalogueLocations.catalogue_id==Catalogue.id
+        ).filter(
+            CatalogueLocations.catalogue_id==catalogue_exist.id, CatalogueLocations.location_id==db_location.id
+        ), User.id, Catalogue.user_id).first()
+        
+        if not catalogue_loc:
+            catalogue_loc = CatalogueLocations(location_id=db_location.id, catalogue_id=catalogue_exist.id)
+            catalogue_loc.insert()
+            inserted = True
+        
+
+        if bin:
+            bin_name = bin.strip()
+            locbin = inv(db.session.query(LocationBins).join(
+                    WarehouseLocations, LocationBins.location_id==WarehouseLocations.id
+                ).filter(
+                    LocationBins.name==bin_name, LocationBins.location_id==db_location.id
+                ), User.dashboard_id, WarehouseLocations.dashboard_id).first()
+            
+            if not locbin:
+                locbin = LocationBins(bin_name, location_id=db_location.id)
+                locbin.insert()
+                inserted = True
+            
+
+            catalogue_loc_bin = inv(db.session.query(CatalogueLocationsBins).join(
+                CatalogueLocations, CatalogueLocationsBins.location_id==CatalogueLocations.id
+            ).join(
                 Catalogue, CatalogueLocations.catalogue_id==Catalogue.id
             ).filter(
-                CatalogueLocations.catalogue_id==catalogue_exist.id, CatalogueLocations.location_id==db_location.id
+                CatalogueLocationsBins.bin_id==locbin.id, CatalogueLocationsBins.location_id==catalogue_loc.id,
+                CatalogueLocations.catalogue_id==catalogue_exist.id
             ), User.id, Catalogue.user_id).first()
-            
-            if not catalogue_loc:
-                catalogue_loc = CatalogueLocations(location_id=db_location.id, catalogue_id=catalogue_exist.id)
-                catalogue_loc.insert()
+
+            if not catalogue_loc_bin:
+                CatalogueLocationsBins(catalogue_loc.id, locbin.id).insert()
                 inserted = True
-            
-            for bin_name in loc_obj['bins']:
-                bin_name = bin_name.strip()
-                
-                locbin = inv(db.session.query(LocationBins).join(
-                        WarehouseLocations, LocationBins.location_id==WarehouseLocations.id
-                    ).filter(
-                        LocationBins.name==bin_name, LocationBins.location_id==db_location.id
-                    ), User.dashboard_id, WarehouseLocations.dashboard_id).first()
-                
-                if not locbin:
-                    locbin = LocationBins(bin_name, location_id=db_location.id)
-                    locbin.insert()
-                    inserted = True
-                
-
-                catalogue_loc_bin = inv(db.session.query(CatalogueLocationsBins).join(
-                    CatalogueLocations, CatalogueLocationsBins.location_id==CatalogueLocations.id
-                ).join(
-                    Catalogue, CatalogueLocations.catalogue_id==Catalogue.id
-                ).filter(
-                    CatalogueLocationsBins.bin_id==locbin.id, CatalogueLocationsBins.location_id==catalogue_loc.id
-                ), User.id, Catalogue.user_id).first()
-
-                if not catalogue_loc_bin:
-                    CatalogueLocationsBins(catalogue_loc.id, locbin.id).insert()
-                    inserted = True
     return inserted
 """
 (About this regex used): this regex says, string must start with english character or number, and followed by any of english characters or numbers or - and must end by english characters or number only and not \n --- note $ diffrent than \Z, \Z means match exact what given and not ignore the \n so if string end with \n will considered not matched, $ will ignore the \n becuase it dynamic handle both re.MULTILINE and normal first match so $ will match anything the string end with before the new line, ---note: []+ here means continue to the end like we say some pattern until end of match + new pattern--in this example ^[a-z0-9]+ means take any character or number until you reach of end where no more characters or numbers, then move to next pattern part which look for any character or number or - until end, using + important incase search here first + can ignored as next pattern part will match any number or character, but if ignored this will match only first char and leave rest for next part (+)!! it near equal to , or and start with part and part etc---match unlike find and search, this not search for example test\Z in string hello test match require pattern to begning part of string you can not say re.match("test\Z",txt) this invalid as missing hello\s or the pattern equal to it \w+ , [a-z]+ .* , etc 

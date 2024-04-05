@@ -10,7 +10,7 @@ from .models import *
 from .forms import *
 from . import vendor_permission, admin_permission, inventory_admin_permission, app_permissions, db, excel, bcrypt
 from .functions import get_mapped_catalogues_dicts, getTableColumns, getFilterBooleanClauseList, ExportSqlalchemyFilter,\
-get_export_data, get_charts, get_excel_rows, get_sheet_row_locations, chunks, apikey_or_none, upload_catalogues, calc_chunks_result, \
+get_export_data, get_charts, get_excel_rows, chunks, apikey_or_none, upload_catalogues, calc_chunks_result, \
 bestbuy_ready, get_remaining_requests, get_requests_before_1minute, upload_orders, calc_orders_result, updateDashboardListings,\
 updateDashboardOrders, import_orders, order_ids_chunks, download_order_image, get_errors_message, generate_ourapi_key,\
 get_activity_dateobjs, complete_activity_date, get_charts_data, get_hashed_sqlalchemycol, ExportSqlalchemyFilter, get_unencrypted_cols,\
@@ -63,47 +63,59 @@ def import_catalogues_excel():
 
                 
                 mapped_catalogues = get_mapped_catalogues_dicts(excel_rows)
-
+                #return str(mapped_catalogues)
 
                 if mapped_catalogues['success']:
 
                     for row_index in range(len(mapped_catalogues['db_rows'])):
                         
                         db_row = mapped_catalogues['db_rows'][row_index]
-                        # get locations name list of current row to insert db warehouse locations if not exist in edit and insert
-
-                        row_locations = get_sheet_row_locations(mapped_catalogues, row_index)
-
                         
                         # as both provided category_code and category_label in excel file create the category if not exist
-                        categoryCode = db_row['category_code']
-                        categoryLabel = db_row['category']
-                        selected_category = inv(Category.query.filter_by(code=categoryCode), User.dashboard_id, Category.dashboard_id).first()
-                        # as in final line will insert using **db_row so must have valid column names
-                        del db_row['category_code']
-                        del db_row['category']
-                        if selected_category:
-                            db_row['category_id'] = selected_category.id
-                        else:
-                            # to not end with duplicated label only create category if label and code not exist else leave it None and user update his category manual (as label should not duplicated) (only create new category if label not exist)
-                            exist_label = inv(Category.query.filter_by(label=categoryLabel), User.dashboard_id, Category.dashboard_id).first()
-                            if not exist_label:
-                                selected_category = Category(dashboard_id=current_user.dashboard.id, code=categoryCode, label=categoryLabel, level=0, parent_code='')
-                                selected_category.insert()
+                        categoryCode = None
+                        categoryLabel = None
+                        location = None
+                        bin = None
+                        if 'category_code' in db_row:
+                            categoryCode = db_row['category_code']
+                            del db_row['category_code']
+                        if 'category' in db_row:
+                            categoryLabel = db_row['category']
+                            del db_row['category']
+                        if 'location' in db_row and db_row['location']:
+                            location = db_row['location']
+                            del db_row['location']
+                        if 'bin' in db_row and db_row['bin']:
+                            bin = db_row['bin']
+                            del db_row['bin']
+
+
+                        if categoryCode is not None and categoryLabel is not None:
+                            selected_category = inv(Category.query.filter_by(code=categoryCode), User.dashboard_id, Category.dashboard_id).first()
+                            # as in final line will insert using **db_row so must have valid column names
+                            if selected_category:
                                 db_row['category_id'] = selected_category.id
-                        #################################################
+                            else:
+                                # to not end with duplicated label only create category if label and code not exist else leave it None and user update his category manual (as label should not duplicated) (only create new category if label not exist)
+                                exist_label = inv(Category.query.filter_by(label=categoryLabel), User.dashboard_id, Category.dashboard_id).first()
+                                if not exist_label:
+                                    selected_category = Category(dashboard_id=current_user.dashboard.id, code=categoryCode, label=categoryLabel, level=0, parent_code='')
+                                    selected_category.insert()
+                                    db_row['category_id'] = selected_category.id
+
 
                         # condition
-                        condition_name = db_row['condition']
-                        del db_row['condition']
-                        # note condition not allow duplicate for same condition
-                        selected_condition = inv(Condition.query.filter_by(name=condition_name), User.dashboard_id, Condition.dashboard_id).first()
-                        if selected_condition:
-                            db_row['condition_id'] = selected_condition.id
-                        else:
-                            new_condition = Condition(dashboard_id=current_user.dashboard.id, name=condition_name)
-                            new_condition.insert()
-                            db_row['condition_id'] = new_condition.id
+                        if 'condition' in db_row:
+                            condition_name = db_row['condition']
+                            del db_row['condition']
+                            # note condition not allow duplicate for same condition
+                            selected_condition = inv(Condition.query.filter_by(name=condition_name), User.dashboard_id, Condition.dashboard_id).first()
+                            if selected_condition:
+                                db_row['condition_id'] = selected_condition.id
+                            else:
+                                new_condition = Condition(dashboard_id=current_user.dashboard.id, name=condition_name)
+                                new_condition.insert()
+                                db_row['condition_id'] = new_condition.id
 
                         row_info = "{}|{}".format(row_index+1, db_row['sku'])
                         if db_row['sku'] not in uploaded_skus:
@@ -120,7 +132,7 @@ def import_catalogues_excel():
 
                                     
                                     valid_quantity = True
-                                    if db_row['quantity']<total_orders:
+                                    if 'quantity' in db_row and db_row['quantity']<total_orders:
                                         flash("Ignored row: {}, the catalogue quantity can not updated, becuase the new quantity exported from excel is less that current catalogue's orders, try update quantity or edit orders of current catalogue".format(str(row_index+1)), "danger")
                                         valid_quantity = False
                                     
@@ -132,20 +144,20 @@ def import_catalogues_excel():
                                         for key, value in db_row.items():
                                             setattr(catalogue_exist, key, value)
                                             catalogue_exist.update()
-                                        
-                                        insert_locs_bins(row_locations, catalogue_exist, current_user.dashboard.id, db)
+
+                                        insert_locs_bins(location, bin, catalogue_exist, current_user.dashboard.id, db)
 
                                         uploaded_skus.append(db_row['sku'])
                                     else:
                                         invalid_rows.append(row_info)
 
-                                else:         
+                                else:
                                     newCatalogue = Catalogue(user_id=current_user.id, **db_row)
 
                                     newCatalogue.insert()
 
                                     # insert catalogue locations if not exist create locations
-                                    insert_locs_bins(row_locations, newCatalogue, current_user.dashboard.id, db)
+                                    insert_locs_bins(location, bin, newCatalogue, current_user.dashboard.id, db)
 
                                     uploaded_skus.append(db_row['sku'])
 
@@ -158,6 +170,10 @@ def import_catalogues_excel():
                                 print('System Error row ignored, import_catalogues_excel: {} , info: {}'.format(utf8_encoded_error, sys.exc_info()))
                                 continue
                         else:
+                            catalogue_exist = inv(Catalogue.query.filter_by(sku=db_row['sku']), User.id, Catalogue.user_id).first()
+                            if catalogue_exist:
+                                insert_locs_bins(location, bin, catalogue_exist, current_user.dashboard.id, db)
+                                
                             duplicated_skus.append(str(db_row['product_name']))
                             continue
                         

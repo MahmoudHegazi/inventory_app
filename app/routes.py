@@ -496,9 +496,9 @@ def edit_catalogue(catalogue_id):
                     for cloc_bin_add in cloc_bins_add:
                         if not CatalogueLocationsBins.query.filter_by(location_id=cloc_bin_add[0], bin_id=cloc_bin_add[1]).first():
                             CatalogueLocationsBins(location_id=cloc_bin_add[0], bin_id=cloc_bin_add[1]).insert()
-                    
-                    """ (this can verify if any data duplicated based on 2 columns (or infinty this not regular sql)) (but code not allow duplicate already)
-                    # hack sql (infinty group by and count) lol (that can verify if 1 or infity columns in same row are duplicated)
+
+                    """ (this can verify if any data duplicated based on 2 columns (or infinty this not regular sql)) (but code not allow duplicate already) (1-2)1, (2-3)2(error) or (1-2-7-8)1, (2-3-4-5)2(error)
+                    # hack sql (infinty group by and count) lol (that can verify if 1 or infity columns in same row are duplicated) 
                     ```SELECT COUNT(CONCAT(location_id, '-' , bin_id)), bin_id, CONCAT(location_id, '-' , bin_id) AS locbin 
                     FROM inventory123.catalogue_locations_bins GROUP BY CONCAT(location_id, '-' , bin_id);```
                     """

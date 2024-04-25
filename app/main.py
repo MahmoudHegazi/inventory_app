@@ -3,6 +3,7 @@ import sys
 import os
 import requests
 import time
+import re
 import math
 import cryptocode
 from flask import Flask, app, Blueprint, session, redirect, url_for, flash, Response, request, render_template, jsonify, Request, Response, current_app
@@ -66,6 +67,9 @@ def import_catalogues_excel():
                 #return str(mapped_catalogues)
 
                 if mapped_catalogues['success']:
+                    # generate static system category code (get last number part of category code identifer) 
+                    category_incrementer = max([0, *list(filter(lambda x:x, [int(code[0].replace('INV_', '').strip()) if re.match("^INV_\d{1,}$", code[0]) else False for code in db.session.query(Category.code).all()]))])
+
 
                     for row_index in range(len(mapped_catalogues['db_rows'])):
                         
@@ -79,9 +83,15 @@ def import_catalogues_excel():
                         if 'category_code' in db_row:
                             categoryCode = db_row['category_code']
                             del db_row['category_code']
+                        else:
+                            # category code not provided
+                            category_incrementer += 1
+                            categoryCode = 'INV_{}'.format(category_incrementer)
+                        
                         if 'category' in db_row:
                             categoryLabel = db_row['category']
                             del db_row['category']
+
                         if 'location' in db_row and db_row['location']:
                             location = db_row['location']
                             del db_row['location']

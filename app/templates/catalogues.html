@@ -278,6 +278,7 @@ if (selectComponent && typeof(selectComponent.onChangeCheckBoxSelectAll) === 'fu
   publicOnChangeCheckBoxSelectAll = selectComponent.onChangeCheckBoxSelectAll;
 }
 
+
 /* search (each type of page have callback to create the rows depend on the style and data and cbs) */
 function rowBuildCB(catalogue){
   // if component select all started and return the public function add the event to checkbox
@@ -351,7 +352,11 @@ searchComponent('fast', 'swing', cp=function(){return true;}, addon='', conditio
 
 // add order by component to arrange table rows using table headers
 orderByColumnsComponent();
-                  
+
+
+// add multiple listing switch position of submit and info div from top to bottom while scrolling for real UX not fb etc apps
+actionPositionYSwitcher("#main_add_multiple", "#ml_action", "#ml_action_tcont", "#ml_action_bcont", "#addMultipleListingModal");
+
 /* multiple Listings Callbacks */
 function multipleListingOpenCB(selectedValues, selectedLabels){
   console.log("cb called", selectedValues, selectedLabels);
@@ -362,7 +367,7 @@ function multipleListingOpenCB(selectedValues, selectedLabels){
       const currentCatalogueId = selectedValues[i];
       const currentCatalogueName = selectedLabels[i];
       const currentNewListingCont = newListingContainers.eq(i);
-      const currentCatalogueLabel = currentNewListingCont.find('h6.catalogue_label');
+      const currentCatalogueLabel = currentNewListingCont.find('.catalogue_label');
 
       const currentCatalogueIdInput = currentNewListingCont.find('input.multiple_platform_ids');
       const currentPlatformId = currentNewListingCont.find('select.multiple_platforms_selects');
@@ -527,5 +532,181 @@ function multipleListingCloseCB(){
   $("input.multiple_reference_type:disabled").removeClass("used");
 }
 
+$('.new_listing_containers:not([style*="display:none"]) .mla_collapse_cont').on('hide.bs.collapse', function(e){
+  const faIcon = $(e.currentTarget).closest('.new_listing_containers').find('i.fa');
+  faIcon.removeClass("fa-arrow-down");
+  faIcon.addClass("fa-arrow-up");
+});
+$('.new_listing_containers:not([style*="display:none"]) .mla_collapse_cont').on('shown.bs.collapse', function(e){
+  const faIcon = $(e.currentTarget).closest('.new_listing_containers').find('i.fa');
+  faIcon.removeClass("fa-arrow-up");
+  faIcon.addClass("fa-arrow-down");
+});
+
+/* Bluk insert automate */
+let inputId = 0;
+let contIds = 0;
+let usedElmIds = [];
+let timeout1 = timeout2 = null;
+function clearBulkInsertInput(){
+  $("#bulk_insert_cont").html("");
+  $("#bulk_insert").hide();
+  $("#bulk_clear").hide();
+  $("#bulk_listing_auto option[disabled]").removeAttr('disabled');
+  
+  // back automated elements as default
+  
+  const checkedElms = $(".mla_list_select:checked");
+  const targetElms = checkedElms.closest(".new_listing_containers").find('.used');
+  const checkedElmParents = checkedElms.parent();
+  targetElms.each((_i, elm)=>{
+    if ($(elm).prop('nodeName').toLowerCase() === 'select') {
+      $(elm).find('option:first').eq(0).prop('selected', 'selected').trigger('change');
+    } else {
+      $(elm).val("").trigger('change');
+    }
+  });
+  checkedElmParents.removeClass('bg-success');
+  usedElmIds = [];
+}
+
+function copyBulkElm(selectedClass) {
+  
+    const selectedElm = $(`.${selectedClass}`).eq(0);
+    const usedElmId = selectedElm.attr('id');
+
+    if (!usedElmIds.includes(usedElmId)) {
+      contIds += 1;
+      inputId += 1;
+      const contId = `copy_cont_${contIds}`;
+
+      const newElm = $(selectedElm.prop('outerHTML'));
+      const newLabel = $(selectedElm.parent().find('label').prop('outerHTML'));
+      const newCloseElm = $(`<button data-cont="#${contId}" type="button" class="btn btn-outline-danger btn-sm remove_copyelm align-self-start close_sm"><i class="fa fa-close"></i></button>`);
+      newElm.attr('id', `copied_bulk_insert_${inputId}`);
+      newElm.attr('data-selector', `.${selectedClass}`);
+      newElm.attr('data-elmid', `.${selectedElm.attr('id')}`);
+      newElm.get(0).classList = [];
+      newElm.addClass('form-control bulk_insert_copy');
+      newLabel.attr('for', `copied_bulk_insert_${inputId}`);
+
+      // apply remove cont of copy elm
+      $(newCloseElm).on('click', (e)=>{
+        if ($(e.currentTarget).attr('data-cont') && $($(e.currentTarget).attr('data-cont')).length){
+          $($(e.currentTarget).attr('data-cont')).remove();
+        }
+      });
+
+      $("#bulk_listing_auto").find(':selected').attr('disabled', 'disabled');
+      const headerCont = $('<div class="d-flex justify-content-between align-items-center"></div>').append(newLabel, newCloseElm);
+      const bodyCont = $('<div></div>').append(newElm);
+      const newElmCont = $(`<div id="${contId}" class="shadow m-1 p-2"></div>`).append(headerCont, bodyCont);
+      $("#bulk_insert_cont").append(newElmCont);
+      
+  
+      $("#bulk_clear").show();
+      $("#bulk_insert").show();
+      $("#bulk_insert").removeClass('btn-outline-primary');
+      if (timeout1){
+        clearTimeout(timeout1);
+      }
+      if (timeout2){
+        clearTimeout(timeout2);
+      }
+      timeout1 = setTimeout(()=>{
+        $("#bulk_insert").addClass('btn-primary');
+        timeout2 = setTimeout(()=>{
+          $("#bulk_insert").removeClass('btn-primary');
+          $("#bulk_insert").addClass('btn-outline-primary');
+        }, 50);
+      }, 50);
+    }
+}
+
+function toggleMLICheck(e){
+
+  /* (Performance this function have hidden paramter performanced for select and unselect even 100 listings) Elm Function arugment (used when async button with change action so same method with no paramters additonal than event can got the paramter boolean or string or number even JSON string obj) */
+  const last = $("#mli_select_all").attr('data-last');
+  // elm hide (mli_select_all) if not needed so jquery can not get so need 2 lasts
+  const last2 = $("#mli_unselect_all").attr('data-last');
+  if (last || last2){
+    if (last && $('.new_listing_containers:not([style*="display:none"]) .mla_list_select:checked:last').get(0) === $(e.currentTarget).get(0)){
+      $("#mli_select_all").removeAttr('data-last');
+      //alert(`here- is the last`);
+    } else if (last2 && $('.new_listing_containers:not([style*="display:none"]) .mla_list_select:last').get(0) === $(e.currentTarget).get(0)) {
+      $("#mli_unselect_all").removeAttr('data-last');
+    } else {
+      //alert(`here not last continue no run`);
+      //remove data-last when it last elm, and will apply method to reuse attr (last was arugment passed but used as data set before event triggered), as select all only use change event this way when select all click it will only execute this method on last change occures so if 10 element checked one by one this method will applied only when current target is last checkbox so best performance and run 1 time only when needed
+      return false;
+    }
+  }
+  
+  const selectedElm = $('.new_listing_containers:not([style*="display:none"])');
+  const allLength = selectedElm.find('.mla_list_select').length;
+  const checkedLength = selectedElm.find('.mla_list_select:checked').length;
+  
+  if (checkedLength === 0) {
+      $("#mli_unselect_all").hide();
+  } else {
+      $("#mli_unselect_all").show();
+  }
+   
+  if (allLength === checkedLength){
+      $("#mli_select_all").hide();
+  } else {
+      $("#mli_select_all").show();
+  }
+}
+
+$("#bulk_listing_auto").on('change', function(e){
+  const selectedClass = `${$("#bulk_listing_auto").val()}.used`;
+  if (selectedClass && $(`.${selectedClass}`).length && $("#bulk_insert_cont").length && $("#bulk_listing_auto").val() && $("#bulk_listing_auto").val() != '0' && $(`.${selectedClass}`).eq(0).attr('id')) {
+    copyBulkElm(selectedClass);
+  } else {
+    clearBulkInsertInput();
+  }
+});
+
+$("#bulk_insert").on('click', function(){
+  $(".bulk_insert_copy").each((_i, elm)=>{
+    const targetElms = $(elm).attr('data-selector') ? $(".mla_list_select:checked").closest(".new_listing_containers").find($(elm).attr('data-selector')) : null;
+    if (targetElms && targetElms.length){
+      targetElms.val($(elm).val()).trigger('change');
+    }
+  });
+  $(".mla_list_select:checked").parent().addClass('bg-success');
+});
+
+$("#bulk_clear").on('click', function(){
+  $("#bulk_listing_auto option:first").prop('selected', 'selected').trigger('change');
+});
+
+
+
+$("#mli_select_all").on('click', function(){
+  // custom way to set arugment on element so when .mla_list_select change trigger callback executed can get the value of last arugment Used as boolean attr or no attr
+  $("#mli_select_all").attr('data-last', 'true');
+
+  $('.mla_list_select').prop('checked', true).trigger('change');
+  
+});
+
+$("#mli_unselect_all").on('click', function(){
+  // set last html arugment to passed to trigger function from element
+  $("#mli_unselect_all").attr('data-last', 'true');
+  
+  $('.mla_list_select').prop('checked', false).trigger('change');
+});
+
+
+
+$("#addMultipleListingModal").on('shown.bs.modal', function(){
+  $('.new_listing_containers:not([style*="display:none"]) .mla_list_select').on('change', toggleMLICheck);
+});
+
+$("#addMultipleListingModal").on('hide.bs.modal', function(){
+  $('.new_listing_containers:not([style*="display:none"]) .mla_list_select').off('change');
+});
 </script>
 {% endblock page_scripts %}

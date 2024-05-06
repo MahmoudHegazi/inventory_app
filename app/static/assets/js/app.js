@@ -1652,6 +1652,52 @@ function deleteSomeRowsComponent(contSelector = '', modalId = '', formSelector =
 }
 
 
+function actionPositionYSwitcher(scrollerS = "", moverS = "", topContS = "", botContS = "", modalSelc="") {
+  if (scrollerS && moverS && topContS && botContS && modalSelc && $(scrollerS).length && $(moverS).length && $(topContS).length && $(botContS).length && $(modalSelc).length) {
+      // avoid duplicate event listener
+      const scroll = $(scrollerS);
+      const mover = $(moverS);
+      const topCont = $(topContS);
+      const botCont = $(botContS);
+      const modalElm = $(modalSelc);
+
+      const switchToTop = ()=>{
+        if (!mover.hasClass("switcher_top")) {
+          // apply one time
+          mover.removeClass("switcher_bot");
+          mover.addClass("switcher_top");
+          mover.hide('mid', null, () => {
+              topCont.get(0).appendChild(mover.get(0));
+              mover.show();
+          });
+        }
+      };
+
+      const switchToBot = ()=>{
+        if (!mover.hasClass("switcher_bot")) {
+          mover.toggleClass("switcher_top");
+          mover.addClass("switcher_bot");
+          mover.hide('mid', null, () => {
+              botCont.get(0).appendChild(mover.get(0));
+              mover.show();
+          });
+        }
+      };
+
+      scroll.off("scroll");
+      modalElm.off('hidden.bs.modal');
+      scroll.on("scroll", () => {
+          if ((scroll.scrollTop() + scroll.get(0).offsetHeight) + 300 >= scroll.get(0).scrollHeight) {
+            // apply switch 1 time per position UI and Performance (ex if scrolled bot no repeat until back top then scrolled bot)
+            switchToBot();
+          } else {
+            switchToTop();
+          }
+      });
+      modalElm.on('hidden.bs.modal', switchToTop);
+  }
+}
+
 $(document).ready(async function(){
     applyHoverEffect();
     $('form:not(".no_submit_hide")').on('submit', (e)=>{

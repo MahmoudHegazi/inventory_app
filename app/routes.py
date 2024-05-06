@@ -30,12 +30,12 @@ def makePagination(page=1, query_obj=None, callback=(), limit_parm=10, by='', de
     try:
         # save integer limit , so can passed direct from query paramter and auto handle incase invalid query paramter set (no code in endpoint)
         str_limit = str(limit_parm).strip()
-        limit = int(str_limit) if str_limit and str_limit.isnumeric() else 10
+        limit = min(int(str_limit), 1000) if str_limit and str_limit.isnumeric() else 10
         offset = 0
         # limit == 0 means no need data
         if limit < 1:
             return {'data': [], 'pagination_btns': []}
-        
+
         total_items = len(query_obj.all())
         total_pages = math.ceil(total_items/limit)
         # handle none integer query parameter without exception for all routes dynamic

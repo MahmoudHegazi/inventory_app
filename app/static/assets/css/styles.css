@@ -25,6 +25,18 @@
 .mxwidth-50 {
     max-width: 50px !important;
 }
+
+.minw-100 {
+    min-width: 100px !important;
+}
+
+.minw-150 {
+    min-width: 150px !important;
+}
+
+.p-absolute {
+    position: absolute !important;
+}
 .cursor-pointer {
     cursor: pointer !important;
 }
@@ -262,12 +274,47 @@ color_lightpink {
 .mini_green_header {
     text-shadow: 2px 2px 4px #000000;
     color: white;
-    background: #a3f386;
+    background: #3b612e40;
     width: fit-content;
-    padding: 7px 16px;
+    padding: 10px;
     border-radius: 4px;
-    font-weight: bold;
+    font-size: 1.2rem;
+    font-weight: bolder;
 }
+
+.bgreen_1 {
+    background-color: #7fff0059 !important;
+}
+
+.collapsed_mla:hover {
+    background-color: #7fff0059 !important;
+}
+.border_remove_lrb {
+    border-left: none !important;
+    border-right: none !important;
+    border-bottom: none !important;
+}
+.cl_span {
+    font-size:15px !important;
+    max-width:100% !important;
+    word-break: break-word !important;
+}
+.db {
+    padding: 10px !important;
+    display: inline-block !important;
+    max-width: fit-content !important;
+}
+select#bulk_listing_auto option:disabled {
+    background: lightgray;
+}
+
+.close_sm {
+    display: inline-block !important;
+    margin-left: auto !important;
+    font-size: 0.420rem !important;
+    padding: 5px !important;
+}
+
 .mini_header_blue {
     text-shadow: 2px 2px 4px #000000 !important;color: #c2ffe8 !important;
 }

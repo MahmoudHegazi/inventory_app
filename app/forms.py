@@ -161,7 +161,7 @@ class AddMultipleListingForm(FlaskForm):
                                     choices=[(0, 'Select Platform')],
                                     render_kw={'style': 'display:none;', 'title': 'Select Platforms'}))
     """
-    platforms_selects = FieldList(SelectField('Platform', choices=[], validators=[InputRequired()], coerce=int, validate_choice=True))
+    platforms_selects = FieldList(SelectField('Platform', choices=[(1,'hi')], validators=[InputRequired()], coerce=int, validate_choice=True))
     catalogue_ids = FieldList(IntegerField(validators=[optional(), NumberRange(min=1)], render_kw={'style': 'display:none;'}))
 
     active = FieldList(SelectField('Active', validators=[optional()], choices=[(0, 'False'), (1, 'True')], default=0, coerce=int, validate_choice=True))
@@ -175,7 +175,7 @@ class AddMultipleListingForm(FlaskForm):
     offer_id = FieldList(IntegerField('Offer ID', validators=[optional()]))
     reference = FieldList(StringField('Reference', validators=[optional(), Length(max=255)]))
     reference_type = FieldList(StringField('Reference Type', validators=[optional(), Length(max=255)]))
-    add = SubmitField('Add Listings')
+    add = SubmitField('Add')
 
 # signup = SubmitField('Signup', default='checked')
 

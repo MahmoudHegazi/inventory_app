@@ -571,11 +571,14 @@ function clearBulkInsertInput(){
 }
 
 function copyBulkElm(selectedClass) {
-  
+    
     const selectedElm = $(`.${selectedClass}`).eq(0);
     const usedElmId = selectedElm.attr('id');
 
     if (!usedElmIds.includes(usedElmId)) {
+
+      
+      if (selectedElm.attr('type')=='datetime-local'){return false;}
       contIds += 1;
       inputId += 1;
       const contId = `copy_cont_${contIds}`;
@@ -669,10 +672,15 @@ $("#bulk_listing_auto").on('change', function(e){
 });
 
 $("#bulk_insert").on('click', function(){
-  $(".bulk_insert_copy").each((_i, elm)=>{
+  $(".bulk_insert_copy").each((i, elm)=>{
+    const elmVal = $(elm).val();
     const targetElms = $(elm).attr('data-selector') ? $(".mla_list_select:checked").closest(".new_listing_containers").find($(elm).attr('data-selector')) : null;
     if (targetElms && targetElms.length){
-      targetElms.val($(elm).val()).trigger('change');
+      targetElms.each((n, tElm)=>{
+         $(tElm).val(elmVal).trigger('change');
+         //console.log($(tElm).val());
+      });
+      // targetElms.val($(elm).val()).trigger('change');
     }
   });
   $(".mla_list_select:checked").parent().addClass('bg-success');
@@ -681,9 +689,12 @@ $("#bulk_insert").on('click', function(){
 $("#bulk_clear").on('click', function(){
   $("#bulk_listing_auto option:first").prop('selected', 'selected').trigger('change');
 });
-
-
-
+/*
+$("form").on('submit', (e)=>{
+  console.log(e.currentTarget);
+e.preventDefault();
+});
+*/
 $("#mli_select_all").on('click', function(){
   // custom way to set arugment on element so when .mla_list_select change trigger callback executed can get the value of last arugment Used as boolean attr or no attr
   $("#mli_select_all").attr('data-last', 'true');

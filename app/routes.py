@@ -175,7 +175,7 @@ def catalogues():
 
             #return str(delete_catalogues.hidden_tag())+str(delete_catalogues.catalogues_ids)
             user_catalogues = pagination['data']
-            inv_platforms = Platform.query.all()
+            inv_platforms = inv(Platform.query, User.dashboard_id, Platform.dashboard_id).all()
             populate_add_multiple_form(add_multiple_listings, inv_platforms, min_entries=len(user_catalogues), max_entries=len(user_catalogues))
 
             return render_template('catalogues.html', catalogues=user_catalogues,  catalogues_excel=catalogues_excel, pagination_btns=pagination['pagination_btns'], delete_catalogues=delete_catalogues, delete_all_catalogues=delete_all_catalogues, add_multiple_listings=add_multiple_listings)
@@ -1140,7 +1140,6 @@ def multiple_listing_add():
         except Exception as e:
             print('System Error: {}'.format(sys.exc_info()))
             flash('Unknown error unable to add multiple listing', 'danger')
-
         finally:
             return redirect(url_for('routes.catalogues'))
     else:

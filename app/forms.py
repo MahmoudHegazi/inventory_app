@@ -177,10 +177,6 @@ class AddMultipleListingForm(FlaskForm):
     reference_type = FieldList(StringField('Reference Type', validators=[optional(), Length(max=255)]))
     add = SubmitField('Add')
 
-    def validate_discount_end_date(self, discount_end_date):
-        for disc in range(len(discount_end_date)):
-            if not discount_end_date[disc]:
-                discount_end_date[disc] = ''
 
 # signup = SubmitField('Signup', default='checked')
 

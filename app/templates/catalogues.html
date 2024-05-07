@@ -359,7 +359,7 @@ actionPositionYSwitcher("#main_add_multiple", "#ml_action", "#ml_action_tcont", 
 
 /* multiple Listings Callbacks */
 function multipleListingOpenCB(selectedValues, selectedLabels){
-  console.log("cb called", selectedValues, selectedLabels);
+  //console.log("cb called", selectedValues, selectedLabels);
   const newListingContainers = $(".new_listing_containers");
   // start if all data is ready and all lengths same (newListingContainers equal to all catalogues of the page dynamic incase size of catalogues increased) so selected values must be less or equal this elements
   if (selectedValues.length == selectedLabels.length && newListingContainers.length >= selectedValues.length){
@@ -570,7 +570,7 @@ function clearBulkInsertInput(){
   usedElmIds = [];
 }
 
-function copyBulkElm(selectedClass) {
+function copyBulkElm(selectedClass, classOnly) {
     
     const selectedElm = $(`.${selectedClass}`).eq(0);
     const usedElmId = selectedElm.attr('id');
@@ -578,7 +578,7 @@ function copyBulkElm(selectedClass) {
     if (!usedElmIds.includes(usedElmId)) {
 
       
-      if (selectedElm.attr('type')=='datetime-local'){return false;}
+      //if (selectedElm.attr('type')=='datetime-local'){return false;}
       contIds += 1;
       inputId += 1;
       const contId = `copy_cont_${contIds}`;
@@ -595,8 +595,17 @@ function copyBulkElm(selectedClass) {
 
       // apply remove cont of copy elm
       $(newCloseElm).on('click', (e)=>{
+        const selectedCls = selectedClass;
+        const elmId = usedElmId;
         if ($(e.currentTarget).attr('data-cont') && $($(e.currentTarget).attr('data-cont')).length){
           $($(e.currentTarget).attr('data-cont')).remove();
+          // remove disabled form select copier (ux)
+          $(`#bulk_listing_auto option[value='${classOnly}'][disabled]`).removeAttr('disabled');
+          // remove coper block than second shield and main for block element already copied from recopy (system)
+          const elmIdIndex = usedElmIds.indexOf(elmId);
+          if (usedElmIds.indexOf(elmId) >= 0){
+            usedElmIds.splice(elmIdIndex, 1);
+          }
         }
       });
 
@@ -623,6 +632,9 @@ function copyBulkElm(selectedClass) {
           $("#bulk_insert").addClass('btn-outline-primary');
         }, 50);
       }, 50);
+
+      usedElmIds.push(usedElmId);
+
     }
 }
 
@@ -664,8 +676,9 @@ function toggleMLICheck(e){
 
 $("#bulk_listing_auto").on('change', function(e){
   const selectedClass = `${$("#bulk_listing_auto").val()}.used`;
-  if (selectedClass && $(`.${selectedClass}`).length && $("#bulk_insert_cont").length && $("#bulk_listing_auto").val() && $("#bulk_listing_auto").val() != '0' && $(`.${selectedClass}`).eq(0).attr('id')) {
-    copyBulkElm(selectedClass);
+  const classOnly = $("#bulk_listing_auto").val();
+  if (classOnly && selectedClass && $(`.${selectedClass}`).length && $("#bulk_insert_cont").length && $("#bulk_listing_auto").val() && $("#bulk_listing_auto").val() != '0' && $(`.${selectedClass}`).eq(0).attr('id')) {
+    copyBulkElm(selectedClass, classOnly);
   } else {
     clearBulkInsertInput();
   }

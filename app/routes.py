@@ -12,7 +12,7 @@ from .forms import *
 from . import db, vendor_permission, app_permissions
 from .functions import updateDashboardListings, updateDashboardOrders, updateDashboardPurchasesSum, secureRedirect, get_charts, \
 bestbuy_ready, get_ordered_dicts, float_or_none, float_or_zero, update_order_taxes, get_orders_and_shippings, get_separate_order_taxes, \
-fill_generate_barcode, order_by, user_have_permissions, inv
+fill_generate_barcode, order_by, user_have_permissions, inv, get_errors_message
 from sqlalchemy.exc import IntegrityError
 from flask_login import login_required, current_user
 from flask import request as flask_request
@@ -1085,15 +1085,18 @@ def delete_listings():
 def multiple_listing_add():
     can = user_have_permissions(app_permissions, permissions=['add'])
     if can:
+        
         try:
             form = AddMultipleListingForm()
             # fill choices only, if called process it back default so nothing selected in default (95%)
             
             inv_platforms = inv(Platform.query, User.dashboard_id, Platform.dashboard_id).all()
             populate_add_multiple_form(form, inv_platforms)
+
             if form.validate_on_submit():
                 total_created = 0
                 total_invalid = 0
+                duplicates = 0
                 #return str(form.catalogue_ids.data)
                 # this function make the processes of any multiple insert very easy and without any unexcpted errors, this function is ultimate secure to use keys without checking
                 new_listings = get_ordered_dicts([
@@ -1117,26 +1120,31 @@ def multiple_listing_add():
                     form.reference.data,
                     form.reference_type.data
                 )
+
                 user_dashboard_id = current_user.dashboard.id
                 for new_list in new_listings:
-                    
-                    valid_catalogue = inv(Catalogue.query.filter_by(id=new_list['catalogue_id']), User.id, Catalogue.user_id).one_or_none()
-                    valid_platform = inv(Platform.query.filter_by(id=new_list['platform_id']), User.dashboard_id, Platform.dashboard_id).one_or_none()
-                    if valid_catalogue and valid_platform:
-                        new_listing = Listing(dashboard_id=user_dashboard_id, **new_list)
-                        new_listing.insert()
-                        total_created += 1
-                    else:
-                        total_invalid += 1
+                    try:
+                        valid_catalogue = inv(Catalogue.query.filter_by(id=new_list['catalogue_id']), User.id, Catalogue.user_id).one_or_none()
+                        valid_platform = inv(Platform.query.filter_by(id=new_list['platform_id']), User.dashboard_id, Platform.dashboard_id).one_or_none()
+                        if valid_catalogue and valid_platform:
+                            new_listing = Listing(dashboard_id=user_dashboard_id, **new_list)
+                            new_listing.insert()
+                            total_created += 1
+                        else:
+                            total_invalid += 1
+                    except:
+                        duplicates += 1
                 
                 if total_created > 0:
                     updateDashboardListings(current_user.dashboard)
 
                 ignored = ', Ignored: {}'.format(total_invalid) if total_invalid > 0 else ''
-                flash('Successfully created {} listings{}'.format(total_created, ignored))
+                duplicates = ', Duplicated: {}'.format(duplicates) if duplicates > 0 else ''
+                flash('Successfully created {} listings{}{}'.format(total_created, ignored, duplicates))
             else:
                 print('error from multiple_listing_add {}'.format(form.errors))
-                flash("Error while processing your request, can not add multiple listing right now.", "danger")
+                error_msg = get_errors_message(form)
+                flash("Please fix these errors and try again: ".format(error_msg if error_msg else 'Unknown error.'), "danger")
         except Exception as e:
             print('System Error: {}'.format(sys.exc_info()))
             flash('Unknown error unable to add multiple listing', 'danger')

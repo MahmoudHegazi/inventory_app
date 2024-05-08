@@ -359,7 +359,7 @@ actionPositionYSwitcher("#main_add_multiple", "#ml_action", "#ml_action_tcont", 
 
 /* multiple Listings Callbacks */
 function multipleListingOpenCB(selectedValues, selectedLabels){
-  //console.log("cb called", selectedValues, selectedLabels);
+  console.log("cb called", selectedValues, selectedLabels);
   const newListingContainers = $(".new_listing_containers");
   // start if all data is ready and all lengths same (newListingContainers equal to all catalogues of the page dynamic incase size of catalogues increased) so selected values must be less or equal this elements
   if (selectedValues.length == selectedLabels.length && newListingContainers.length >= selectedValues.length){
@@ -601,7 +601,7 @@ function copyBulkElm(selectedClass, classOnly) {
           $($(e.currentTarget).attr('data-cont')).remove();
           // remove disabled form select copier (ux)
           $(`#bulk_listing_auto option[value='${classOnly}'][disabled]`).removeAttr('disabled');
-          // remove coper block than second shield and main for block element already copied from recopy (system)
+          // remove coper block than second shield and main for block element already copied from recopy )
           const elmIdIndex = usedElmIds.indexOf(elmId);
           if (usedElmIds.indexOf(elmId) >= 0){
             usedElmIds.splice(elmIdIndex, 1);

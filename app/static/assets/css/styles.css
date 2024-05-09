@@ -430,7 +430,15 @@ img#api_unsetup {
 }
 
 
+#settings_toast {
+    position: absolute !important;
+    z-index: 10000 !important;
+    right: 45px !important;
+}
 
+#settings_toast.pleft {
+    left: 45px !important;
+}
 /* scroll bar */
 /* width */
 ::-webkit-scrollbar {

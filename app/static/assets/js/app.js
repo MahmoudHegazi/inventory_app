@@ -1698,6 +1698,32 @@ function actionPositionYSwitcher(scrollerS = "", moverS = "", topContS = "", bot
   }
 }
 
+function updateElmZoom(){
+  const newZom = ($("#zoom_input").val() && !isNaN(parseInt($("#zoom_input").val()))) ? parseInt($("#zoom_input").val()) : null;
+  const targetElm = ($("#zoom_input").attr('data-selector') && $($("#zoom_input").attr('data-selector')).length) ? $($("#zoom_input").attr('data-selector')) : null;
+
+  if (targetElm){
+    if (newZom){
+      targetElm.css('zoom', `${newZom}%`);
+    } else {
+      targetElm.css('zoom', '');
+    }
+  }
+}
+// toggle bottstrap classes on elems settings function
+function classToggler(e){
+  const targetVal = $(e.currentTarget).val();
+  const elm = ($(e.currentTarget).attr('data-selector') && $($(e.currentTarget).attr('data-selector')).length) ? $($(e.currentTarget).attr('data-selector')) : null;
+  const bsClass = ($(e.currentTarget).attr('data-class')) ? $(e.currentTarget).attr('data-class') : null;
+  if (elm && bsClass){
+    if (targetVal) {
+      $(elm).addClass(bsClass);
+    } else {
+      $(elm).removeClass(bsClass);
+    }
+  }
+}
+
 $(document).ready(async function(){
     applyHoverEffect();
     $('form:not(".no_submit_hide")').on('submit', (e)=>{

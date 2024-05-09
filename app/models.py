@@ -1488,7 +1488,7 @@ def update_listing_on_catalogue_update(mapper, connection, target):
         for alisting in target.listings:
             list_to_update = scoped_session.query(Listing).filter_by(id=alisting.id).one_or_none()
             if list_to_update:
-                print('print executed {}'.format(target.sku))
+                # print('print executed {}'.format(target.sku))
                 list_to_update.sku = target.sku
                 list_to_update.product_name = target.product_name
                 list_to_update.product_description = target.product_description

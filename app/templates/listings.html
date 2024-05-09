@@ -37,13 +37,45 @@
              </div>
              <div class="toast-body">
                 <div class="row">
-                   <div class="col-sm-12 d-flex justify-content-start align-items-center">
-                      <label>Display: </label>
-                      <select class="form-control ml-2" id="switch_display">
-                         <option value="table" selected="selected">Table</option>
-                         <option value="card">Card</option>                     
-                      </select>
-                   </div>
+                  <div class="col-sm-12 d-flex justify-content-start align-items-center">
+                    <label>Display: </label>
+                    <select class="form-control ml-2" id="switch_display">
+                        <option value="table" selected="selected">Table</option>
+                        <option value="card">Card</option>                     
+                    </select>
+                  </div>
+                  <div class="col-sm-12 row mt-2" title="Set custom table zoom precentage">
+                    <label class="col-sm-7">Table Zoom (Percentage): </label>
+                    <input class="form-control col-sm-5" id="zoom_input" data-selector="#listings_table" type="number" oninput="updateElmZoom()" placeholder="Percentages">
+                  </div>
+                  <div class="col-sm-12 row mt-2" title="Do you wana make table rows have one row with color and row after with diffrent color for Better vision">
+                    <label class="col-sm-7">Striped Table: </label>
+                    <select class="class_selctors col-sm-5 form-control" data-class="table-striped" data-selector="#listings_table" onchange="classToggler(event)">
+                      <option value="">No</option>
+                      <option value="true">Yes</option>
+                    </select>
+                  </div>
+                  <div class="col-sm-12 row mt-2" title="Do You Wana Make table rows Hoverable their background color change when mouse stand over table rows?">
+                    <label class="col-sm-7" >Table Hover: </label>
+                    <select class="class_selctors col-sm-5 form-control" data-class="table-hover" data-selector="#listings_table" onchange="classToggler(event)">
+                      <option value="">No</option>
+                      <option value="true" selected="selected">Yes</option>
+                    </select>
+                  </div>
+                  <div class="col-sm-12 row mt-2" title="Do you wana change table background to black?">
+                    <label class="col-sm-7">Table Dark: </label>
+                    <select class="class_selctors col-sm-5 form-control" data-class="table-dark" data-selector="#listings_table" onchange="classToggler(event)">
+                      <option value="">No</option>
+                      <option value="true">Yes</option>
+                    </select>
+                  </div>
+                  <div class="col-sm-12 row mt-2" title="Do you wana add border around table cells?">
+                    <label class="col-sm-7">Table Bordered: </label>
+                    <select class="class_selctors col-sm-5 form-control" data-class="table-bordered" data-selector="#listings_table" onchange="classToggler(event)">
+                      <option value="">No</option>
+                      <option value="true" selected="selected">Yes</option>
+                    </select>
+                  </div>
                 </div>
              </div>
           </div>
@@ -148,7 +180,7 @@
     <div class="row" id="table_display">
       <!-- table display -->
       <div class="col-sm-12">         
-        <table class="table table-hover arrangable" data-ignore="0,1,10" id="listings_table">
+        <table class="table table-hover table-bordered arrangable" data-ignore="0,1,10" id="listings_table">
           <thead>
             <tr>
               <th>#</th>

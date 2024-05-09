@@ -2055,7 +2055,7 @@ def get_ordered_dicts(keys=[], *lists):
         # as previous check , checks for the length of the keys vs length of data lists , this check is deep 1 level it check for each list values and make sure all data lists have same length
         if len(set(list(map(lambda l : len(l), lists)))) > 1:
             raise ValueError("Data lists length not equal")
-        
+
         zip_lists = list(zip(*lists))
         for l in zip_lists:
             list_of_dicts.append(dict(zip(keys, l)))
@@ -2346,7 +2346,9 @@ def get_errors_message(form):
         if field == 'csrf_token':
             errorsl.append('Form expired please try again')
         else:
-            errorsl.append('{}:{}'.format(field, ','.join(errors)))
+
+            errors_string = ','.join(list(map(lambda e: '-'.join(e) if isinstance(e, list) else e, errors)))
+            errorsl.append('{}:{}'.format(field, errors_string))
     error = '|'.join(errorsl)
     return error
 

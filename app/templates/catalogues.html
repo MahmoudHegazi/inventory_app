@@ -591,6 +591,8 @@ function copyBulkElm(selectedClass, classOnly) {
       newElm.attr('data-elmid', `.${selectedElm.attr('id')}`);
       newElm.get(0).classList = [];
       newElm.addClass('form-control bulk_insert_copy');
+      newElm.attr('name', '');
+      newElm.removeAttr('name');
       newLabel.attr('for', `copied_bulk_insert_${inputId}`);
 
       // apply remove cont of copy elm
@@ -688,8 +690,9 @@ $("#bulk_insert").on('click', function(){
   $(".bulk_insert_copy").each((i, elm)=>{
     const elmVal = $(elm).val();
     const targetElms = $(elm).attr('data-selector') ? $(".mla_list_select:checked").closest(".new_listing_containers").find($(elm).attr('data-selector')) : null;
-    if (targetElms && targetElms.length){
+    if (targetElms && targetElms.length && elmVal){
       targetElms.each((n, tElm)=>{
+         console.log(elmVal);
          $(tElm).val(elmVal).trigger('change');
          //console.log($(tElm).val());
       });
@@ -731,6 +734,11 @@ $("#addMultipleListingModal").on('shown.bs.modal', function(){
 
 $("#addMultipleListingModal").on('hide.bs.modal', function(){
   $('.new_listing_containers:not([style*="display:none"]) .mla_list_select').off('change');
+});
+
+// remoev copy elements automaters
+$("#addMultipleListingModal #add[type='submit']").on('click', function(){
+  $(".bulk_insert_copy").remove();
 });
 </script>
 {% endblock page_scripts %}

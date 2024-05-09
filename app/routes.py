@@ -1091,8 +1091,10 @@ def multiple_listing_add():
             # fill choices only, if called process it back default so nothing selected in default (95%)
             
             inv_platforms = inv(Platform.query, User.dashboard_id, Platform.dashboard_id).all()
+            user_catalogues = inv(Catalogue.query, User.id, Catalogue.user_id).all()
+            # populate_add_multiple_form(form, inv_platforms)
             populate_add_multiple_form(form, inv_platforms)
-
+            
             if form.validate_on_submit():
                 total_created = 0
                 total_invalid = 0

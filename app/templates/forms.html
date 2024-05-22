@@ -345,12 +345,10 @@
               {% if add_multiple_listings.platforms_selects|length == add_multiple_listings.catalogue_ids|length %}
                 <!-- bluk insert -->
                 <div class="row m-0 p-2 shadow mb-3">
-                  <div class="col-sm-12 text-center p-2">
+                  <div class="col-sm-12 text-center p-2 d-flex justify-content-between algin-items-center flex-wrap mb-3">
+                    <button type="button" class="btn btn-outline-info btn-sm" id="mli_select_all" title="Select all listing to be automated">Select All</button>
                     <h6 class="badge badge-primary">Automate Bulk Insertion</h6>
-                  </div>
-                  <div class="col-sm-12 d-flex justify-content-around align-items-center mb-2">
-                    <button type="button" class="btn btn-outline-info btn-sm w-50" id="mli_select_all" title="Select all listing to be automated">Select All</button>
-                    <button type="button" class="btn btn-outline-info btn-sm w-50" id="mli_unselect_all" title="Un select all selected Listings, you can click this after complete automate of some listings and want to automate new group" style="display:none;">Un Select All</button>
+                    <button type="button" class="btn btn-outline-danger btn-sm" id="mli_unselect_all" title="Un select all selected Listings, you can click this after complete automate of some listings and want to automate new group">Un Select All</button>
                   </div>
                   <div class="col-sm-4">Select Input: </div>
                   <div class="col-sm-8">
@@ -373,91 +371,134 @@
                   <div class="col-sm-12 p-0 m-0 row">
                     <div id="bulk_insert_cont" class="col-sm-8 p-2 m-0"></div>
                     <div class="col-sm-4 p-2 m-0 d-flex justify-content-around align-items-center">
-                      <button id="bulk_insert" type="button" class="btn btn-outline-primary btn-sm" style="display:none;">Bulk Apply</button>
-                      <button id="bulk_clear" type="button" class="btn btn-danger btn-sm" style="display:none;"><i class="fa fa-close"></i></button>
+                      <button id="bulk_insert" type="button" class="btn btn-outline-primary btn-sm next_click" style="display:none;">Bulk Apply</button>
+                      <button id="bulk_clear" type="button" class="btn btn-danger btn-sm" style="display:none;" title="this will reset all values of all inputs">Reset <i class="fa fa-close"></i></button>
                     </div>
-                  </div>                  
-                </div>
-                
-
-                <!-- display listings data -->
-                {% for platform_select in add_multiple_listings.catalogue_ids %}
-                <div class="border border-secondary rounded new_listing_containers mb-3 shadow-sm" id="container_{{loop.index}}" style="display:none;">
-                    <!-- Collapse -->
-                    {% set collapse_id = 'ml_collapse_'~loop.index %}
-                    <div class="m-0 p-0 row">
-                      <div class="col-sm-1 shadow d-flex justify-content-center align-items-center">
-                        <input type="checkbox" class="mla_list_select" title="Select Listing to automate selection of input with one value for all selected listing such as category for this listings, when value selected will applied to all elements you can view or edit value by click on arrow to view listing insert details and update the value.">
+                  </div>
+                  <div class="col-sm-12 container my-3">
+                    <button class="btn btn-success btn-block btn-sm" type="button" data-toggle="collapse" data-target="#cont">
+                      <span>Toggle Filters Tool</span>
+                    </button>
+                  </div>
+                  <div class="col-sm-12 container my-3 collapse" id="cont">
+                    <div>
+                      <label>Search</label>
+                      <div class="row m-0">                        
+                        <select id="search_select_col" class="form-control col-sm-3">
+                          <option value="platform">platform</option>
+                          <option value="unit_discount_price">unit_discount_price</option>
+                          <option value="unit_origin_price">unit_origin_price</option>
+                          <option value="quantity_threshold">quantity_threshold</option>
+                          <option value="active">active</option>
+                          <option value="discount_start_date">discount_start_date</option>
+                          <option value="discount_end_date">discount_end_date</option>
+                          <option value="currency_iso_code">currency_iso_code</option>
+                          <option value="shop_sku">shop_sku</option>
+                          <option value="offer_id">offer_id</option>
+                          <option value="reference">reference</option>
+                          <option value="reference_type">reference_type</option>
+                        </select>
+                        <select id="search_select_operator" class="form-control col-sm-3">
+                          <option value="equal">Equal</option>
+                          <option value="not_equal">Not Equal</option>
+                          <option value="bigger">Bigger</option>
+                          <option value="lower">Lower</option>
+                        </select>
+                        <input type="text" class="form-control col-sm-4" id="search_mlisting" placeholder="Value"/>
+                        <button type="button" class="btn btn-primary btn-sm col-sm-1" id="search_mlisting_click" title="search"><i class="fa fa-search"></i></button>
+                        <button type="button" class="btn btn-danger btn-sm col-sm-1" id="search_mlisting_clear">Clear</button>
                       </div>
-                      <div class="p-0 m-0 col-sm-11 shadow cursor-pointer p-0 m-0" style="border-left:none;">
-                        <div data-toggle="collapse" data-target="#{{collapse_id}}" class="m-0 p-0 text-dark w-100 d-flex justify-content-center align-items-stretch m-0 p-0 cursor-pointer db collapsed_mla">                     
-                          <div class="p-0 m-0 ml-2 mr-1 d-flex justify-content-center align-items-center" title="View Listing Full Inputs Data" style="min-width:20px;max-width:10%;">
-                            <i class="fa fa-arrow-down"></i>
+                    </div>
+                  </div>
+                </div>
+                <div id="mlisting_cont">
+                  <!-- display listings data -->
+                  {% for platform_select in add_multiple_listings.catalogue_ids %}
+                  <div class="border border-secondary rounded new_listing_containers mb-3 shadow-sm" id="container_{{loop.index}}" style="display:none;" 
+                      data-groupby-index="{{loop.index}}"
+                      data-groupby-platform="BestBuy", data-groupby-unit_discount_price="0.00",
+                      data-groupby-unit_origin_price="0.00" data-groupby-quantity_threshold="0"
+                      data-groupby-active="0" data-groupby-discount_start_date=""
+                      data-groupby-discount_end_date="" data-groupby-currency_iso_code=""
+                      data-groupby-shop_sku="" data-groupby-offer_id=""
+                      data-groupby-reference="" data-groupby-reference_type="">
+                      <!-- static attrs make it starts faster and fewer not related to dynamic done to result, also spearate functions-->
+                      <!-- Collapse -->
+                      {% set collapse_id = 'ml_collapse_'~loop.index %}
+                      <div class="m-0 p-0 row">
+                        <div class="col-sm-1 shadow d-flex justify-content-center align-items-center">
+                          <input type="checkbox" class="mla_list_select" title="Select Listing to automate selection of input with one value for all selected listing such as category for this listings, when value selected will applied to all elements you can view or edit value by click on arrow to view listing insert details and update the value.">
+                        </div>
+                        <div class="p-0 m-0 col-sm-11 shadow cursor-pointer p-0 m-0" style="border-left:none;">
+                          <div data-toggle="collapse" data-target="#{{collapse_id}}" class="m-0 p-0 text-dark w-100 d-flex justify-content-center align-items-stretch m-0 p-0 cursor-pointer db collapsed_mla">                     
+                            <div class="p-0 m-0 ml-2 mr-1 d-flex justify-content-center align-items-center" title="View Listing Full Inputs Data" style="min-width:20px;max-width:10%;">
+                              <i class="fa fa-arrow-down"></i>
+                            </div>
+                            <div class="w-100 p-1 m-0 shadow rounded catalogue_label cl_span" style="display:none;min-width: 90%;"></div>
                           </div>
-                          <div class="w-100 p-1 m-0 shadow rounded catalogue_label cl_span" style="display:none;min-width: 90%;"></div>
                         </div>
                       </div>
-                    </div>
 
-                    
-                    <div class="shadow p-3 rounded p-0 m-0 mla_collapse_cont collapse" id="{{collapse_id}}">
-                      {{add_multiple_listings.catalogue_ids[loop.index0](class='multiple_platform_ids', style='display:none;')}}
-                      <div class="form-group">
-                        {{add_multiple_listings.platforms_selects.label}}
-                        {{add_multiple_listings.platforms_selects[loop.index0](class='multiple_platforms_selects form-control', style='display:none;')}}
-                      </div>
-                      <div class="form-group">
-                        <div class="d-flex justify-content-start align-items-center">
-                          {{add_multiple_listings.active.label(class="mr-1")}}
-                          {{add_multiple_listings.active[loop.index0](class='multiple_active form-control mxwidth-100', style='display:none;')}} 
+                      
+                      <div class="shadow p-3 rounded p-0 m-0 mla_collapse_cont collapse" id="{{collapse_id}}">
+                        {{add_multiple_listings.catalogue_ids[loop.index0](class='multiple_platform_ids', style='display:none;')}}
+                        <div class="form-group">
+                          {{add_multiple_listings.platforms_selects.label}}
+                          {{add_multiple_listings.platforms_selects[loop.index0](class='multiple_platforms_selects form-control multiple_listings_input', data_name='platform', style='display:none;')}}
+                        </div>
+                        <div class="form-group">
+                          <div class="d-flex justify-content-start align-items-center">
+                            {{add_multiple_listings.active.label(class="mr-1")}}
+                            {{add_multiple_listings.active[loop.index0](class='multiple_active form-control mxwidth-100 multiple_listings_input', data_name='active', style='display:none;')}} 
+                          </div>
+                        </div>
+                        <div class="form-group">
+                          {{add_multiple_listings.discount_end_date.label}}
+                          {{add_multiple_listings.discount_end_date[loop.index0](class='multiple_discount_end form-control multiple_listings_input', data_name='discount_end_date', style='display:none;')}}
+                        </div>
+                        <div class="form-group">
+                          {{add_multiple_listings.discount_start_date.label}}
+                          {{add_multiple_listings.discount_start_date[loop.index0](class='multiple_discount_start form-control multiple_listings_input', data_name='discount_start_date', style='display:none;')}}
+                        </div>
+                        <div class="form-group">
+                          {{add_multiple_listings.unit_discount_price.label}}
+                          {{add_multiple_listings.unit_discount_price[loop.index0](class='multiple_unit_discount form-control multiple_listings_input', data_name='unit_discount_price', style='display:none;')}}
+                        </div>
+                        <div class="form-group">
+                          {{add_multiple_listings.unit_origin_price.label}}
+                          {{add_multiple_listings.unit_origin_price[loop.index0](class='multiple_unit_origin form-control multiple_listings_input', data_name='unit_origin_price', style='display:none;')}}
+                        </div>
+                        <div class="form-group">
+                          {{add_multiple_listings.quantity_threshold.label}}
+                          {{add_multiple_listings.quantity_threshold[loop.index0](class='multiple_quantity_threshold form-control multiple_listings_input', data_name='quantity_threshold', style='display:none;')}}
+                        </div>
+                        <div class="form-group">
+                          {{add_multiple_listings.currency_iso_code.label}}
+                          {{add_multiple_listings.currency_iso_code[loop.index0](class='multiple_currency_iso form-control multiple_listings_input', data_name='currency_iso_code', style='display:none;')}}
+                        </div>
+                        <div class="form-group">
+                          {{add_multiple_listings.shop_sku.label}}
+                          {{add_multiple_listings.shop_sku[loop.index0](class='multiple_shop_sku form-control multiple_listings_input', data_name='shop_sku', style='display:none;')}}
+                        </div>
+                        <div class="form-group">
+                          {{add_multiple_listings.offer_id.label}}
+                          {{add_multiple_listings.offer_id[loop.index0](class='multiple_offer_id form-control multiple_listings_input', data_name='offer_id', style='display:none;')}}
+                        </div>
+                        <div class="form-group">
+                          {{add_multiple_listings.reference.label}}
+                          {{add_multiple_listings.reference[loop.index0](class='multiple_reference form-control multiple_listings_input', data_name='reference', style='display:none;')}}
+                        </div>
+                        <div class="form-group">
+                          {{add_multiple_listings.reference_type.label}}
+                          {{add_multiple_listings.reference_type[loop.index0](class='multiple_reference_type form-control multiple_listings_input', data_name='reference_type', style='display:none;')}}
                         </div>
                       </div>
-                      <div class="form-group">
-                        {{add_multiple_listings.discount_end_date.label}}
-                        {{add_multiple_listings.discount_end_date[loop.index0](class='multiple_discount_end form-control', style='display:none;')}}
-                      </div>
-                      <div class="form-group">
-                        {{add_multiple_listings.discount_start_date.label}}
-                        {{add_multiple_listings.discount_start_date[loop.index0](class='multiple_discount_start form-control', style='display:none;')}}
-                      </div>
-                      <div class="form-group">
-                        {{add_multiple_listings.unit_discount_price.label}}
-                        {{add_multiple_listings.unit_discount_price[loop.index0](class='multiple_unit_discount form-control', style='display:none;')}}
-                      </div>
-                      <div class="form-group">
-                        {{add_multiple_listings.unit_origin_price.label}}
-                        {{add_multiple_listings.unit_origin_price[loop.index0](class='multiple_unit_origin form-control', style='display:none;')}}
-                      </div>
-                      <div class="form-group">
-                        {{add_multiple_listings.quantity_threshold.label}}
-                        {{add_multiple_listings.quantity_threshold[loop.index0](class='multiple_quantity_threshold form-control', style='display:none;')}}
-                      </div>
-                      <div class="form-group">
-                        {{add_multiple_listings.currency_iso_code.label}}
-                        {{add_multiple_listings.currency_iso_code[loop.index0](class='multiple_currency_iso form-control', style='display:none;')}}
-                      </div>
-                      <div class="form-group">
-                        {{add_multiple_listings.shop_sku.label}}
-                        {{add_multiple_listings.shop_sku[loop.index0](class='multiple_shop_sku form-control', style='display:none;')}}
-                      </div>
-                      <div class="form-group">
-                        {{add_multiple_listings.offer_id.label}}
-                        {{add_multiple_listings.offer_id[loop.index0](class='multiple_offer_id form-control', style='display:none;')}}
-                      </div>
-                      <div class="form-group">
-                        {{add_multiple_listings.reference.label}}
-                        {{add_multiple_listings.reference[loop.index0](class='multiple_reference form-control', style='display:none;')}}
-                      </div>
-                      <div class="form-group">
-                        {{add_multiple_listings.reference_type.label}}
-                        {{add_multiple_listings.reference_type[loop.index0](class='multiple_reference_type form-control', style='display:none;')}}
-                      </div>
-                    </div>
-                    <!-- add the remaning inputs -->
-                    <hr class="my-0" />
+                      <!-- add the remaning inputs -->
+                      <hr class="my-0" />
+                  </div>
+                  {% endfor %}
+                  <!-- END OF DISPLAY ALL POSSIBLE -->
                 </div>
-                {% endfor %}
-              
               
               {% else %}
                 <div class="alert alert-danger">Unable to Display Listings data inputs right now.</div>

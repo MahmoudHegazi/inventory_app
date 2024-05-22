@@ -34,8 +34,15 @@
     min-width: 150px !important;
 }
 
+.top_right_5 {
+    top: 5px;
+    right: 5px;
+}
 .p-absolute {
     position: absolute !important;
+}
+.p-relative {
+    position: relative !important;
 }
 .cursor-pointer {
     cursor: pointer !important;
@@ -527,6 +534,15 @@ img#api_unsetup {
     background: honeydew !important;
   }
   
+  .group_header {
+    word-break: break-word !important;
+    text-shadow: 2px 2px 4px #000000 !important;
+    padding: 10px !important;
+    border-radius: 20px !important;
+    font-weight: bold !important;
+    color: white !important;
+    border: 1px solid chartreuse !important;
+  }
 @media only screen and (max-width: 768px) {
     .media_small_width_100 {
         width: 100%  !important;

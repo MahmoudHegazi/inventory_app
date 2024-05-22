@@ -1698,6 +1698,7 @@ function actionPositionYSwitcher(scrollerS = "", moverS = "", topContS = "", bot
   }
 }
 
+
 function updateElmZoom(){
   const newZom = ($("#zoom_input").val() && !isNaN(parseInt($("#zoom_input").val()))) ? parseInt($("#zoom_input").val()) : null;
   const targetElm = ($("#zoom_input").attr('data-selector') && $($("#zoom_input").attr('data-selector')).length) ? $($("#zoom_input").attr('data-selector')) : null;

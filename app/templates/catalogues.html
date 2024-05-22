@@ -575,30 +575,183 @@ $('.new_listing_containers:not([style*="display:none"]) .mla_collapse_cont').on(
   faIcon.addClass("fa-arrow-down");
 });
 
+const mListingData = {
+        index: {
+            name: 'index',
+            type: 'int'
+        },
+        platform: {
+            name: 'platform',
+            type: 'string'
+        },
+        unit_discount_price: {
+            name: 'unit_discount_price',
+            type: 'float'
+        },
+        unit_origin_price: {
+            name: 'unit_origin_price',
+            type: 'float'
+        },
+        quantity_threshold: {
+            name: 'quantity_threshold',
+            type: 'int'
+        },
+        active: {
+            name: 'active',
+            type: 'bool'
+        },
+        discount_start_date: {
+            name: 'discount_start_date',
+            type: 'datetime'
+        },
+        discount_end_date: {
+            name: 'discount_end_date',
+            type: 'datetime',
+            value: null
+        },
+        currency_iso_code: {
+            name: 'currency_iso_code',
+            type: 'string'
+        },
+        shop_sku: {
+            name: 'shop_sku',
+            type: 'string'
+        },
+        offer_id: {
+            name: 'offer_id',
+            type: 'int'
+        },
+        reference: {
+            name: 'reference',
+            type: 'string'
+        },
+        reference_type: {
+            name: 'reference_type',
+            type: 'string'
+        }
+};
+
+const mListingArgs ={
+  index: 'data-groupby-index',
+  platform: 'data-groupby-platform',
+  unit_discount_price: 'data-groupby-unit_discount_price',
+  unit_origin_price: 'data-groupby-unit_origin_price',
+  quantity_threshold: 'data-groupby-quantity_threshold',
+  active: 'data-groupby-active',
+  discount_start_date: 'data-groupby-discount_start_date',
+  discount_end_date: 'data-groupby-discount_end_date',
+  currency_iso_code: 'data-groupby-currency_iso_code',
+  shop_sku: 'data-groupby-shop_sku',
+  offer_id: 'data-groupby-offer_id',
+  reference: 'data-groupby-reference',
+  reference_type: 'data-groupby-reference_type'
+};
+
+
+function getFormatedVal(searchVal, colType){
+  switch(colType){
+      case 'int':
+        searchVal = (!isNaN(parseInt(searchVal))) ? parseInt(searchVal) : '';
+        break;
+      case 'bool':
+        searchVal = (!isNaN(parseInt(searchVal))) ? (parseInt(searchVal) === 1) ? 1 : 0 : '';
+        break;
+      case 'float':
+        searchVal = (!isNaN(parseFloat(searchVal))) ? parseFloat(searchVal) : '';
+        break;
+      case 'string':
+        searchVal = (typeof(searchVal) === 'string') ? searchVal.toLowerCase() : '';
+        break;
+      case 'datetime':
+        const parsedDate = Date.parse(searchVal);
+        searchVal = (!isNaN(parsedDate)) ? new Date(searchVal) : '';
+        break;
+      default:
+        break;
+  }
+  return searchVal;
+}
+
+
+function removeSearch(){
+  $(".search_hidden").show();
+  $(".search_hidden").removeClass("search_hidden");
+}
+
+function searchMlisting(){
+  const searchVal = $("#search_mlisting").val();
+  const col = $("#search_select_col").val();
+  const operator = $("#search_select_operator").val();
+  const colType = (col && mListingData.hasOwnProperty(col)) ? mListingData[col].type : null;
+  const dataArg = (col && mListingArgs.hasOwnProperty(col)) ? mListingArgs[col] : null;
+
+  removeSearch();
+
+  if (col && operator && colType && dataArg) {
+      const typedVal = getFormatedVal(searchVal, colType);
+      const searchRows = $(".new_listing_containers:not(:hidden)");
+      searchRows.each((_i, elm)=>{
+        if (typeof($(elm).attr(dataArg)) !== 'undefined'){
+          const typedElmVal = getFormatedVal($(elm).attr(dataArg), colType);
+
+          let hideElm = false;
+          switch(operator) {
+            case 'equal':
+              hideElm = (typedElmVal == typedVal) ? false : true;
+              break;
+            case 'not_equal':
+              hideElm = (typedElmVal != typedVal) ? false : true;
+              break;
+            case 'bigger':
+              hideElm = (typedElmVal > typedVal) ? false : true;
+              break;
+            case 'lower':
+              hideElm = (typedElmVal < typedVal) ? false : true;
+              break;
+            default:
+              break;
+          }
+          if (hideElm){
+            $(elm).find('.mla_list_select').prop('checked', false).trigger('change');            
+            $(elm).addClass("search_hidden");
+            $(elm).hide();
+          }
+        }
+      });
+  }
+
+}
+
+$("#search_mlisting_click").on('click', searchMlisting);
+$("#search_mlisting_clear").on('click', removeSearch);
+
 /* Bluk insert automate */
 let inputId = 0;
 let contIds = 0;
 let usedElmIds = [];
 let timeout1 = timeout2 = null;
-function clearBulkInsertInput(){
-  $("#bulk_insert_cont").html("");
-  $("#bulk_insert").hide();
-  $("#bulk_clear").hide();
-  $("#bulk_listing_auto option[disabled]").removeAttr('disabled');
-  
-  // back automated elements as default
-  
-  const checkedElms = $(".mla_list_select:checked");
-  const targetElms = checkedElms.closest(".new_listing_containers").find('.used');
-  const checkedElmParents = checkedElms.parent();
-  targetElms.each((_i, elm)=>{
-    if ($(elm).prop('nodeName').toLowerCase() === 'select') {
-      $(elm).find('option:first').eq(0).prop('selected', 'selected').trigger('change');
-    } else {
-      $(elm).val("").trigger('change');
-    }
-  });
-  checkedElmParents.removeClass('bg-success');
+function clearBulkInsertInput(html=false, backAutomated=false){
+  if (html){
+    $("#bulk_insert_cont").html("");
+    $("#bulk_insert").hide();
+    $("#bulk_clear").hide();
+    $("#bulk_listing_auto option[disabled]").removeAttr('disabled');
+  }
+
+  if (backAutomated){
+    // back automated elements as default
+    const checkedElms = $(".mla_list_select:checked");
+    const targetElms = checkedElms.closest(".new_listing_containers").find('.used');
+    const checkedElmParents = checkedElms.parent();
+    targetElms.each((_i, elm)=>{
+      if ($(elm).prop('nodeName').toLowerCase() === 'select') {
+        $(elm).find('option:first').eq(0).prop('selected', 'selected').trigger('change');
+      } else {
+        $(elm).val("").trigger('change');
+      }
+    });
+    checkedElmParents.removeClass('bg-success');    
+  }
   usedElmIds = [];
 }
 
@@ -640,6 +793,10 @@ function copyBulkElm(selectedClass, classOnly) {
           if (usedElmIds.indexOf(elmId) >= 0){
             usedElmIds.splice(elmIdIndex, 1);
           }
+          if (usedElmIds.length === 0){
+            // if last input removed back input selector to default which will also then hide action buttons 
+            $("#bulk_listing_auto option:first").prop('selected', 'selected').trigger('change');
+          }
         }
       });
 
@@ -672,41 +829,6 @@ function copyBulkElm(selectedClass, classOnly) {
     }
 }
 
-function toggleMLICheck(e){
-
-  /* (Performance this function have hidden paramter performanced for select and unselect even 100 listings) Elm Function arugment (used when async button with change action so same method with no paramters additonal than event can got the paramter boolean or string or number even JSON string obj) */
-  const last = $("#mli_select_all").attr('data-last');
-  // elm hide (mli_select_all) if not needed so jquery can not get so need 2 lasts
-  const last2 = $("#mli_unselect_all").attr('data-last');
-  if (last || last2){
-    if (last && $('.new_listing_containers:not([style*="display:none"]) .mla_list_select:checked:last').get(0) === $(e.currentTarget).get(0)){
-      $("#mli_select_all").removeAttr('data-last');
-      //alert(`here- is the last`);
-    } else if (last2 && $('.new_listing_containers:not([style*="display:none"]) .mla_list_select:last').get(0) === $(e.currentTarget).get(0)) {
-      $("#mli_unselect_all").removeAttr('data-last');
-    } else {
-      //alert(`here not last continue no run`);
-      //remove data-last when it last elm, and will apply method to reuse attr (last was arugment passed but used as data set before event triggered), as select all only use change event this way when select all click it will only execute this method on last change occures so if 10 element checked one by one this method will applied only when current target is last checkbox so best performance and run 1 time only when needed
-      return false;
-    }
-  }
-  
-  const selectedElm = $('.new_listing_containers:not([style*="display:none"])');
-  const allLength = selectedElm.find('.mla_list_select').length;
-  const checkedLength = selectedElm.find('.mla_list_select:checked').length;
-  
-  if (checkedLength === 0) {
-      $("#mli_unselect_all").hide();
-  } else {
-      $("#mli_unselect_all").show();
-  }
-   
-  if (allLength === checkedLength){
-      $("#mli_select_all").hide();
-  } else {
-      $("#mli_select_all").show();
-  }
-}
 
 $("#bulk_listing_auto").on('change', function(e){
   const selectedClass = `${$("#bulk_listing_auto").val()}.used`;
@@ -714,18 +836,44 @@ $("#bulk_listing_auto").on('change', function(e){
   if (classOnly && selectedClass && $(`.${selectedClass}`).length && $("#bulk_insert_cont").length && $("#bulk_listing_auto").val() && $("#bulk_listing_auto").val() != '0' && $(`.${selectedClass}`).eq(0).attr('id')) {
     copyBulkElm(selectedClass, classOnly);
   } else {
-    clearBulkInsertInput();
+    clearBulkInsertInput(html=true, backAutomated=false);
   }
 });
 
+// when any input bulk changed will add group by so can group by changed inputs not this inputs belongs to listings not catalogues so must get from input and this future action of user so each time update value and get updated js order and group obj, you need bulk insert so can apply filter not change inputs
+function setInputGroupByVAL(elmVal, tElm, tParent){
+  const nameAttr = $(tElm).attr('data-name');
+  const dataName = typeof(nameAttr) === 'string' ? nameAttr.trim().toLowerCase() : '';
+  
+  let resultVal = elmVal;
+  if (dataName){
+     if (dataName == 'platform' && $(tElm).is("select")){
+       // platform fix always make sure there is text in the platform it required and check
+       resultVal = $(tElm).find('option:selected').text();
+     }
+     // note for group and order containers have default values for selected
+     tParent.attr(`data-groupby-${dataName}`, resultVal);
+  }
+  return resultVal;
+}
+
+// when multiple listings change update parent
+$(".multiple_listings_input").on('change', function(e){
+  const tElm = $(e.currentTarget);
+  setInputGroupByVAL(tElm.val(), tElm, tElm.closest(".new_listing_containers"));
+})
 $("#bulk_insert").on('click', function(){
   $(".bulk_insert_copy").each((i, elm)=>{
     const elmVal = $(elm).val();
     const targetElms = $(elm).attr('data-selector') ? $(".mla_list_select:checked").closest(".new_listing_containers").find($(elm).attr('data-selector')) : null;
-    if (targetElms && targetElms.length && elmVal){
+    if (targetElms && targetElms.length){
       targetElms.each((n, tElm)=>{
-         console.log(elmVal);
+         console.log(elmVal, $(tElm)[0], $(tElm).attr('data-name'), $(tElm).attr('data-type'));
          $(tElm).val(elmVal).trigger('change');
+
+         // set data name and data-type in attr for group and order
+         setInputGroupByVAL(elmVal, tElm, $(tElm).closest(".new_listing_containers"));
+      
          //console.log($(tElm).val());
       });
       // targetElms.val($(elm).val()).trigger('change');
@@ -734,8 +882,10 @@ $("#bulk_insert").on('click', function(){
   $(".mla_list_select:checked").parent().addClass('bg-success');
 });
 
+
 $("#bulk_clear").on('click', function(){
   $("#bulk_listing_auto option:first").prop('selected', 'selected').trigger('change');
+  clearBulkInsertInput(html=false, backAutomated=true);
 });
 /*
 $("form").on('submit', (e)=>{
@@ -744,33 +894,20 @@ e.preventDefault();
 });
 */
 $("#mli_select_all").on('click', function(){
-  // custom way to set arugment on element so when .mla_list_select change trigger callback executed can get the value of last arugment Used as boolean attr or no attr
-  $("#mli_select_all").attr('data-last', 'true');
-
-  $('.mla_list_select').prop('checked', true).trigger('change');
-  
+  // mlisting_cont will help when apply filter and temp hide rows so not select hidden elms and automate while filter applied
+  $('#mlisting_cont .new_listing_containers:not(:hidden) .mla_list_select').prop('checked', true).trigger('change');
 });
 
 $("#mli_unselect_all").on('click', function(){
-  // set last html arugment to passed to trigger function from element
-  $("#mli_unselect_all").attr('data-last', 'true');
-  
-  $('.mla_list_select').prop('checked', false).trigger('change');
+  $('#mlisting_cont .mla_list_select').prop('checked', false).trigger('change');
 });
 
-
-
-$("#addMultipleListingModal").on('shown.bs.modal', function(){
-  $('.new_listing_containers:not([style*="display:none"]) .mla_list_select').on('change', toggleMLICheck);
-});
-
-$("#addMultipleListingModal").on('hide.bs.modal', function(){
-  $('.new_listing_containers:not([style*="display:none"]) .mla_list_select').off('change');
-});
 
 // remoev copy elements automaters
 $("#addMultipleListingModal #add[type='submit']").on('click', function(){
   $(".bulk_insert_copy").remove();
 });
+
+
 </script>
 {% endblock page_scripts %}

@@ -96,7 +96,7 @@
     <!-- search component -->
     <div class="row mt-2 mb-2">
       <div class="col-sm-11 mx-auto" title="search by id, sku, price, location">
-        <form id="search_form" class="row">
+        <form id="search_form" class="row no_submit_hide">
           <input class="form-control col-sm-3" type="text" name="search_value" id="search_value" placeholder="search by id, sku, price, location" value=""/>
           <select class="form-control col-sm-3" name="search_by" id="search_by">
             <option value="">Search BY</option>
@@ -457,7 +457,10 @@ function multipleListingOpenCB(selectedValues, selectedLabels){
         currentOfferId.eq(0).addClass("used");
         currentReference.eq(0).addClass("used");
         currentReferenceType.eq(0).addClass("used");
-
+        
+        /* ################################### Extra New Part For Group By ################################### */
+        // add groupby class on select elements
+        currentNewListingCont.addClass("mlisting_groupby");
         //multipleSelectV2();
 
       } else {
@@ -550,6 +553,32 @@ function multipleListingCloseCB(){
   // remove disabled from inputs
   $("input.multiple_platform_ids:disabled").removeAttr("disabled");
   $("select.multiple_platforms_selects:disabled").removeAttr("disabled");
+  $("select.multiple_active:disabled").removeAttr("disabled");
+  $("input.multiple_discount_end:disabled").removeAttr("disabled");
+  $("input.multiple_discount_start:disabled").removeAttr("disabled");
+  $("input.multiple_unit_discount:disabled").removeAttr("disabled");
+  $("input.multiple_unit_origin:disabled").removeAttr("disabled");
+  $("input.multiple_quantity_threshold:disabled").removeAttr("disabled");
+  $("input.multiple_currency_iso:disabled").removeAttr("disabled");
+  $("input.multiple_shop_sku:disabled").removeAttr("disabled");
+  $("input.multiple_offer_id:disabled").removeAttr("disabled");
+  $("input.multiple_reference:disabled").removeAttr("disabled");
+  $("input.multiple_reference_type:disabled").removeAttr("disabled");
+
+  // back default values
+  $("select.multiple_platforms_selects option:first").prop("selected", true).trigger('change');
+  $("select.multiple_active option:first").prop("selected", true).trigger('change');
+  $("input.multiple_discount_end").val("").trigger("change");
+  $("input.multiple_discount_start").val("").trigger("change");
+  $("input.multiple_unit_discount").val("").trigger("change");
+  $("input.multiple_unit_origin").val("");
+  $("input.multiple_quantity_threshold").val("").trigger("change");
+  $("input.multiple_currency_iso").val("").trigger("change");
+  $("input.multiple_shop_sku").val("").trigger("change");
+  $("input.multiple_offer_id").val("").trigger("change");
+  $("input.multiple_reference").val("").trigger("change");
+  $("input.multiple_reference_type").val("").trigger("change");
+
 
   $("select.multiple_active:disabled").removeClass("used");
   $("input.multiple_discount_end:disabled").removeClass("used");
@@ -562,6 +591,22 @@ function multipleListingCloseCB(){
   $("input.multiple_offer_id:disabled").removeClass("used");
   $("input.multiple_reference:disabled").removeClass("used");
   $("input.multiple_reference_type:disabled").removeClass("used");
+
+  /* ################################### Extra New Part For Group By ################################### */
+  // remove groupby class
+  cancelGroupBy();
+  removeSearch(); /* Please note elements even if hidden due to search this component will display them when open modal */
+  // remove greenbg on any updated rows
+  $(".bg-success .mla_list_select").parent().removeClass("bg-success");
+  $(".mlisting_groupby").removeClass("mlisting_groupby");
+
+
+  // back to default groupby btn
+  $("#groupby_btn").removeClass("btn-danger");
+  $("#groupby_btn").addClass("btn-warning");
+  $("#groupby_btn").text("Group By Platform");
+  $("#groupby_btn").attr("data-action", 'apply_group');
+
 }
 
 $('.new_listing_containers:not([style*="display:none"]) .mla_collapse_cont').on('hide.bs.collapse', function(e){
@@ -575,6 +620,7 @@ $('.new_listing_containers:not([style*="display:none"]) .mla_collapse_cont').on(
   faIcon.addClass("fa-arrow-down");
 });
 
+/* ########################  Mlisting search and groupBy ######################## */
 const mListingData = {
         index: {
             name: 'index',
@@ -674,6 +720,8 @@ function getFormatedVal(searchVal, colType){
 
 
 function removeSearch(){
+  $("#search_mlisting").val("");
+  $("#search_mlisting").css('background', '');
   $(".search_hidden").show();
   $(".search_hidden").removeClass("search_hidden");
 }
@@ -685,7 +733,10 @@ function searchMlisting(){
   const colType = (col && mListingData.hasOwnProperty(col)) ? mListingData[col].type : null;
   const dataArg = (col && mListingArgs.hasOwnProperty(col)) ? mListingArgs[col] : null;
 
-  removeSearch();
+  // show all hidden elements from any prev search
+  $(".search_hidden").show();
+  $(".search_hidden").removeClass("search_hidden");
+
 
   if (col && operator && colType && dataArg) {
       const typedVal = getFormatedVal(searchVal, colType);
@@ -718,12 +769,98 @@ function searchMlisting(){
           }
         }
       });
+      $("#search_mlisting").css('background', 'lightgreen');
   }
 
 }
 
+function updateSearchType(){
+  const col = $("#search_select_col").val();
+  if (col && mListingData.hasOwnProperty(col) && mListingData[col].hasOwnProperty('type') && mListingData[col]['type']){
+    let inputType = 'text';
+    if (mListingData[col]['type'] === 'int' || mListingData[col]['type'] === 'bool' || mListingData[col]['type'] === 'float') {
+      inputType = 'number';
+    } else if (mListingData[col]['type'] === 'datetime') {
+      inputType = 'datetime-local';
+    } else {
+      inputType = 'text';
+    }
+    $("#search_mlisting").attr('type', inputType);
+  }
+}
+
+/* Select Group only */
+function toggleGroupCheck(e){
+  const groupCont = $(e.currentTarget).closest('.groupby_cont');
+  if (groupCont.length) {
+    if ($(e.currentTarget).is(':checked')){
+      groupCont.find('.new_listing_containers:not(:hidden) .mla_list_select').prop('checked', true).trigger('change');
+    } else {
+      groupCont.find('.mla_list_select').prop('checked', false).trigger('change');
+    }
+  }
+}
+/* cancel grouping and back elements ordered by index to main cont and remove all created group conts */
+function cancelGroupBy() {
+    $('.new_listing_containers').sort((l, r) => {
+        const lVal = parseInt($(l).attr('data-groupby-index'));
+        const rVal = parseInt($(r).attr('data-groupby-index'));
+        return (lVal > rVal) ? 1 : -1;
+    }).each((_i, elm) => {
+        $("#mlisting_cont").append(elm);
+    });
+    $(".groupby_cont").remove();
+}
+
+/* based on data-action of group btn toggle between re-apply groupby and cancel (re-apply means start everytime from 0)*/
+function toggleGroupBy() {
+    // remove previous grouping
+    cancelGroupBy();
+
+    if ($("#groupby_btn").attr("data-action") == 'apply_group') {
+        // apply group by
+        const uniquePlatforms = {};
+        let contI = 0;
+        $(".mlisting_groupby").each((_i, elm)=>{
+          const elmPlatform = $(elm).attr("data-groupby-platform");
+
+          if (!uniquePlatforms.hasOwnProperty(elmPlatform)){
+            contI += 1;
+
+            const contId = `groupby_cont_${contI}`;
+            $("#mlisting_cont").append($(`<div id="${contId}" class="groupby_cont">
+               <div class="text-center">
+                <h5 class="badge badge-primary">${elmPlatform} 
+                <input type="checkbox" onchange="toggleGroupCheck(event)" /></h5></div>
+               </div>`));
+            
+            uniquePlatforms[elmPlatform] = $(`#${contId}`);
+            
+          }
+          uniquePlatforms[elmPlatform].append(elm);
+        });
+
+        $("#groupby_btn").removeClass("btn-warning");
+        $("#groupby_btn").addClass("btn-danger");
+        $("#groupby_btn").text("Cancel Grouping");
+        $("#groupby_btn").attr("data-action", 'cancel_group');
+    } else {
+        // cancel group by
+
+        $("#groupby_btn").removeClass("btn-danger");
+        $("#groupby_btn").addClass("btn-warning");
+        $("#groupby_btn").text("Group By Platform");
+        $("#groupby_btn").attr("data-action", 'apply_group');
+    }
+}
+
+
 $("#search_mlisting_click").on('click', searchMlisting);
 $("#search_mlisting_clear").on('click', removeSearch);
+$("#search_select_col").on("change", updateSearchType);
+$("#groupby_btn").on('click', toggleGroupBy);
+/* ########################  Mlisting search and groupBy ######################## */
+
 
 /* Bluk insert automate */
 let inputId = 0;

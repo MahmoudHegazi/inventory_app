@@ -78,25 +78,28 @@
               <p class="overflow_within"><span class="badge badge-info">Discount End Date: </span><span class="p-1 shadow"> {{listing.discount_end_date}}</span></p>
             </div>
             <div class="col-sm-12">
-              <p class="overflow_within"><span class="badge badge-dark">Unit Discount Price: </span><span class="p-1 shadow"> {{listing.unit_discount_price}}</span></p>
+              <p class="overflow_within"><span class="badge badge-dark">Unit Origin Price: </span><span class="p-1 shadow"> {{listing.unit_origin_price}}</span></p>
             </div>
             <div class="col-sm-12">
-              <p class="overflow_within"><span class="badge badge-info">Quantity Threshold: </span><span class="p-1 shadow"> {{listing.quantity_threshold}}</span></p>
+              <p class="overflow_within"><span class="badge badge-info">Unit Discount Price: </span><span class="p-1 shadow"> {{listing.unit_discount_price}}</span></p>
             </div>
             <div class="col-sm-12">
-              <p class="overflow_within"><span class="badge badge-dark">Currency ISO Code: </span><span class="p-1 shadow"> {{listing.currency_iso_code}}</span></p>
+              <p class="overflow_within"><span class="badge badge-dark">Quantity Threshold: </span><span class="p-1 shadow"> {{listing.quantity_threshold}}</span></p>
             </div>
             <div class="col-sm-12">
-              <p class="overflow_within"><span class="badge badge-info">Shop SKU: </span><span class="p-1 shadow"> {{listing.shop_sku}}</span></p>
+              <p class="overflow_within"><span class="badge badge-info">Currency ISO Code: </span><span class="p-1 shadow"> {{listing.currency_iso_code}}</span></p>
             </div>
             <div class="col-sm-12">
-              <p class="overflow_within"><span class="badge badge-dark">Offer ID: </span><span class="p-1 shadow"> {{listing.offer_id}}</span></p>
+              <p class="overflow_within"><span class="badge badge-dark">Shop SKU: </span><span class="p-1 shadow"> {{listing.shop_sku}}</span></p>
             </div>
             <div class="col-sm-12">
-              <p class="overflow_within"><span class="badge badge-info">Reference: </span><span class="p-1 shadow"> {{listing.reference}}</span></p>
+              <p class="overflow_within"><span class="badge badge-info">Offer ID: </span><span class="p-1 shadow"> {{listing.offer_id}}</span></p>
             </div>
             <div class="col-sm-12">
-              <p class="overflow_within"><span class="badge badge-dark">Reference Type: </span><span class="p-1 shadow"> {{listing.reference_type}}</span></p>
+              <p class="overflow_within"><span class="badge badge-dark">Reference: </span><span class="p-1 shadow"> {{listing.reference}}</span></p>
+            </div>
+            <div class="col-sm-12">
+              <p class="overflow_within"><span class="badge badge-info">Reference Type: </span><span class="p-1 shadow"> {{listing.reference_type}}</span></p>
             </div>
             <div class="col-sm-12">
               <span class="badge badge-dark">Locations: </span>
@@ -147,7 +150,7 @@
           <!-- search component -->
           <div class="row mt-2 mb-2">
             <div class="col-sm-11 mx-auto" title="search by id, quantity, Supplier Name">
-              <form id="search_form" class="row">
+              <form id="search_form" class="row no_submit_hide">
                 <input class="form-control col-sm-3" type="text" name="search_value" id="search_value" placeholder="search by id, quantity, Supplier Name" value=""/>
                 <select class="form-control col-sm-3" name="search_by" id="search_by">
                   <option value="">Search BY</option>
@@ -211,7 +214,7 @@
             <!-- search component -->
             <div class="row mt-2 mb-2">
               <div class="col-sm-11 mx-auto" title="search by id, quantity, First Name, Last Name">
-                <form id="search_form2" class="row">
+                <form id="search_form2" class="row no_submit_hide">
                   <input class="form-control col-sm-3" type="text" name="search_value" id="search_value2" placeholder="search by id, quantity, First Name, Last Name" value=""/>
                   <select class="form-control col-sm-3" name="search_by2" id="search_by2">
                     <option value="">Search BY</option>

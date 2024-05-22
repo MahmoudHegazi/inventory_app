@@ -596,6 +596,8 @@ function multipleListingCloseCB(){
   // remove groupby class
   cancelGroupBy();
   removeSearch(); /* Please note elements even if hidden due to search this component will display them when open modal */
+  // uncheck any checked mla_list_select checkbox
+  $('#mlisting_cont .mla_list_select').prop('checked', false).trigger('change');
   // remove greenbg on any updated rows
   $(".bg-success .mla_list_select").parent().removeClass("bg-success");
   $(".mlisting_groupby").removeClass("mlisting_groupby");

@@ -258,7 +258,7 @@
                 </div>
                 <div class="row m-0">
                   {% if add_inventory is defined %}
-                  <form class="col-sm-12 onetime" id="add_inv_form" method="post" action="{{url_for('main.add_inventory')}}">
+                  <form class="col-sm-12 onetime" id="add_inv_form" method="post" action="{{url_for('main.add_inventory')}}" autocomplete="off">
                     {{add_inventory.csrf_token(id='csrf_token_addinv')}}
                     <div class="form-group">
                       {{ add_inventory.a_name.label() }}

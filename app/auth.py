@@ -92,7 +92,7 @@ def signup():
 @auth.route('/signup', methods=['POST'])
 def submit_signup():
     valid_form = False
-    valid_image = True
+    is_private = False
     try:
         # check if vendor role found else create it
         vendor_role = Role.query.filter_by(name='vendor').one_or_none()
@@ -107,6 +107,7 @@ def submit_signup():
             is_private = True if form.is_private.data == True else False
             # dynamic get right inv also tricky
             inventory = Inventory.query.filter_by(code=form.inventory_code.data, active=True, private=is_private).one_or_none()
+            #return str(is_private)
             if inventory:
                 if inventory.total_requests() <= inventory.max_pending:
                     # if there pass not empty
@@ -170,7 +171,8 @@ def submit_signup():
         elif valid_form == None:
             return redirect(url_for('auth.signup'))
         else:
-            return render_template('signup.html', form=form)
+            # pass is_private to jinja2 if true will execute script that click on private button so both ux and prevent user unlogical error like he changed his mind was submit wrong private and when redirect he stayed and continue on public but the issue form.is_private not updated, script will update it then and sync
+            return render_template('signup.html', form=form, is_private=is_private)
 
 
 @auth.route('/logout', methods=['GET'])

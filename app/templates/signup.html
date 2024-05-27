@@ -26,7 +26,7 @@
               </div>
             </div>
         </div>
-        <form action="{{url_for('auth.submit_signup')}}" method="post" enctype="multipart/form-data" class="col-sm-6 p-3 mx-auto shadow mt-3 mb-3">
+        <form action="{{url_for('auth.submit_signup')}}" method="post"  class="col-sm-6 p-3 mx-auto shadow mt-3 mb-3">
             {{ form.hidden_tag() }}
             <div class="p-1 form-group">
                 {{ form.name.label }}
@@ -107,7 +107,7 @@
 
             <div class="p-1 form-group{% if form.email.errors %} shadow-danger{% endif %}" id="inventory_pass" style="display:none;">
                 {{ form.join_password.label }}
-                {{ form.join_password(class='form-control', placeholder='Enter Inventory Password') }}
+                {{ form.join_password(class='form-control', placeholder='Enter Inventory Password', autocomplete="new-password") }}
   
                 {% if form.join_password.errors %}
                 <ul class="errors bg-danger text-white">
@@ -133,24 +133,31 @@
         const privateBtn = $("#private_btn");
         if ( publicBtn.length && privateBtn.length && e && $(e.currentTarget).length && $(e.currentTarget).attr('data-action')){
             const nextAction = $(e.currentTarget).attr('data-action');
+            console.log(nextAction);
             if (nextAction == 'private') {
                 publicBtn.removeClass('btn-success');
                 publicBtn.addClass('btn-outline-success');
-
                 privateBtn.removeClass('btn-outline-secondary');
                 privateBtn.addClass('btn-secondary');
+                $("#is_private").prop('checked', true).trigger("change");
                 $("#inventory_pass").show('fast');
-                $("#is_private").prop('checked', true);
             } else {
                 privateBtn.removeClass('btn-secondary');
                 privateBtn.addClass('btn-outline-secondary');
-
                 publicBtn.removeClass('btn-outline-success');
                 publicBtn.addClass('btn-success');
-                $("#inventory_pass").hide('slow');
-                $("#is_private").prop('checked', false);
+                $("#is_private").prop('checked', false).trigger("change");
+                $("#inventory_pass").hide('fast');
+                
             }
         }
     }
 </script>
+{# jinja2 handling with js for both UX+when error reupdate the value of is_private by toggleForm, (ex of issue if u private and have error render_template will return u to public while render_template also not cleared form is_private which is true, so no is_private will be true while u see u in public inventory if u saidyes i want public not private and try signup it will send is_private True , but now when error render_template send python var is_private and here jinja2 checks if is_private true then it will click on it also note as always we start on public so this code always will executed only when error happend while submit private signup) #}
+{% if is_private %}
+<script>
+    $("#private_btn").get(0).click();
+</script>
+{% endif %}
+
 {% endblock %}

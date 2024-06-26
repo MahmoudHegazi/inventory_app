@@ -232,7 +232,7 @@ function searchComponent(speed='slow',easing='swing', cp=function(){return true;
         /* to allow reaserch not pass cp (clean and old search which hide cards, before start new search) */
         cancelSearch(speed, easing, ()=>{});
         selectType = ($(`select#search_type${addon}`).length) ? $(`select#search_type${addon}`).val() : 'current';
-        const searchValue = $(`#search_value${addon}`).val().trim();
+        const searchValue = $(`#search_value${addon}`).val(); // .trim
         const searchColumn = $(`#search_by${addon}`).val().trim();
         const dataAttrName = dataSearchAttrs[searchColumn];
         console.log(dataAttrName);  

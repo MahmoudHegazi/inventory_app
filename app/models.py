@@ -3,6 +3,7 @@ import sys
 import decimal
 import enum
 import secrets
+import pytz
 #from sqlalchemy.types import TypeDecorator
 from sqlalchemy import desc, asc
 from sqlalchemy.orm import relationship, backref
@@ -15,6 +16,8 @@ from flask_login import UserMixin
 from sqlalchemy.orm.attributes import get_history
 from dateutil.relativedelta import *
 from datetime import timedelta
+from datetime import timezone, datetime as td
+
 Base = declarative_base()
 
 
@@ -25,6 +28,26 @@ class AllowedPermissions(enum.Enum):
     update = 'update'
     delete = 'delete'
 
+class LogsCategories(enum.Enum):
+    platform = 'platform'
+    catalog = 'catalog'
+    listing = 'listing'
+    order = 'order'
+    purchase = 'purchase'
+    supplier = 'supplier'
+    condition = 'condition'
+    category = 'category'
+    warehouse_location = 'warehouse_location'
+    bin_location = 'bin_location'
+    user = 'user'
+    api_key = 'api_key'
+
+class LogsActions(enum.Enum):    
+    create = 'create'
+    update = 'update'
+    delete = 'delete'
+    multiple_create = 'multiple_create'
+    multiple_delete = 'multiple_delete'
 
 class Inventory(db.Model):
     __tablename__ = 'inventory'
@@ -39,10 +62,11 @@ class Inventory(db.Model):
     exportable = db.Column(db.Boolean, nullable=False, default=True)
     deletable = db.Column(db.Boolean, nullable=False, default=True)
     added_by = db.Column(db.Integer, db.ForeignKey('user.id', ondelete="CASCADE", onupdate="CASCADE"), nullable=False)
-    created_date = db.Column(DateTime, nullable=False, default=datetime.datetime.utcnow)
-    updated_date = db.Column(DateTime, nullable=True, default=None, onupdate=datetime.datetime.utcnow)
+    created_date = db.Column(DateTime, nullable=False, default=td.now(timezone.utc))
+    updated_date = db.Column(DateTime, nullable=True, default=None, onupdate=td.now(timezone.utc))
     admin = db.relationship("User", backref="inv", foreign_keys=[added_by])
     #users = db.relationship("User", foreign_keys=[User.inventory_id])
+
 
     def __init__(self, added_by, name, join_pass='', salat='', max_pending=50, active=True, private=False, exportable=True, deletable=True):
         self.code = self.generate_code()
@@ -122,8 +146,8 @@ class Dashboard(db.Model):
     num_of_listings = db.Column(db.Integer, nullable=True, default=0)
     num_of_orders = db.Column(db.Integer, nullable=True, default=0)
     sum_of_monthly_purchases = db.Column(db.DECIMAL(precision=12, scale=2, asdecimal=True), nullable=True, default=0.00)    
-    created_date = db.Column(db.DateTime, nullable=False, default=datetime.datetime.utcnow)
-    updated_date = db.Column(db.DateTime, nullable=True, default=None, onupdate=datetime.datetime.utcnow)
+    created_date = db.Column(db.DateTime, nullable=False, default=td.now(timezone.utc))
+    updated_date = db.Column(db.DateTime, nullable=True, default=None, onupdate=td.now(timezone.utc))
     listings = db.relationship("Listing", backref="dashboard", cascade="all, delete", passive_deletes=True)
     platforms = db.relationship("Platform", backref="dashboard", cascade="all, delete", passive_deletes=True)
     locations = db.relationship("WarehouseLocations", backref="dashboard", cascade="all, delete", passive_deletes=True)
@@ -173,8 +197,8 @@ class User(UserMixin, db.Model):
     image = db.Column(db.String(150), default='default_user.png')
     approved = db.Column(db.Boolean, nullable=False, default=True)
     authenticated = db.Column(db.Boolean, default=False)
-    created_date = db.Column(db.DateTime, nullable=False, default=datetime.datetime.utcnow)
-    updated_date = db.Column(db.DateTime, nullable=True, default=None, onupdate=datetime.datetime.utcnow)    
+    created_date = db.Column(db.DateTime, nullable=False, default=td.now(timezone.utc))
+    updated_date = db.Column(db.DateTime, nullable=True, default=None, onupdate=td.now(timezone.utc))    
     dashboard_id = db.Column(db.Integer, db.ForeignKey('dashboard.id', ondelete="CASCADE", onupdate="CASCADE"), nullable=False, unique=True)
     inventory_id = db.Column(db.Integer, db.ForeignKey('inventory.id', ondelete="SET NULL", onupdate="CASCADE"), nullable=True, default=None)
 
@@ -185,6 +209,7 @@ class User(UserMixin, db.Model):
     catalogues = db.relationship('Catalogue', backref='user', cascade="all, delete", lazy='dynamic', passive_deletes=True)
     keys_logs = db.relationship("ApiKeysLogs", backref="user", cascade="all, delete", passive_deletes=True)
     company = db.relationship("Inventory", foreign_keys=[inventory_id], backref='users')
+    logs = db.relationship("Logs", backref="user", cascade="all, delete", passive_deletes=True)
 
     def __init__(self, name, uname, email, upass, dashboard_id=None, inventory_id=None, image='default_user.png', approved=True):
         if dashboard_id:
@@ -231,7 +256,7 @@ class User(UserMixin, db.Model):
         return db.session.query(Role).join(UserRoles, UserRoles.role_id==Role.id).join(User, UserRoles.user_id==User.id).filter(Role.system==False, UserRoles.user_id==self.id).all()
     
     def admin_requests_alert(self):
-        current_time = datetime.datetime.utcnow()
+        current_time = td.now(timezone.utc)
         two_month_ago = current_time - timedelta(weeks=8)
         return db.session.query(func.count(User.id)).join(
                     Inventory, User.inventory_id==Inventory.id
@@ -283,8 +308,8 @@ class UserMeta(db.Model):
     key = db.Column(db.String(45), nullable=False)
     value = db.Column(db.String(255), nullable=True, default=None)
     user_id = db.Column(db.Integer, db.ForeignKey('user.id', ondelete="CASCADE", onupdate="CASCADE"), nullable=False)
-    created_date = db.Column(DateTime, nullable=False, default=datetime.datetime.utcnow)
-    updated_date = db.Column(DateTime, nullable=True, default=None, onupdate=datetime.datetime.utcnow)
+    created_date = db.Column(DateTime, nullable=False, default=td.now(timezone.utc))
+    updated_date = db.Column(DateTime, nullable=True, default=None, onupdate=td.now(timezone.utc))
     user = db.relationship('User', back_populates='meta')
     def __init__(self, user_id, key, value=None):
         self.user_id = user_id
@@ -320,8 +345,8 @@ class Role(db.Model):
     system = db.Column(db.Boolean, nullable=True, default=False)
     superuser = db.Column(db.Boolean, nullable=True, default=False)
 
-    created_date = db.Column(db.DateTime, nullable=False, default=datetime.datetime.utcnow)
-    updated_date = db.Column(db.DateTime, nullable=True, default=None, onupdate=datetime.datetime.utcnow)
+    created_date = db.Column(db.DateTime, nullable=False, default=td.now(timezone.utc))
+    updated_date = db.Column(db.DateTime, nullable=True, default=None, onupdate=td.now(timezone.utc))
     users = db.relationship("UserRoles", backref="role", cascade="all, delete", passive_deletes=True)
     permissions = db.relationship("RolePermissions", backref="role", cascade="all, delete", passive_deletes=True)
 
@@ -357,8 +382,8 @@ class UserRoles(db.Model):
     id = db.Column(db.Integer, primary_key=True, nullable=False)
     user_id = db.Column(db.Integer, db.ForeignKey('user.id', ondelete="SET NULL", onupdate="CASCADE"), nullable=False)
     role_id = db.Column(db.Integer, db.ForeignKey('role.id', ondelete="SET NULL", onupdate="CASCADE"), nullable=False)
-    created_date = db.Column(db.DateTime, nullable=False, default=datetime.datetime.utcnow)
-    updated_date = db.Column(db.DateTime, nullable=True, default=None, onupdate=datetime.datetime.utcnow)
+    created_date = db.Column(db.DateTime, nullable=False, default=td.now(timezone.utc))
+    updated_date = db.Column(db.DateTime, nullable=True, default=None, onupdate=td.now(timezone.utc))
     def __init__(self, user_id=None, role_id=None):
         if user_id:
             self.user_id = user_id
@@ -389,8 +414,8 @@ class Permission(db.Model):
     __tablename__ = 'permission'
     id = db.Column(db.Integer, primary_key=True, nullable=False)
     permission = db.Column(Enum(AllowedPermissions), nullable=False)
-    created_date = db.Column(DateTime, nullable=False, default=datetime.datetime.utcnow)
-    updated_date = db.Column(DateTime, nullable=True, default=None, onupdate=datetime.datetime.utcnow)
+    created_date = db.Column(DateTime, nullable=False, default=td.now(timezone.utc))
+    updated_date = db.Column(DateTime, nullable=True, default=None, onupdate=td.now(timezone.utc))
     all_users_permissions = db.relationship("RolePermissions", backref="permission", cascade="all, delete", passive_deletes=True)
 
     def __init__(self, permission):
@@ -420,8 +445,8 @@ class RolePermissions(db.Model):
     id = db.Column(db.Integer, primary_key=True, nullable=False, autoincrement=True)
     role_id = db.Column(db.Integer, db.ForeignKey('role.id', ondelete="CASCADE", onupdate="CASCADE"), nullable=False)
     permission_id = db.Column(db.Integer, db.ForeignKey('permission.id', ondelete="CASCADE", onupdate="CASCADE"), nullable=False)
-    created_date = db.Column(DateTime, nullable=False, default=datetime.datetime.utcnow)
-    updated_date = db.Column(DateTime, nullable=True, default=None, onupdate=datetime.datetime.utcnow)
+    created_date = db.Column(DateTime, nullable=False, default=td.now(timezone.utc))
+    updated_date = db.Column(DateTime, nullable=True, default=None, onupdate=td.now(timezone.utc))
 
     def __init__(self, role_id, permission_id):
         self.role_id = role_id
@@ -457,8 +482,8 @@ class Supplier(db.Model):
     phone = db.Column(db.String(45), nullable=False)
     address = db.Column(db.String(125), nullable=False)
     user_id = db.Column(db.Integer, db.ForeignKey('user.id', ondelete="CASCADE", onupdate="CASCADE"), nullable=False)
-    created_date = db.Column(DateTime, nullable=False, default=datetime.datetime.utcnow)
-    updated_date = db.Column(DateTime, nullable=True, default=None, onupdate=datetime.datetime.utcnow)
+    created_date = db.Column(DateTime, nullable=False, default=td.now(timezone.utc))
+    updated_date = db.Column(DateTime, nullable=True, default=None, onupdate=td.now(timezone.utc))
     purchases = db.relationship("Purchase", backref="supplier", cascade="all, delete", passive_deletes=True)
     
     def __init__(self, name, user_id, phone, address):
@@ -502,8 +527,8 @@ class Category(db.Model):
     level = db.Column(db.Integer, nullable=True, default=0)
     parent_code = db.Column(db.String(45), nullable=True, default='')
     dashboard_id = db.Column(db.Integer, db.ForeignKey('dashboard.id', ondelete="CASCADE", onupdate="CASCADE"), nullable=False)
-    created_date = db.Column(DateTime, nullable=False, default=datetime.datetime.utcnow)
-    updated_date = db.Column(DateTime, nullable=True, default=None, onupdate=datetime.datetime.utcnow)
+    created_date = db.Column(DateTime, nullable=False, default=td.now(timezone.utc))
+    updated_date = db.Column(DateTime, nullable=True, default=None, onupdate=td.now(timezone.utc))
     catalogues = db.relationship("Catalogue", backref="category")
 
     def __init__(self, dashboard_id, code, label, level=0, parent_code=''):
@@ -537,7 +562,7 @@ class Category(db.Model):
 
 ################################ ---------- Tables for Dashboard Catagories (End) ---------------- #########################
 # uselist=False make the one-to-one not return list of classes
-class Catalogue(db.Model): # catelouge
+class Catalogue(db.Model): # catalog
     __tablename__ = 'catalogue'
     id = db.Column(db.Integer, primary_key=True, nullable=False)
     sku = db.Column(db.String(45), nullable=False)
@@ -552,8 +577,8 @@ class Catalogue(db.Model): # catelouge
     reference_type = db.Column(db.String(50), nullable=True, default=None)
     product_image = db.Column(db.String(45), nullable=True, default='default_product.png')
     barcode = db.Column(db.String(100), nullable=True, default=None)
-    created_date = db.Column(DateTime, nullable=False, default=datetime.datetime.utcnow)
-    updated_date = db.Column(DateTime, nullable=True, default=None, onupdate=datetime.datetime.utcnow)
+    created_date = db.Column(DateTime, nullable=False, default=td.now(timezone.utc))
+    updated_date = db.Column(DateTime, nullable=True, default=None, onupdate=td.now(timezone.utc))
     category_id = db.Column(db.Integer, db.ForeignKey('category.id', ondelete="SET NULL", onupdate="CASCADE"), nullable=True, default=None)
     user_id = db.Column(db.Integer, db.ForeignKey('user.id', ondelete="CASCADE", onupdate="CASCADE"), nullable=False)
     condition_id = db.Column(db.Integer, db.ForeignKey('condition.id', ondelete="SET NULL", onupdate="CASCADE"), nullable=True, default=None)
@@ -603,6 +628,7 @@ class Catalogue(db.Model): # catelouge
         'quantity': self.quantity,
         'product_model': self.product_model,
         'product_image': self.product_image,
+        'created_date': self.created_date.strftime('%Y-%m-%d %H:%M:%S') if self.created_date else '',
         'upc': self.upc,
         'location': ",".join([loc.warehouse_location.name for loc in self.locations]),
         'locations': [{'location_name': catalogue_loc.warehouse_location.name, 'bins': [catalogue_loc_bin.bin.name for catalogue_loc_bin in catalogue_loc.bins]} for catalogue_loc in self.locations]
@@ -635,8 +661,8 @@ class Listing(db.Model):
     
 
     image = db.Column(db.String(45), nullable=True, default='default_listing.png')
-    created_date = db.Column(DateTime, nullable=False, default=datetime.datetime.utcnow)
-    updated_date = db.Column(DateTime, nullable=True, default=None, onupdate=datetime.datetime.utcnow)
+    created_date = db.Column(DateTime, nullable=False, default=td.now(timezone.utc))
+    updated_date = db.Column(DateTime, nullable=True, default=None, onupdate=td.now(timezone.utc))
     dashboard_id = db.Column(db.Integer, db.ForeignKey('dashboard.id', ondelete="CASCADE", onupdate="CASCADE"), nullable=False)
     catalogue_id = db.Column(db.Integer, db.ForeignKey('catalogue.id', ondelete="CASCADE", onupdate="CASCADE"), nullable=False)
     platform_id = db.Column(db.Integer, db.ForeignKey('platform.id', ondelete="CASCADE", onupdate="CASCADE"), nullable=False)
@@ -769,8 +795,8 @@ class Purchase(db.Model):
     date = db.Column(db.DateTime, nullable=False)
     supplier_id = db.Column(db.Integer, db.ForeignKey('supplier.id', ondelete="CASCADE", onupdate="CASCADE"), nullable=False)
     listing_id = db.Column(db.Integer, db.ForeignKey('listing.id', ondelete="CASCADE", onupdate="CASCADE"), nullable=False)
-    created_date = db.Column(DateTime, nullable=False, default=datetime.datetime.utcnow)
-    updated_date = db.Column(DateTime, nullable=True, default=None, onupdate=datetime.datetime.utcnow)
+    created_date = db.Column(DateTime, nullable=False, default=td.now(timezone.utc))
+    updated_date = db.Column(DateTime, nullable=True, default=None, onupdate=td.now(timezone.utc))
     
 
     def __init__(self, quantity, date, supplier_id, listing_id):
@@ -833,8 +859,8 @@ class Order(db.Model):
     product_title = db.Column(db.String(500), nullable=True, default=None)
     product_sku = db.Column(db.String(45), nullable=True, default=None)
     order_state = db.Column(db.String(50), nullable=True, default=None)
-    created_date = db.Column(DateTime, nullable=False, default=datetime.datetime.utcnow)
-    updated_date = db.Column(DateTime, nullable=True, default=None, onupdate=datetime.datetime.utcnow)
+    created_date = db.Column(DateTime, nullable=False, default=td.now(timezone.utc))
+    updated_date = db.Column(DateTime, nullable=True, default=None, onupdate=td.now(timezone.utc))
     taxes = db.relationship("OrderTaxes", backref="order", cascade="all, delete", passive_deletes=True)
 
     def __init__(self, listing_id, quantity=0, date=None, customer_firstname='', customer_lastname='', tax=0.0, shipping=0.0, shipping_tax=0.0, commission=0.0, total_cost=0.0, commercial_id=None, currency_iso_code=None, phone=None, street_1=None, street_2=None, zip_code=None, city=None, country=None, fully_refunded=False, can_refund=False, order_id=None, category_code=None, price=0, product_title=None, product_sku=None, order_state=None):
@@ -920,8 +946,8 @@ class OrderTaxes(db.Model):
     code = db.Column(db.String(255), nullable=True, default=None)
     type = db.Column(db.String(45), nullable=False)
     order_id = db.Column(db.Integer, db.ForeignKey('order.id', ondelete="CASCADE", onupdate="CASCADE"), nullable=False)    
-    created_date = db.Column(DateTime, nullable=False, default=datetime.datetime.utcnow)
-    updated_date = db.Column(DateTime, nullable=True, default=None, onupdate=datetime.datetime.utcnow)
+    created_date = db.Column(DateTime, nullable=False, default=td.now(timezone.utc))
+    updated_date = db.Column(DateTime, nullable=True, default=None, onupdate=td.now(timezone.utc))
 
     def __init__(self, type, order_id=None, amount=0, code=None):
         self.type = type
@@ -958,8 +984,8 @@ class Platform(db.Model):
     id = db.Column(db.Integer, primary_key=True, nullable=False)
     name = db.Column(db.String(100), nullable=False)
     dashboard_id = db.Column(db.Integer, db.ForeignKey('dashboard.id', ondelete="CASCADE", onupdate="CASCADE"), nullable=False)    
-    created_date = db.Column(DateTime, nullable=False, default=datetime.datetime.utcnow)
-    updated_date = db.Column(DateTime, nullable=True, default=None, onupdate=datetime.datetime.utcnow)
+    created_date = db.Column(DateTime, nullable=False, default=td.now(timezone.utc))
+    updated_date = db.Column(DateTime, nullable=True, default=None, onupdate=td.now(timezone.utc))
     listings = db.relationship("Listing", backref='platform', cascade="all, delete", passive_deletes=True)
 
     def __init__(self, dashboard_id, name):
@@ -995,8 +1021,8 @@ class Condition(db.Model):
     id = db.Column(db.Integer, primary_key=True, nullable=False)
     name = db.Column(db.String(100), nullable=False)
     dashboard_id = db.Column(db.Integer, db.ForeignKey('dashboard.id', ondelete="CASCADE", onupdate="CASCADE"), nullable=False)    
-    created_date = db.Column(DateTime, nullable=False, default=datetime.datetime.utcnow)
-    updated_date = db.Column(DateTime, nullable=True, default=None, onupdate=datetime.datetime.utcnow)
+    created_date = db.Column(DateTime, nullable=False, default=td.now(timezone.utc))
+    updated_date = db.Column(DateTime, nullable=True, default=None, onupdate=td.now(timezone.utc))
     catalogues = db.relationship("Catalogue", backref='condition')
 
     def __init__(self, dashboard_id, name):
@@ -1036,8 +1062,8 @@ class WarehouseLocations(db.Model):
     name = db.Column(db.String(255), nullable=False)
     dashboard_id = db.Column(db.Integer, db.ForeignKey('dashboard.id', ondelete="CASCADE", onupdate="CASCADE"), nullable=False)
     default = db.Column(db.Boolean, nullable=True, default=False)
-    created_date = db.Column(DateTime, nullable=False, default=datetime.datetime.utcnow)
-    updated_date = db.Column(DateTime, nullable=True, default=None, onupdate=datetime.datetime.utcnow)
+    created_date = db.Column(DateTime, nullable=False, default=td.now(timezone.utc))
+    updated_date = db.Column(DateTime, nullable=True, default=None, onupdate=td.now(timezone.utc))
     bins = db.relationship("LocationBins", backref="warehouse_location", cascade="all, delete", passive_deletes=True)
     catalogues_locations = db.relationship("CatalogueLocations", backref="warehouse_location", cascade="all, delete", passive_deletes=True)
 
@@ -1073,8 +1099,8 @@ class LocationBins(db.Model):
     id = db.Column(db.Integer, primary_key=True, nullable=False)
     name = db.Column(db.String(255), nullable=False)
     location_id = db.Column(db.Integer, db.ForeignKey('warehouse_locations.id', ondelete="CASCADE", onupdate="CASCADE"), nullable=False)
-    created_date = db.Column(DateTime, nullable=False, default=datetime.datetime.utcnow)
-    updated_date = db.Column(DateTime, nullable=True, default=None, onupdate=datetime.datetime.utcnow)
+    created_date = db.Column(DateTime, nullable=False, default=td.now(timezone.utc))
+    updated_date = db.Column(DateTime, nullable=True, default=None, onupdate=td.now(timezone.utc))
     catalogues_bins = db.relationship("CatalogueLocationsBins", backref="bin", cascade="all, delete", passive_deletes=True)
 
     def __init__(self, name, location_id=None):
@@ -1109,8 +1135,8 @@ class CatalogueLocations(db.Model):
     id = db.Column(db.Integer, primary_key=True, nullable=False)
     catalogue_id = db.Column(db.Integer, db.ForeignKey('catalogue.id', ondelete="CASCADE", onupdate="CASCADE"), nullable=False)
     location_id = db.Column(db.Integer, db.ForeignKey('warehouse_locations.id', ondelete="CASCADE", onupdate="CASCADE"), nullable=False)
-    created_date = db.Column(DateTime, nullable=False, default=datetime.datetime.utcnow)
-    updated_date = db.Column(DateTime, nullable=True, default=None, onupdate=datetime.datetime.utcnow)
+    created_date = db.Column(DateTime, nullable=False, default=td.now(timezone.utc))
+    updated_date = db.Column(DateTime, nullable=True, default=None, onupdate=td.now(timezone.utc))
     bins = db.relationship("CatalogueLocationsBins", backref="catalogue_location", cascade="all, delete", passive_deletes=True)
 
     def __init__(self, location_id, catalogue_id=None):
@@ -1144,15 +1170,17 @@ class CatalogueLocations(db.Model):
 class CatalogueLocationsBins(db.Model):
     __tablename__ = 'catalogue_locations_bins'
     id = db.Column(db.Integer, primary_key=True, nullable=False)
-    location_id = db.Column(db.Integer, db.ForeignKey('catalogue_locations.id', ondelete="CASCADE", onupdate="CASCADE"), nullable=True)
-    bin_id = db.Column(db.Integer, db.ForeignKey('location_bins.id', ondelete="CASCADE", onupdate="CASCADE"), nullable=True)
-    created_date = db.Column(DateTime, nullable=False, default=datetime.datetime.utcnow)
-    updated_date = db.Column(DateTime, nullable=True, default=None, onupdate=datetime.datetime.utcnow)
+    location_id = db.Column(db.Integer, db.ForeignKey('catalogue_locations.id', ondelete="CASCADE", onupdate="CASCADE"), nullable=False)
+    bin_id = db.Column(db.Integer, db.ForeignKey('location_bins.id', ondelete="CASCADE", onupdate="CASCADE"), nullable=False)
+    created_date = db.Column(DateTime, nullable=False, default=td.now(timezone.utc))
+    updated_date = db.Column(DateTime, nullable=True, default=None, onupdate=td.now(timezone.utc))
 
 
-    def __init__(self, location_id, bin_id):
-        self.location_id = location_id 
+    def __init__(self, bin_id, location_id=None):
         self.bin_id = bin_id
+        if location_id is not None:
+            self.location_id = location_id 
+        
 
     def insert(self):
         db.session.add(self)
@@ -1181,8 +1209,8 @@ class CatalogueMeta(db.Model):
     key = db.Column(db.String(255), nullable=False)
     value = db.Column(db.String(255), nullable=True, default=None)
     catalogue_id = db.Column(db.Integer, db.ForeignKey('catalogue.id', ondelete="CASCADE", onupdate="CASCADE"), nullable=False)
-    created_date = db.Column(DateTime, nullable=False, default=datetime.datetime.utcnow)
-    updated_date = db.Column(DateTime, nullable=True, default=None, onupdate=datetime.datetime.utcnow)
+    created_date = db.Column(DateTime, nullable=False, default=td.now(timezone.utc))
+    updated_date = db.Column(DateTime, nullable=True, default=None, onupdate=td.now(timezone.utc))
     
     def __init__(self, catalogue_id, key, value):
         self.catalogue_id = catalogue_id 
@@ -1215,21 +1243,23 @@ class CatalogueMeta(db.Model):
 ################################ ---------- Tables for Dashboard Warehouse Locations (End) ---------------- #########################   
 def get_expiration_date(expiration_date):
     valid_expiry = False
-    now = datetime.datetime.utcnow()
+    now = td.now(timezone.utc)
 
     final_expiration_date = (now+relativedelta(months=+1)).strftime("%Y-%m-%dT%H:%M")
-    diff = now - now
+    diff = datetime.timedelta()
     # happend here as it db releated action to store value, not asked from user to calc seconds and utc date time he selected
     try:
+        #expiration_date.astimezone(pytz.UTC)
+        # set timezone to UTC if timzone of expiration_date not set or set already (maybe other timzone) finall make sure compare two utc 
+        expiration_date = pytz.UTC.localize(expiration_date) if expiration_date.tzinfo is None else expiration_date.astimezone(pytz.timezone('UTC'))
         valid_expiry = True if expiration_date is not None and expiration_date <= (now+relativedelta(months=+6)) else False
         if valid_expiry:
             diff = expiration_date - now
         else:
             diff = (now+relativedelta(months=+1)) - now
-    except Exception as e:
+    except:
         valid_expiry = False
-        diff = now - now
-    
+        diff = datetime.timedelta()
     return {'final_expiration_date': final_expiration_date, 'diff': diff, 'valid_expiry': valid_expiry}
 
 ################################ ---------- Tables for OUR API (Start) ---------------- #########################
@@ -1239,15 +1269,15 @@ class OurApiKeys(db.Model):
     key = db.Column(db.String(255), nullable=False)
     total_requests = db.Column(db.Integer, nullable=False, default=0)
     key_limit = db.Column(db.Integer, nullable=False, default=0)
-    key_update_date = db.Column(db.Date, nullable=True, default=datetime.datetime.utcnow)
+    key_update_date = db.Column(db.Date, nullable=True, default=td.now(timezone.utc))
     user_id = db.Column(db.Integer, db.ForeignKey('user.id', ondelete="CASCADE", onupdate="CASCADE"), nullable=False)
     white_ips = db.Column(db.String(5000), nullable=True, default='')
     black_ips = db.Column(db.String(5000), nullable=True, default='')
     # 8 should be max as it 6 month max but ok 11
     expiration_seconds = db.Column(db.DECIMAL(precision=10, scale=2, asdecimal=True), nullable=False, default=0.00)
-    expiration_date = db.Column(DateTime, nullable=False, default=None)
-    created_date = db.Column(DateTime, nullable=False, default=datetime.datetime.utcnow)
-    updated_date = db.Column(DateTime, nullable=True, default=None, onupdate=datetime.datetime.utcnow)
+    expiration_date = db.Column(DateTime, nullable=False)
+    created_date = db.Column(DateTime, nullable=False, default=td.now(timezone.utc))
+    updated_date = db.Column(DateTime, nullable=True, default=None, onupdate=td.now(timezone.utc))
     logs = db.relationship("ApiKeysLogs", backref="key", cascade="all, delete", passive_deletes=True)
 
     def __init__(self, user_id, key, key_limit=0, expiration_date=None, key_update_date=None, white_ips='', black_ips=''):
@@ -1359,10 +1389,10 @@ class OurApiKeys(db.Model):
             return None
 
 
-    def is_expired(self):
+    def is_expired(self):        
         try:
-            now = datetime.datetime.utcnow()
-            return True if self.expiration_date <= now else False
+            now = td.now(timezone.utc)
+            return True if pytz.UTC.localize(self.expiration_date) <= now else False
         except:
             print('error in is_expired, {}'.format(sys.exc_info()))
             return True
@@ -1372,20 +1402,23 @@ class OurApiKeys(db.Model):
         expiration_days = 0
         extension = 'days'
         try:
-            time = self.expiration_seconds
+            expiration_date_data = get_expiration_date(self.expiration_date)
+            seconds = max(expiration_date_data['diff'].total_seconds(), 0)
+
             zero = float(0.00)
             # Calculate the number of full days in the given time duration.
-            days = time / (24 * 3600)
+            days = seconds / (24 * 3600)
             floored = int(days)
             after_dot = days % 1
 
-            if time > zero:
+            
+            if seconds > zero:
                 if floored > 0:
                     expiration_days = floored
                     if after_dot > 0:
                         beganing = 'bigger than '                    
                 else:
-                    if time > zero:
+                    if seconds > zero:
                         expiration_days = 1
                         beganing = 'less than '
                     else:
@@ -1395,7 +1428,7 @@ class OurApiKeys(db.Model):
             
             if expiration_days == 1:
                 extension = 'day'
-        except:
+        except Exception as e:
             print('error in get_expiration_seconds, {}'.format(sys.exc_info()))
         finally:
             return '{}{} {}'.format(beganing, expiration_days, extension)
@@ -1419,8 +1452,8 @@ class ApiKeysLogs(db.Model):
     endpoint = db.Column(db.String(45), nullable=True, default=None)
     key_id = db.Column(db.Integer, db.ForeignKey('our_api_keys.id', ondelete="CASCADE", onupdate="CASCADE"), nullable=False)
     user_id = db.Column(db.Integer, db.ForeignKey('user.id', ondelete="CASCADE", onupdate="CASCADE"), nullable=False)
-    created_date = db.Column(DateTime, nullable=False, default=datetime.datetime.utcnow)
-    updated_date = db.Column(DateTime, nullable=True, default=None, onupdate=datetime.datetime.utcnow)
+    created_date = db.Column(DateTime, nullable=False, default=td.now(timezone.utc))
+    updated_date = db.Column(DateTime, nullable=True, default=None, onupdate=td.now(timezone.utc))
 
     def __init__(self, user_id, key_id, status=None, endpoint=None):
         self.user_id = user_id
@@ -1451,6 +1484,47 @@ class ApiKeysLogs(db.Model):
         }
 
 ################################ ---------- Tables for OUR API (End) ---------------- #########################
+
+################################ ---------- Table Logs(End) ---------------- #########################
+class Logs(db.Model):
+    __tablename__ = 'logs'
+    id = db.Column(db.Integer, primary_key=True, nullable=False)
+    category = db.Column(Enum(LogsCategories), nullable=False)
+    action = db.Column(Enum(LogsActions), nullable=False)
+    message = db.Column(db.String, nullable=False)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id', ondelete="CASCADE", onupdate="CASCADE"), nullable=False)
+    created_date = db.Column(DateTime, nullable=False, default=td.now(timezone.utc))
+    updated_date = db.Column(DateTime, nullable=True, default=None, onupdate=td.now(timezone.utc))
+# 
+    def __init__(self, user_id, category, action, message):
+        self.category = category
+        self.action = action
+        self.user_id = user_id
+        self.message = message
+
+    def insert(self):
+        db.session.add(self)
+        db.session.commit()
+
+    def update(self):
+        db.session.commit()
+
+    def delete(self):
+        db.session.delete(self)
+        db.session.commit()
+
+    def format(self):
+        return {
+            'id': self.id,
+            'category': self.category.value if self.category else '',
+            'action': self.action.value if self.action else '',
+            'message': self.message,
+            'user_id': self.user_id
+        }
+################################ ---------- Table Logs (End) ---------------- #########################
+
+
+
 
 ################################ ---------- Tables for Inventory (End) ---------------- #########################
 # some functions for automation

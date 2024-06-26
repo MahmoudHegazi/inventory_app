@@ -103,6 +103,7 @@
             <option class="search_column" value="id">ID</option>
             <option class="search_column" value="sku">SKU</option>
             <option class="search_column" value="product_name">Product Name</option>
+            <option class="search_column" value="created_date">Date</option>
             <option class="search_column" value="price">Price</option>
             <option class="search_column" value="location">location</option>
           </select>
@@ -152,6 +153,9 @@
             <p class="overflow_within">Price: <span>{{catalogue.price}}</span></p>
           </div>
           <div class="col-sm-12">
+            <p class="overflow_within">Price: <span>{{catalogue.created_date}}</span></p>
+          </div>
+          <div class="col-sm-12">
             <p class="overflow_within">Location: <span>{{catalogue.location}}</span></p>
           </div>
           <div class="col-sm-12 row">
@@ -180,6 +184,7 @@
               <th>Product Name</th>
               <th>SKU</th>              
               <th>Price</th>
+              <th>Date</th>
               <th>Location</th>
               <th>Action</th>
             </tr>
@@ -198,7 +203,7 @@
 
             <tr class="searching_card"
             data-search-id="{{catalogue.id}}" data-search-sku="{{catalogue.sku}}" data-search-product_name="{{catalogue.product_name}}"
-            data-search-price="{{catalogue.price}}"  data-search-location="{{location_string}}">
+            data-search-price="{{catalogue.price}}"  data-search-location="{{location_string}}" data-search-created_date="{{catalogue.created_date}}">
               <td>
                 <p class="overflow_within"><input type="checkbox" data-check-catalogue="{{catalogue.product_name}}" class="deleted_catalogues form-control w-75" name="deleted_catalogues" value="{{catalogue.id}}" /></p>
               </td>
@@ -213,6 +218,9 @@
               </td>
               <td>
                 <p class="overflow_within">{{catalogue.price}}</p>
+              </td>
+              <td>
+                <p class="overflow_within">{{catalogue.created_date}}</p>
               </td>
               <td>
                 <div class="overflow_within" style="max-height:180px !important;overflow: auto;word-wrap: break-word;">
@@ -320,7 +328,8 @@ function rowBuildCB(catalogue){
   if (catalogue && catalogue.id !== undefined && catalogue.sku !== undefined && catalogue.product_name !== undefined && catalogue.price !== undefined && catalogue.location !== undefined && catalogue.product_image_url !== undefined && catalogue.view_catalogue && catalogue.edit_catalogue && Array.isArray(catalogue.locations) ){
     rowHTML = `<tr class="searching_card search_all_card"
             data-search-id="${catalogue.id}" data-search-sku="${catalogue.sku}" data-search-product_name="${catalogue.product_name}"
-            data-search-price="${catalogue.price}"  data-search-location="${catalogue.location}" style="background: gainsboro!important;" title="This Row not belong to this page it returned from search all">
+            data-search-price="${catalogue.price}"  data-search-location="${catalogue.location}"
+            data-search-created_date="${catalogue.created_date}" style="background: gainsboro!important;" title="This Row not belong to this page it returned from search all">
               <td>
                 <p class="overflow_within">
                   <input type="checkbox" data-check-catalogue="${catalogue.product_name}" class="deleted_catalogues form-control w-75"
@@ -338,6 +347,9 @@ function rowBuildCB(catalogue){
               </td>
               <td>
                 <p class="overflow_within">${catalogue.price}</p>
+              </td>
+              <td>
+                <p class="overflow_within">${catalogue.created_date}</p>
               </td>
               <td>
                 <div class="overflow_within" style="max-height:180px !important;overflow: auto;word-wrap: break-word;">`;

@@ -4,7 +4,7 @@ from flask import Flask, app, Blueprint, session, redirect, url_for, Response, r
 from functools import wraps
 from .models import *
 from sqlalchemy import or_, and_, func , asc, desc, text, select
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from .functions import valid_ourapi_key, get_filter_params, pass_api_request, getQueryLimit
 
 api = Blueprint('api', __name__)
@@ -19,9 +19,9 @@ def apikey_required(fn):
             if param_apikey is not None:
                 db_apikey = OurApiKeys.query.filter_by(key=param_apikey).one_or_none()
                 if db_apikey is not None and db_apikey.user and db_apikey.user.id:
-                    #return str(request.remote_addr)
-                    # check if key expired or not
-                    if datetime.utcnow() < db_apikey.expiration_date:
+                    # return str(request.remote_addr)
+                    # check if key expired or not (middleware)
+                    if datetime.now(timezone.utc) < db_apikey.expiration_date.astimezone(timezone.utc):
                         # to achive the target anti simple bot and block bot forever you need insert logs for invalid right now better for db, right now max 2 minutes as no new log created new requests will not calcauted
                         # simple advanced anti scraper, anti api abuse, anti bots (max delay 2 minutes always but with bots or not follow rules will blocked for ever no db recoreds added for block also block happend in inner before even any action done in db, all done is 2 sqlalchemy check, so if bot keep resend and block it not effect performance or db much )
                         can_pass = pass_api_request(db_apikey.id, db)

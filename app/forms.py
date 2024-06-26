@@ -557,11 +557,10 @@ class addInventoryForm(FlaskForm):
     a_private = BooleanField('private',validators=[], default=False)
     a_exportable = BooleanField('exportable',validators=[], default=True)
     a_deletable = BooleanField('deletable',validators=[], default=True)
-    joinpass = PasswordField('Join Password (Optional)', id='a_joinpass', validators=[optional()], 
+    joinpass = StringField('Join Password (Optional)', id='a_joinpass', validators=[optional()], 
                             render_kw={
                                     'title': 'Add an extra layer of security Enter the required password for private inventory user logins. The inventory must be private for the password to be applied.',
-                                    'style': 'display:none;',
-                                    'autocomplete': 'off'
+                                    'style': 'display:none;'
                                 }
                             )
     pass_salat = StringField('One Time Secert Keyword (Optional)', id="a_pass_salat", render_kw={

@@ -30,7 +30,7 @@
               </div>
               <div class="container hover_shadow shadow">
                 <h5 class="mb-3">Main Info:</h4>
-                <div style="max-height:300px;overflow-y: auto;">
+                <div style="max-height:400px;overflow-y: auto;">
                   <div class="col-sm-12">
                     <p class="overflow_within">Listing: <span>{{order.listing_id}}</span></p>
                   </div>
@@ -39,6 +39,9 @@
                   </div>
                   <div class="col-sm-12">
                     <p class="overflow_within">Date: <span>{{order.date}}</span></p>
+                  </div>
+                  <div class="col-sm-12">
+                    <p class="overflow_within">Total Cost: <span>{{order.total_cost}}</span></p>
                   </div>
                   <div class="col-sm-12">
                     <p class="overflow_within">Tax: <span>{{order.tax}}</span></p>
@@ -53,7 +56,7 @@
                     <p class="overflow_within">Commission: <span>{{order.commission}}</span></p>
                   </div>
                   <div class="col-sm-12">
-                    <p class="overflow_within">Total Cost: <span>{{order.total_cost}}</span></p>
+                    <p class="overflow_within">Price: <span>{{order.price}}</span></p>
                   </div>
                   <div class="col-sm-12">
                     <p class="overflow_within">Commercial id: <span>{{order.commercial_id}}</span></p>
@@ -72,9 +75,6 @@
                   </div>
                   <div class="col-sm-12">
                     <p class="overflow_within">Category Code: <span>{{order.category_code}}</span></p>
-                  </div>
-                  <div class="col-sm-12">
-                    <p class="overflow_within">Price: <span>{{order.price}}</span></p>
                   </div>
                   <div class="col-sm-12">
                     <p class="overflow_within">Product Title: <span>{{order.product_title}}</span></p>

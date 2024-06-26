@@ -16,6 +16,7 @@
           <div class="row m-0 w-100 p-2">
             <div id="user_details" class="col-sm-12 border border-secondary rounded shadow p-3 break_word mb-2 hover_darkcyan active_darkcyan switcher_link" data-target="#details_component">User Details</div>
             <div id="user_credentials" class="col-sm-12 border border-secondary rounded shadow p-3 break_word mb-2 hover_darkcyan switcher_link" data-target="#credentials_component">User Credentials</div>
+            <div id="logs" class="col-sm-12 border border-secondary rounded shadow p-3 break_word mb-2 hover_darkcyan switcher_link" data-target="#logs_component">Activty Logs</div>
             {% if current_user.is_super() %}
             <div id="users" class="col-sm-12 border border-secondary rounded shadow p-3 break_word mb-2 hover_darkcyan switcher_link" data-target="#manager_component">Users</div>
             <div id="inventories" class="col-sm-12 border border-secondary rounded shadow p-3 break_word mb-2 hover_darkcyan switcher_link" data-target="#inventories_component">Inventories</div>
@@ -704,6 +705,14 @@
               {% endif %}
             </div>
             <!-- API end -->
+
+
+            <!-- Activty Logs -->
+            <div class="container effect_components" id="logs_component" style="display:none;">
+
+            </div>
+            <!-- Activty Logs end -->
+
         </div>      
       </div>
       {% else %}
@@ -871,6 +880,10 @@ const componentsMap = {
     api: {
         link_elm: '#api',
         data_target: '#api_component'
+    },
+    logs: {
+        link_elm: '#logs',
+        data_target: '#logs_component'
     },
     inventories: {
         link_elm: '#inventories',
@@ -1088,7 +1101,807 @@ Promise.all(
 );
 
 
+/*Logs*/
+class Filter {
+    constructor(filter, index, componentId, logClass, logsOl, currentSelc, totalSelc, data = [], total = 0, current = 0, active = false, allCaps = false, isCustom = false) {
+        this.filter = filter.trim(); // if not string error auto
+        this.componentId = componentId;
+        this.logsOl = logsOl;
+        this.logClass = logClass;
+        this.total = total;
+        this.current = current;
+        this.active = active;
+        this.allCaps = allCaps;
+        this.htmlId = `filter_${this.filter}_${this.componentId}`;
+        this.id = index;
+        this.isCustom = isCustom;
+        this.logsHTML = '';
+        // (keep desc) to solve issue of desc and sql and offset ex loaded all data 10items, new item added offset 10 with order desc will forget previous and consider the new item which not loaded before is already in previous offset so it instead will get last item so only solutions sent prev ids or asc order the default
+        this.loadedIds = [];
+
+        this.currentSelc = currentSelc;
+        this.totalSelc = totalSelc;
+
+        this.component = null;
+        /* note this is the js variable name not ready yet, will assigned by component start */
+        this.componentVarName = null;
+        this.started = false;
+        this.data = this.setInitalData(data);
+
+    }
+    setInitalData(data) {
+        // for set inital data recived from jinja2 or passed to filter consturctor
+        const dataResult = [];
+        if (Array.isArray(data) && data.length > 0) {
+            let loopIndex = 0;
+            data.forEach((logObj) => {
+                if (typeof(logObj) === 'object' && logObj.id && logObj.hasOwnProperty("content")) {
+                    loopIndex += 1;
+                    this.loadedIds.push(logObj.id);
+                    logObj['htmlId'] = `log_${this.componentId}_${this.id}_${loopIndex}`;
+                    dataResult.push(logObj);
+                }
+            });
+        }
+        return dataResult;
+    }
+    textify() {
+        const category = this.filter;
+        return String(Array.from(category.split(/[\s|_|-]/g)).map((word) => {
+            word = word.trim().toLowerCase();
+            return (word !== '') ? (this.allCaps) ? word.toUpperCase() : (word[0].toUpperCase() + word.slice(1)) : false;
+        }).filter((filterWord) => {
+            return (filterWord) ? true : false;
+        }).join(" "));
+    }
+    spliceLog(logId) {
+        if (logId) {
+            const removeIndex = this.data.findIndex((logObj) => {
+                return logObj.id == logId;
+            });
+            const logToRemove = this.data.find((logObj) => {
+                return logObj.id == logId;
+            });
+            if (typeof(logToRemove) === 'object' && removeIndex !== -1) {
+                this.data.splice(removeIndex, 1);
+                this.current = this.data.length;
+                this.total = (this.total > 0) ? (this.total - 1) : 0;
+
+                // note this component follow angular main rule (create needed elements only based on the list so html elements delete is only for current display list), this technique incerase performance imagine have 99 filters and each filters has 1k items instead of dom contains 99k now dom only contains 1k for displayed list so nice technique
+                if (logToRemove.htmlId && $(`#${logToRemove.htmlId}`).length) {
+                    $(`#${logToRemove.htmlId}`).remove();
+                }
+            }
+        }
+        return this.data;
+    }
+    fixLowerTotalThanCurrent() {
+        // note total not updated is server sent it valid as it jinja2 loaded first time (this only needed when user loaded data, then other admin deleted some of loaded data so current will be bigger than total reset done also html("") will make scroll event and the scroll height at bottom as no items or 0 and send request for user)
+        this.data = [];
+        this.loadedIds = [];
+        this.current = 0;
+        $(this.logsOl).html('');
+        $(this.currentSelc).text(this.current);
+        $(this.totalSelc).text(this.total);
+        this.component.displayMessage("We have detected changes in server that do not match the records displayed, administrator deleted some records, and the data will be reset...", 'warning');
+    }
+    displayData(newData = [], total = null) {
+
+        if (this.component && this.componentVarName && this.logsOl && $(this.logsOl).length && $(this.currentSelc).length && $(this.totalSelc).length) {
 
 
+            // insert the new gotten data,  note this display the new data (index in for each is partially it not the original data index)
+            let lastIndex = this.data.length;
+            newData.forEach((logObj) => {
+                lastIndex += 1;
+                if (typeof(logObj) === 'object' && logObj.id && logObj.hasOwnProperty("content")) {
+                    logObj['htmlId'] = `log_${this.componentId}_${this.id}_${lastIndex}`;
+                    this.data.push(logObj);
+                    this.loadedIds.push(logObj.id);
+                }
+            });
+
+            // update total
+            if (!isNaN(parseInt(total))) {
+                this.total = total;
+            }
+
+            // update current
+            this.current = this.data.length;
+
+            // (note check for arugment total is not only check for new only and prevent, it also confirm never infity call happend) here check to solve if admin/invadmin deleted logs that displayed for other admin so server will sent total less than current displayed items (as no socket for deleted items top solution Notify user then reset data and start from beging (creator of word ux can not find better solution)) other option were let user delete if recived log 404 but not ux as if 1k items and 300 deleted between hard to detected 
+            if (!isNaN(parseInt(total)) && this.total >= 0 && this.total < this.current) {
+                this.fixLowerTotalThanCurrent();
+            } else {
+                this.logsHTML = '';
+                this.data.forEach((log, logIndex) => {
+                    const deleteBtn = (this.component.isAdmin === true) ? `<button type="button" data-id="${this.id}" class="btn btn-danger btn-sm" onclick="${this.componentVarName}.removeLog('${this.filter}', ${log.id})">X</button>` : '';
+                    this.logsHTML += `
+                      <li id="${log.htmlId}" class="${this.logClass}">
+                        <div class="m-2 p-2 rounded  border border-light shadow d-flex justify-content-start align-items-start">
+                          ${deleteBtn}
+                          <div class="p-2 text-secondary" style="word-break:break-word;">${log.content}</div>
+                        </div>
+                      </li>`;
+                });
+                $(this.logsOl).html(this.logsHTML);
+
+                // display/update total and current in html
+                $(this.currentSelc).text(this.current);
+                $(this.totalSelc).text(this.total);
+            }
+
+
+
+        } else {
+            console.log(`issue with self unable to display ${this.filter} filter data`, this.component, this.componentVarName, this.logsOl, $(this.logsOl).length, $(this.currentSelc).length, $(this.totalSelc).length);
+        }
+    }
+}
+
+/* class uses current method to get the right object list (all, or filter) that used by app and will send its data to server and update it and display it (for scroll and simple mode 1 current only also for law if all can not be with filter ex *, category=platform this not only sql unlogical this js and syntax so 1 current (class made with abilty make more than 1 filter togther active but right now 1 only as require new dynamic collections added auto that best solution ex platform + listing = [] bin+platform+listing but see it complex only not neserary alot action in this class */
+
+class LogsComponent {
+    constructor(id, parentSelector, filters = [], initalData = {}, isAdmin = false, users = [], url = '', removeUrl = '') {
+
+        this.caps = ['api'];
+        this.id = id;
+        this.url = url
+        this.removeUrl = removeUrl;
+        this.parentSelector = parentSelector;
+        this.isAdmin = isAdmin;
+        this.initalData = initalData;
+        this.scrollable = true;
+        this.requireUpdate = false;
+        this.users = [];
+        this.categories = [];
+
+
+        this.filters = {};
+        // this all filters props or unique filters detector fast
+        this.currentFilters = [];
+
+        this.filterI = 1;
+
+
+        this.attrs = {
+            filterContId: `filters_cont_${this.id}`,
+            filterBtnClass: `filter_btn_${this.id}`,
+            filterBtnContClass: `filter_btn_cont_${this.id}`,
+            logsOlId: `logs_ol_${this.id}`,
+            logClass: `log_item_${this.id}`,
+            currentSelcId: `current_logs_${this.id}`,
+            totalSelcId: `total_logs_${this.id}`,
+            checkUpdatesId: `check_updates_${this.id}`,
+            loadContentId: `load_content_${this.id}`,
+            loadIconId: `load_icon_${this.id}`,
+            customFilterModalId: `customFilterModal_${this.id}`,
+            customAlertId: `custom_alert_${this.id}`,
+            customCatsId: `custom_cats_${this.id}`,
+            alertMessageId: `alert_message_${this.id}`
+        };
+        if (this.isAdmin === true) {
+            // attrs for admin
+            this.attrs.customUsersId = `custom_users_${this.id}`;
+        }
+
+
+
+
+        this.filterCont = `#${this.attrs.filterContId}`;
+        this.filterBtns = `.${this.attrs.filterBtnClass}`;
+        this.filterBtnCont = `.${this.attrs.filterBtnContClass}`;
+        this.logsOl = `#${this.attrs.logsOlId}`;
+        this.logConts = `.${this.attrs.logClass}`;
+        this.currentSelc = `#${this.attrs.currentSelcId}`;
+        this.totalSelc = `#${this.attrs.totalSelcId}`;
+        this.checkUpdates = `#${this.attrs.checkUpdatesId}`;
+        this.loadContent = `#${this.attrs.loadContentId}`;
+        this.loadIcon = `#${this.attrs.loadIconId}`;
+        this.customFilterModal = `#${this.attrs.customFilterModalId}`;
+        this.customAlert = `#${this.attrs.customAlertId}`;
+        this.customCats = `#${this.attrs.customCatsId}`;
+        this.alertMessage = `#${this.attrs.alertMessageId}`;
+
+        if (this.isAdmin === true) {
+            // selectors for admin technique no property if not admin
+            this.customUsers = `#${this.attrs.customUsersId}`;
+        }
+
+
+
+        // add javascript properties to server log objects(jinja2) recived (server can not know index for example and as this multiple call component allowed can not sue id only to idintify html)
+        /*this.initalData.data = this.initalData.data.map((serverLogObj, i)=>{
+          
+          return serverLogObj;
+        });*/
+
+        this.filters['all'] = new Filter('all', this.filterI, this.id, this.attrs.logClass, this.logsOl, this.currentSelc, this.totalSelc, this.initalData.data, this.initalData.total, 0, true, true, false);
+        this.filters['all'].started = true;
+
+        // set admin users
+        if (this.isAdmin === true && Array.isArray(users)) {
+            users.forEach((userObj) => {
+                if (typeof(userObj) === 'object' && userObj.hasOwnProperty('user') && !isNaN(parseInt(userObj.id))) {
+                    this.users.push(userObj);
+                }
+            });
+        }
+
+
+
+        // set logs
+        filters.forEach((filterString, i) => {
+            this.filterI = i + 2;
+            const category = filterString.trim();
+            const allCaps = (this.caps.includes(category)) ? true : false;
+            this.filters[category] = new Filter(category, this.filterI, this.id, this.attrs.logClass, this.logsOl, this.currentSelc, this.totalSelc, [], 0, 0, false, allCaps, false);
+            this.categories.push(category);
+            this.currentFilters.push(category);
+        });
+
+
+    }
+
+    current() {
+        let currentResult = null;
+        for (let key in this.filters) {
+            const filterObj = this.filters[key];
+            if (filterObj.active === true) {
+                currentResult = filterObj;
+                break;
+            }
+        }
+        return currentResult;
+    }
+    displayComponent() {
+        if (this.parentSelector && $(this.parentSelector).length) {
+
+            let categoriesOptions = '';
+            const filterCategories = this.categories.forEach((cat) => {
+                cat = cat.trim();
+                if (cat) {
+                    categoriesOptions += `<option value="${cat}">${cat}</option>`;
+                }
+            });
+
+            // admin ext
+            let usersOptions = '';
+            if (this.isAdmin === true) {
+                usersOptions = `<div class="form-group"> <label>Select Multiple Users: </label> <select id="${this.attrs.customUsersId}" class="form-control" multiple="multiple">`;
+
+                this.users.forEach((userObj) => {
+                    usersOptions += `<option value="${userObj.id}">${userObj.user}</option>`;
+                });
+
+                usersOptions += '</select></div>';
+            }
+
+
+            $(this.parentSelector).html(`
+<div class="container-fluid border py-3">
+    <!-- filters -->
+    <div class="container-fluid py-3 px-0 bg-dark">
+        <div class="container-fluid d-flex flex-wrap justify-content-center align-items-center" id="${this.attrs.filterContId}">
+      
+        </div>
+        <div class="container-fluid d-flex justify-content-center align-items-center ${this.attrs.filterBtnContClass}">
+            <button type="button" class="btn btn-outline-success btn-sm btn-block text-white w-50 my-2 ${this.attrs.filterBtnClass}" data-toggle="modal" data-target="${this.customFilterModal}">Add Custom Unique Filter</button>
+        </div>
+    </div>
+    <!-- end filters -->
+    <div class="container-fluid border rounded shadow bg-white text-white p-3  pt-3">
+        <div class="container text-center bg-primary text-white shadow mb-3 p-1">
+            <h5 class="badge badge-primary">Activity Logs</h5>
+        </div>
+        <div id="${this.attrs.alertMessageId}"></div>
+        <div class="container-fluid m-0 p-0">
+      
+            <div class="d-flex justify-content-between align-items-center mb-2 shadow p-1">
+                <span class="badge badge-primary">Current: <span id="${this.attrs.currentSelcId}">0</span></span>
+                <span class="badge badge-danger">Total: <span id="${this.attrs.totalSelcId}">0</span></span>
+            </div>
+      
+            <ol class="pb-5 border border-light bg-white shadow text-dark py-4" id="${this.attrs.logsOlId}" style="min-height:350px; max-height:350px !important;overflow: auto;">
+      
+      
+            </ol>
+            <div id="${this.attrs.checkUpdatesId}" class="text-center text-white bg-primary text-center rounded p-1" title="click here to check for new server updates" style="font-size:0.827rem;cursor:pointer;" onclick="${this.selfVarName}.loadManual()">
+                <span id="${this.attrs.loadContentId}">Scroll Down To Load More or click for updates</span><br />
+                <span id="${this.attrs.loadIconId}"><i class="fa fa-angle-double-down"></i></span>
+            </div>
+        </div>
+    </div>
+</div>
+<!-- Custom Filters Modal -->
+<div class="modal fade" id="${this.attrs.customFilterModalId}">
+    <div class="modal-dialog">
+        <div class="modal-content">
+      
+            <!-- Modal Header -->
+            <div class="modal-header">
+                <h4 class="modal-title">Add Unique Custom Filter</h4>
+                <button type="button" class="close" data-dismiss="modal">&times;</button>
+            </div>
+      
+            <!-- Modal body -->
+            <div class="modal-body">
+              <div id="${this.attrs.customAlertId}"></div>
+              <div class="form-group">
+                 <label>Select Multiple Categories: </label>
+                 <select id="${this.attrs.customCatsId}" class="form-control" multiple="multiple">${categoriesOptions}</select>
+              </div>
+              ${usersOptions}
+            </div>
+      
+            <!-- Modal footer -->
+            <div class="modal-footer">
+                <button type="button" class="btn btn-primary" onclick="${this.selfVarName}.addCustomFilter()">Add Filter</button>
+                <button type="button" class="btn btn-danger" data-dismiss="modal">Close</button>
+            </div>
+      
+        </div>
+    </div>
+</div>
+<!-- Custom Filters Modal end -->
+         `);
+        } else {
+            console.log("can not display component parent not found");
+        }
+    }
+    displayFilters() {
+        if (this.self && this.selfVarName && $(this.filterCont).length) {
+            let filterHTML = '';
+            for (let fKey in this.filters) {
+                const filterObj = this.filters[fKey];
+                const btnClass = (filterObj.active) ? 'btn-primary' : 'btn-outline-primary';
+                const removeCustomBtn = (filterObj.isCustom === true) ? `<button type="button" class="btn btn-outline-danger btn-sm rounded text-white" onclick="${this.selfVarName}.removeFilter('${filterObj.filter}')">X</button>` : '';
+                const needBorderClass = (filterObj.isCustom === true) ? 'border border-white' : '';
+                filterHTML += `
+                <div class="d-flex justify-content-between align-items-strech p-1 mr-1 my-1 ${this.attrs.filterBtnContClass} ${needBorderClass}" style="min-width:100px;">
+                    <span id="${filterObj.htmlId}" class="mr-1 w-100 btn ${btnClass} rounded cursor-pointer border border-primary ${this.attrs.filterBtnClass} text-white" onclick="${this.selfVarName}.switchFilter('${filterObj.filter}')">${filterObj.textify()}</span>
+                    ${removeCustomBtn}
+                </div>`;
+            }
+            $(this.filterCont).html(filterHTML);
+        } else {
+            console.log("unable to execute displayFilters");
+        }
+    }
+    removeFilter(filterName) {
+        const currentFilter = this.current();
+        if (currentFilter.filter !== filterName) {
+            if (filterName && this.filters.hasOwnProperty(filterName)) {
+                delete this.filters[filterName];
+                const currentFIndex = this.currentFilters.indexOf(filterName);
+                if (currentFIndex !== -1) {
+                    this.currentFilters.splice(currentFIndex);
+                }
+                this.displayFilters();
+                return true;
+            }
+            return false;
+        } else {
+            this.displayMessage('Please switch to a different filter before attempting to delete the one currently in use.', 'info');
+        }
+    }
+    addActiveDesgin(activeSelector) {
+        if (this.filterBtns && $(this.filterBtns).length) {
+            $(this.filterBtns).removeClass("btn-primary");
+            $(this.filterBtns).addClass("btn-outline-primary");
+
+            if (activeSelector && $(activeSelector).length) {
+                $(activeSelector).removeClass("btn-outline-primary");
+                $(activeSelector).addClass("btn-primary");
+            }
+        } else {
+            console.log('unable to add active desgin invalid btn selector or no btns');
+        }
+    }
+    switchFilter(filterName) {
+        if (!this.scrollable) {
+            return false;
+        }
+        let activeFilter = null;
+        for (let fKey in this.filters) {
+            if (this.filters[fKey].filter === filterName) {
+                this.filters[fKey].active = true;
+                activeFilter = this.filters[fKey];
+            } else {
+                this.filters[fKey].active = false;
+            }
+        }
+        const current = this.current();
+
+        if (current instanceof Filter) {
+
+            this.addActiveDesgin(`#${activeFilter.htmlId}`);
+            if (!current.started) {
+                this.loadMoreData();
+                //console.log("ux anad ajax jquery async");
+            } else {
+
+                current.displayData();
+                //console.log("display only there data");
+            }
+
+        } else {
+            console.log("unable to switch filter check obj", activeFilter);
+        }
+    }
+    toggleActions(show = false, started = true) {
+        if (show) {
+            $(this.filterBtnCont).css('visibility', '');
+            // note !started happend one time only per each filter on first click on it (like inital data of this list think in jinja2)
+            if (!started) {
+                $(this.logConts).show();
+            } else {
+                $(this.logConts).css('visibility', '');
+            }
+
+            // loading circle for loadmore (actions)
+            $(this.loadContent).text("Scroll Down To Load More or click for updates");
+            $(this.loadIcon).html('<i class="fa fa-angle-double-down"></i>');
+            $(this.checkUpdates).css('cursor', 'pointer');
+            $(this.checkUpdates).attr('title', 'click here to check for new server updates');
+
+            // current, total spans
+            $(this.currentSelc).show();
+            $(this.totalSelc).show();
+
+
+        } else {
+            $(this.filterBtnCont).css('visibility', 'hidden');
+
+            if (!started) {
+                $(this.logConts).hide();
+            } else {
+                $(this.logConts).css('visibility', 'hidden');
+            }
+            $(this.loadContent).text("Loading ...");
+            $(this.loadIcon).html('<i class="fa fa-spinner fa-spin"></i>');
+
+            $(this.checkUpdates).css('cursor', '');
+            $(this.checkUpdates).attr('title', 'Please wait...');
+
+            $(this.currentSelc).hide();
+            $(this.totalSelc).hide();
+        }
+    }
+    displayCustomAlert(message, status) {
+        if ($(this.customAlert).length && typeof(message) === 'string' && typeof(status) === 'string') {
+            $(this.customAlert).html(`
+            <div class="alert alert-${status} alert-dismissible fade show">
+              <button type="button" class="close" data-dismiss="alert">&times;</button>
+              <span>${message}</span>
+            </div>`);
+        }
+    }
+    displayMessage(message, status) {
+        if ($(this.alertMessage).length && typeof(message) === 'string' && typeof(status) === 'string') {
+            $(this.alertMessage).html(`
+            <div class="alert alert-${status} alert-dismissible fade show">
+              <button type="button" class="close" data-dismiss="alert">&times;</button>
+              <span>${message}</span>
+            </div>`);
+        }
+    }
+    addCustomFilter() {
+        //this.displayCustomAlert('hello world', 'success');
+
+        if ($(this.customCats).length && !(this.isAdmin === true && !this.customUsers)) {
+
+            // normal first
+            let newCustomFilter = String($(this.customCats).val().map((cat) => {
+                return cat.trim();
+            }).filter((cat) => {
+                return (cat !== '') ? true : false
+            }).join('__'));
+
+
+            if (this.isAdmin === true) {
+                // handle empty if any
+                const targetUsers = String($(this.customUsers).val().map((user) => {
+                    return 'id' + user.trim();
+                }).filter((user) => {
+                    return (user !== '') ? true : false;
+                }).join('__'));
+
+                if (targetUsers !== '') {
+                    if (newCustomFilter !== '') {
+                        newCustomFilter += `__${targetUsers}`;
+                    } else {
+                        newCustomFilter = targetUsers;
+                    }
+                }
+            }
+
+            if (newCustomFilter) {
+                if (!this.currentFilters.includes(newCustomFilter)) {
+                    this.filterI += 1;
+                    this.filters[newCustomFilter] = new Filter(newCustomFilter, this.filterI, this.id, this.attrs.logClass, this.logsOl, this.currentSelc, this.totalSelc, [], 0, 0, false, false, true);
+
+
+                    this.currentFilters.push(newCustomFilter);
+                    this.asyncFilters();
+                    this.displayFilters();
+
+
+                    this.displayCustomAlert(`Successfully Added Filter ${newCustomFilter}`, 'success');
+
+                    //console.log(newCustomFilter, this.currentFilters);
+                    return true;
+                } else {
+                    this.displayCustomAlert('Filter Already Exist!', 'danger');
+                    return false;
+                }
+            } else {
+                this.displayCustomAlert('Please select Filters First!', 'warning');
+                return false;
+            }
+
+        } else {
+            console.log('Unable to add custom filter missing required inputs');
+            return false;
+        }
+    }
+    getFilters(filterStr) {
+        const result = {
+            categories: []
+        };
+        if (this.isAdmin) {
+            result['users'] = [];
+        }
+        const filtersList = filterStr.replaceAll(" ", "").split("__");
+        filtersList.forEach((filterItem) => {
+            if (filterItem) {
+                if (filterItem.startsWith("id")) {
+                    if (this.isAdmin) {
+                        const targetId = parseInt(filterItem.replace("id", "").trim());
+                        if (!isNaN(targetId)) {
+                            result.users.push(targetId);
+                        }
+                    }
+                } else {
+                    result.categories.push(filterItem.replaceAll(" ", ""));
+                }
+            }
+        });
+        return result;
+    }
+    loadManual() {
+        /* this for check for new server updates (only remaning option why click here covered by (inital load when cont empty, min items 10-50 must there scroll) (UX) */
+
+        if (!this.scrollable) {
+            return false;
+        }
+
+        this.requireUpdate = true;
+        this.loadMoreData();
+
+    }
+    loadMoreData() {
+        // realtime wait until ajax completed unlick of scroll event off not real time and ignore some calls until happend
+        if (!this.scrollable) {
+            return false;
+        }
+        const current = this.current();
+
+        if (this.logsOl && $(this.logsOl).length && current instanceof Filter) {
+
+            const currentScroll = parseInt($(this.logsOl).scrollTop() + $(this.logsOl).innerHeight());
+            const scrollHeight = parseInt($(this.logsOl)[0].scrollHeight);
+
+            if (!isNaN(currentScroll) && !isNaN(scrollHeight)) {
+
+                /* here the 3 actions can run ajax to load data 1(scroll at end) 2(when switch to new filter not started) 3(here if items lower than start scroll and js max is reached so even if scroll nothing loaded here when manual click btn to check for new updates ex after last request which said no more items user added more items so now need load them can done with btn manual check for server updates) */
+                if (currentScroll >= scrollHeight || !current.started || this.requireUpdate) {
+
+                    // current.current >= current.total if server return invalid total, > prevent open inifity ajax
+                    if ((currentScroll >= scrollHeight && current.current >= current.total) && current.started && !this.requireUpdate) {
+                        // this performance stop scroll ajax request if no remaning items (you can click btn to check for new updates)
+                        return false;
+                    } else {
+
+
+                        // stop scroll event so no send more requests until complete this
+                        this.scrollable = false;
+
+                        // make sure always when load new items by button scroll at end of ol
+                        if (this.requireUpdate) {
+                            $(this.logsOl).get(0).scrollTo(0, scrollHeight);
+                        }
+                        this.toggleActions(false, current.started);
+                        const filtersObj = this.getFilters(current.filter);
+
+
+                        if (filtersObj.categories.length == 0) {
+                            /* incase user selected filter for only users and not selected any categories,
+                             so add all excepting he need get all categories for this users */
+                            filtersObj.categories.push('all');
+                        }
+                        /* new solution to handle order desc and new data and previous loaded data issue ex loaded all data and new item added this new item will contains last id, while desc excpted last id to be first item so if send request pagantion with offset will get the first item again*/
+
+                        let minId = 0;
+                        let maxId = 0;
+                        if (current.loadedIds.length > 0) {
+                            minId = Math.min(...current.loadedIds);
+                            maxId = Math.max(...current.loadedIds);
+                        }
+                        const reqData = {
+                            filters: filtersObj,
+                            minId: minId,
+                            maxId: maxId
+                        };
+
+                        try {
+                            $.ajax({
+                                type: 'POST',
+                                url: this.url,
+                                dataType: 'json',
+                                contentType: 'application/json',
+                                data: JSON.stringify(reqData),
+                                success: (res) => {
+                                    if (typeof(res) === 'object' && res.code === 200 && Array.isArray(res.data) && !isNaN(parseInt(res.total))) {
+                                        current.displayData(res.data, res.total);
+                                    } else {
+                                        current.displayData([], current.total);
+                                        const errorMessage = (typeof(res) === 'object' && res.message) ? res.message : 'Unable to load data right now unknown error.';
+                                        this.displayMessage(errorMessage, 'danger');
+                                        // as no new content scroll back small period for ux (also button exist)
+                                        $(this.logsOl).get(0).scrollTo(0, $(this.logsOl).scrollTop() - 50);
+                                    }
+                                },
+                                error: (error) => {
+                                    this.displayMessage('Unable to load data right now, please make sure there is internet connection and try again.', 'danger');
+                                    $(this.logsOl).get(0).scrollTo(0, $(this.logsOl).scrollTop() - 50);
+                                },
+                                complete: () => {
+                                    current.started = true;
+                                    this.scrollable = true;
+                                    this.requireUpdate = false;
+                                    this.toggleActions(true, current.started);
+                                }
+                            });
+                        } catch (error) {
+                            console.log(error);
+                            current.started = true;
+                            this.scrollable = true;
+                            this.requireUpdate = false;
+                            this.toggleActions(true, current.started);
+                            this.displayMessage('Unable to load data right now, System error please report this.', 'danger');
+                            $(this.logsOl).get(0).scrollTo(0, $(this.logsOl).scrollTop() - 50);
+                        }
+                    }
+
+                } else {
+                    //console.log("not scroll at end");
+                    return false;
+                }
+            } else {
+                //console.log('invalid to process scroll');
+                return false;
+            }
+        }
+
+
+
+    }
+    asyncFilters() {
+        // this add self and selfVarName to filters object and set their value from null to current in LogsComponent class
+        for (let fKey in this.filters) {
+            this.filters[fKey].component = this.self;
+            this.filters[fKey].componentVarName = this.selfVarName;
+        }
+    }
+    removeLogFromAllFilters(logId) {
+        /* Note same log may exist in multiple filters ex all and platform and custom filter so make sure js remove this log from all filters list and update numbers*/
+        for (let filterKey in this.filters) {
+            const filter = this.filters[filterKey];
+            if (filter instanceof Filter) {
+                filter.spliceLog(logId);
+            }
+        }
+        return true;
+    }
+    removeLog(filter, logId) {
+        if (this.filters.hasOwnProperty(filter) && this.filters[filter] instanceof Filter) {
+            // ajax first remove log
+            // update html and async filters html
+            const currentFilter = this.current();
+            this.scrollable = false;
+            this.toggleActions(false, currentFilter.started);
+            try {
+                $.ajax({
+                    type: 'POST',
+                    url: this.removeUrl,
+                    dataType: 'json',
+                    contentType: 'application/json',
+                    data: JSON.stringify({
+                        id: parseInt(logId)
+                    }),
+                    success: (res) => {
+                        if (typeof(res) === 'object' && res.code === 200 && res.message) {
+                            this.removeLogFromAllFilters(logId);
+                            /* reload data of current action filter */
+                            currentFilter.displayData();
+                            this.displayMessage(res.message, 'success');
+                        } else {
+                            const errorMessage = (typeof(res) === 'object' && res.message) ? res.message : 'Unable to load delete log right now unknown error.';
+                            this.displayMessage(errorMessage, 'danger');
+                        }
+                    },
+                    error: (error) => {
+                        this.displayMessage('Unable to delete log right now, please make sure there is internet connection and try again.', 'danger');
+                    },
+                    complete: () => {
+                        this.scrollable = true;
+                        this.toggleActions(true, currentFilter.started);
+                    }
+                });
+            } catch (error) {
+                console.log(error);
+                this.scrollable = true;
+                this.toggleActions(true, currentFilter.started);
+                this.displayMessage('Unable to delete log right now, System error please report this.', 'danger');
+            }
+        } else {
+            console.log('LogsComponent.removeLog: can not find log to remove');
+        }
+    }
+    start(selfObj) {
+        const selfVarName = Object.keys(selfObj)[0];
+        if (selfObj[selfVarName] instanceof LogsComponent) {
+            // set self
+            this.selfVarName = selfVarName;
+            this.self = selfObj[this.selfVarName];
+
+
+            // display component
+            this.displayComponent();
+            if ($(this.filterCont).length && $(this.logsOl).length &&
+                $(this.currentSelc).length && $(this.totalSelc).length &&
+                $(this.checkUpdates).length && $(this.loadContent).length &&
+                $(this.loadIcon).length && $(this.customFilterModal).length &&
+                $(this.customAlert).length &&
+                $(this.customCats).length &&
+                $(this.alertMessage) &&
+                !(this.isAdmin === true && !this.customUsers)) {
+                // it have self before displayed in document
+                this.asyncFilters();
+                this.displayFilters();
+                this.switchFilter('all');
+                $(this.logsOl).on("scroll", () => {
+                    this.loadMoreData();
+                });
+            } else {
+                if (this.parentSelector && $(this.parentSelector)) {
+                    $(this.parentSelector).html("");
+                    console.log("required elements not exist, roolback");
+                } else {
+                    console.log("parent not found unable to roolback.");
+                }
+            }
+
+        } else {
+            console.log("invalid start issue in self");
+        }
+
+    }
+}
+
+
+const logsData = {{logs|tojson}};
+
+const logsApp = new LogsComponent('normal', '#logs_component', logsData.categories, {
+    data: logsData.data,
+    total: logsData.total
+}, logsData.isAdmin, logsData.users, logsData.url, logsData.removeUrl);
+// must called like that change var name as you like and use es6 or lower (for secuirty reasons and dynamic reasions to allow es6 not checked the var name so must call it like that or {yourvarname: yourvarname})
+logsApp.start({
+    logsApp
+});
+
+//console.log(logsApp, logsApp.current());
 </script>
 {% endblock page_scripts %}

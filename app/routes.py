@@ -7,12 +7,13 @@ import flask_excel
 from flask import Flask, Blueprint, session, redirect, url_for, flash, Response, request, render_template, jsonify, abort, current_app
 from flask_wtf import Form
 from .models import User, Supplier, Dashboard, Listing, Catalogue, Purchase, Order, Platform, WarehouseLocations, LocationBins, \
-CatalogueLocations, CatalogueLocationsBins, Category, UserMeta, OrderTaxes, Condition, Inventory
+CatalogueLocations, CatalogueLocationsBins, Category, UserMeta, OrderTaxes, Condition, Inventory, Logs, \
+LogsActions as logsA, LogsCategories as logsC
 from .forms import *
 from . import db, vendor_permission, app_permissions
 from .functions import updateDashboardListings, updateDashboardOrders, updateDashboardPurchasesSum, secureRedirect, get_charts, \
 bestbuy_ready, get_ordered_dicts, float_or_none, float_or_zero, update_order_taxes, get_orders_and_shippings, get_separate_order_taxes, \
-fill_generate_barcode, order_by, user_have_permissions, inv, get_errors_message
+fill_generate_barcode, order_by, user_have_permissions, inv, get_errors_message, create_log
 from sqlalchemy.exc import IntegrityError
 from flask_login import login_required, current_user
 from flask import request as flask_request
@@ -74,12 +75,12 @@ def makePagination(page=1, query_obj=None, callback=(), limit_parm=10, by='', de
 @login_required
 @vendor_permission.require(http_exception=403)
 def index():
-    #return str(get_remaining_requests())
+    #new_log = create_log(user=current_user, category=logsC.platform.value, action=logsA.create.value, action_ids=[1])
     try:
         charts_data = get_charts(db, current_user,
             charts_ids=[
                 'top_ordered_products',
-                'most_purchased_products', 
+                'most_purchased_products',
                 'top_purchases_suppliers', 'orders_yearly_performance',
             ]
         )
@@ -283,12 +284,13 @@ def add_catalogue():
                                 if valid_location is not None:
                                     new_catalogue_location = CatalogueLocations(location_id=valid_location.id)
                                     for bin_id in form.locations_bins.data:
-                                        valid_bin = inv(db.query(LocationBins).query.join(WarehouseLocations, LocationBins.location_id==WarehouseLocations.id), User.dashboard_id, WarehouseLocations.dashboard_id).one_or_none()
+                                        valid_bin = inv(db.session.query(LocationBins).join(WarehouseLocations, LocationBins.location_id==WarehouseLocations.id).filter(LocationBins.id==bin_id, LocationBins.location_id==valid_location.id), User.dashboard_id, WarehouseLocations.dashboard_id).one_or_none()
                                         if valid_bin is not None:
                                             new_location_bin = CatalogueLocationsBins(bin_id=valid_bin.id)
                                             new_catalogue_location.bins.append(new_location_bin)
                                     new_catalogue.locations.append(new_catalogue_location)
                             new_catalogue.insert()
+                            create_log(user=current_user, category=logsC.catalog.value, action=logsA.create.value, action_ids=[new_catalogue.id])
                             success = True
                             flash('Successfully Created New Catalogue.', 'success')
                         else:
@@ -299,10 +301,9 @@ def add_catalogue():
                         flash('Invalid Category.', 'danger')
                 else:
                     success = False
-            except Exception as e:
+            except:
                 print('System Error: {}'.format(sys.exc_info()))
                 flash('Unknown Error unable to create new Catalogue', 'danger')
-            
             finally:
                 if success == True:
                     return redirect(url_for('routes.catalogues'))
@@ -315,8 +316,7 @@ def add_catalogue():
             try:
                 # get dashboard locations and bins data (advanced) (display locations with null bins to fill the warehouse location select options)
                 return render_template('crud/add_catalogue.html', form=form, locations_bins_data=locations_bins_data)
-            except Exception as e:
-                raise e
+            except:
                 print('System Error: {}'.format(sys.exc_info()))
                 flash('unable to display Add new Catalogue page', 'danger')
                 return redirect(url_for('routes.catalogues'))
@@ -447,7 +447,7 @@ def edit_catalogue(catalogue_id):
                     catalogue_locs = target_catalogue.locations
                     locs_bins = []
                     for catalogue_loc in catalogue_locs:
-                        locs_bins = [*locs_bins, *[catalogue_bin for catalogue_bin in catalogue_loc.bins]]              
+                        locs_bins = [*locs_bins, *[catalogue_bin for catalogue_bin in catalogue_loc.bins]]    
 
                     current_bins = [lc.bin.id for lc in locs_bins]
 
@@ -474,12 +474,15 @@ def edit_catalogue(catalogue_id):
 
                     # (adds) data in new list and not in old get unqiue warehouse_locations to add
                     warehouse_add = inv(db.session.query(WarehouseLocations).filter(
-                            WarehouseLocations.id.in_(list(filter(lambda recived_warloc:True if recived_warloc not in [cwl.warehouse_location.id for cwl in catalogue_locs] else False, form.warehouse_locations.data)))
+                            WarehouseLocations.id.in_(list(filter(
+                                lambda recived_warloc:True if recived_warloc not in [cwl.warehouse_location.id for cwl in catalogue_locs] else False, 
+                                form.warehouse_locations.data
+                                )))
                             ), User.dashboard_id, WarehouseLocations.dashboard_id).all()
                     
                     # add catalogus locations
                     for warto_add in warehouse_add:
-                        if not CatalogueLocations.query.filter_by(location_id=warto_add.id, catalogue_id=target_catalogue.id).first():
+                        if not inv(db.session.query(CatalogueLocations).join(WarehouseLocations, CatalogueLocations.location_id==WarehouseLocations.id).filter(CatalogueLocations.location_id==warto_add.id, CatalogueLocations.catalogue_id==target_catalogue.id), User.dashboard_id, WarehouseLocations.dashboard_id).first():
                             CatalogueLocations(location_id=warto_add.id, catalogue_id=target_catalogue.id).insert()
 
 
@@ -494,7 +497,11 @@ def edit_catalogue(catalogue_id):
                                 ), User.dashboard_id, WarehouseLocations.dashboard_id).all()
                     
                     for cloc_bin_add in cloc_bins_add:
-                        if not CatalogueLocationsBins.query.filter_by(location_id=cloc_bin_add[0], bin_id=cloc_bin_add[1]).first():
+                        if not inv(db.session.query(CatalogueLocationsBins
+                                                    ).join(CatalogueLocations, CatalogueLocationsBins.location_id==CatalogueLocations.id
+                                                    ).join(WarehouseLocations, CatalogueLocations.location_id==WarehouseLocations.id
+                                                    ).filter(CatalogueLocationsBins.location_id==cloc_bin_add[0], CatalogueLocationsBins.bin_id==cloc_bin_add[1]
+                                                    ), User.dashboard_id, WarehouseLocations.dashboard_id).first():
                             CatalogueLocationsBins(location_id=cloc_bin_add[0], bin_id=cloc_bin_add[1]).insert()
 
                     """ (this can verify if any data duplicated based on 2 columns (or infinty this not regular sql)) (but code not allow duplicate already) (1-2)1, (2-3)2(error) or (1-2-7-8)1, (2-3-4-5)2(error)
@@ -505,6 +512,7 @@ def edit_catalogue(catalogue_id):
 
                     ################ Update locations and bins (!technique 2 arrays changes!) end #####################
                     flash('Successfully updated catalogue data', 'success')
+                    create_log(user=current_user, category=logsC.catalog.value, action=logsA.update.value, action_ids=[target_catalogue.id])
                     success = True
                 else:
                     # invalid wtforms form sumited in finally this will return render_template to display errors
@@ -556,6 +564,8 @@ def delete_catalogue(catalogue_id):
                     updateDashboardListings(current_user.dashboard)
                     updateDashboardOrders(db, current_user.dashboard)
                     updateDashboardPurchasesSum(db, Purchase, Listing, current_user.dashboard)
+
+                    create_log(user=current_user, category=logsC.catalog.value, action=logsA.delete.value, action_ids=[target_Catalogue.id])
                     flash('Successfully deleted Catalogue ID: {}'.format(catalogue_id), 'success')
                 else:
                     flash('Unable to delete Catalogue, ID: {}'.format(catalogue_id), 'danger')
@@ -599,6 +609,7 @@ def delete_catalogues():
                     updateDashboardListings(current_user.dashboard)
                     updateDashboardOrders(db, current_user.dashboard)
                     updateDashboardPurchasesSum(db, Purchase, Listing, current_user.dashboard)
+                    create_log(user=current_user, category=logsC.catalog.value, action=logsA.multiple_delete.value, action_ids=deleted_ids)
                     flash('Successfully deleted Catalogues', 'success')
                 else:
                     flash('No Changes Detected', 'success')
@@ -634,6 +645,7 @@ def delete_all_catalogues():
                     updateDashboardListings(current_user.dashboard)
                     updateDashboardOrders(db, current_user.dashboard)
                     updateDashboardPurchasesSum(db, Purchase, Listing, current_user.dashboard)
+                    create_log(user=current_user, category=logsC.catalog.value, action=logsA.multiple_delete.value, action_ids=['all ids'])
                     flash('Successfully deleted Catalogues', 'success')
                 else:
                     flash('No Changes Detected', 'success')
@@ -745,6 +757,7 @@ def add_listing():
                         if selected_platform:
                             new_listing = Listing(dashboard_id=current_user.dashboard.id, catalogue_id=selected_catalogue.id, platform_id=selected_platform.id, active=form.active.data, discount_start_date=form.discount_start_date.data, discount_end_date=form.discount_end_date.data, unit_discount_price=form.unit_discount_price.data, unit_origin_price=form.unit_origin_price.data, quantity_threshold=form.quantity_threshold.data, currency_iso_code=form.currency_iso_code.data, shop_sku=form.shop_sku.data, offer_id=form.offer_id.data, reference=form.reference.data, reference_type=form.reference_type.data)
                             new_listing.insert()
+                            create_log(user=current_user, category=logsC.listing.value, action=logsA.create.value, action_ids=[new_listing.id])
                             # set the number of total listings after adding action
                             updateDashboardListings(current_user.dashboard)
                             success = True
@@ -753,15 +766,14 @@ def add_listing():
                             flash('Platform not found', 'danger')
                     else:
                         success = 'redirect_error'
-                        flash('Catalogue not found', 'danger')           
+                        flash('Catalogue not found', 'danger')    
                 else:
                     success = False
                     
-            except Exception as e:
+            except:
                 print('System Error: {}'.format(sys.exc_info()))
                 flash('Unknown Error unable to create new Listing', 'danger')
                 success = None
-                raise e
 
             finally:
                 if success == True:
@@ -778,7 +790,7 @@ def add_listing():
             # GET Requests
             try:
                 return render_template('crud/add_listing.html', form=form)
-            except Exception as e:
+            except:
                 print('System Error: {} , info: {}'.format(e, sys.exc_info()))
                 return redirect(url_for('routes.index'))
     else:
@@ -821,7 +833,7 @@ def edit_listing(listing_id):
             else:
                 flash('Unable to display Edit listing form, target listing maybe removed', 'danger')
                 return redirect(url_for('routes.listings'))
-        except Exception as e:
+        except:
             print('System Error: {}'.format(sys.exc_info()))
             flash('unable to display edit listing form due to issue in data collection', 'danger')
             return redirect(url_for('routes.listings'))
@@ -901,6 +913,7 @@ def edit_listing(listing_id):
                                     # listing sync with new catalogue done on catalogue after update (catalogue.update, and sync_listing do same event)
                                     selected_catalogue.update()
                                     target_listing.sync_listing()
+                                    create_log(user=current_user, category=logsC.listing.value, action=logsA.update.value, action_ids=[target_listing.id])
                                 else:
                                     flash("Unable to edit the list, the new catalogue quantity does not accept the listing's orders, please add purchase to this listing, or edit the new catalogue quantity before editing.", "warning")
                                     success = False
@@ -943,6 +956,7 @@ def edit_listing(listing_id):
                                     target_listing.reference_type = form.reference_type.data
 
                                 target_listing.update()
+                                create_log(user=current_user, category=logsC.listing.value, action=logsA.update.value, action_ids=[target_listing.id])
                         else:
                             success = 'redirect_error'
                             flash('Platform not found', 'danger')
@@ -951,7 +965,7 @@ def edit_listing(listing_id):
                         flash('Catalogue not found', 'danger')
                 else:
                     success = False
-            except Exception as e:
+            except:
                 print('System Error: {}'.format(sys.exc_info()))
                 success = None
 
@@ -1004,6 +1018,7 @@ def delete_listing(listing_id):
                     updateDashboardListings(user_dashboard)
                     updateDashboardOrders(db, user_dashboard)
                     updateDashboardPurchasesSum(db, Purchase, Listing, user_dashboard)
+                    create_log(user=current_user, category=logsC.listing.value, action=logsA.delete.value, action_ids=[listing_id])
                     flash('Successfully deleted Listing ID: {}'.format(listing_id), 'success')
                 else:
                     flash('Unable to delete Listing, ID: {}'.format(listing_id), 'danger')
@@ -1064,11 +1079,12 @@ def delete_listings():
                 updateDashboardListings(user_dashboard)
                 updateDashboardOrders(db, user_dashboard)
                 updateDashboardPurchasesSum(db, Purchase, Listing, user_dashboard)
+                create_log(user=current_user, category=logsC.listing.value, action=logsA.multiple_delete.value, action_ids=selected_listings)
                 flash('Successfully deleted Listings', 'success')
             else:
                 flash('Unable to delete Listings', 'danger')
 
-        except Exception as e:
+        except:
             print('System Error: {}'.format(sys.exc_info()))
             flash('Unknown error unable to delete Listing', 'danger')
 
@@ -1124,6 +1140,7 @@ def multiple_listing_add():
                 )
 
                 user_dashboard_id = current_user.dashboard.id
+                created_listids = []
                 for new_list in new_listings:
                     try:
                         valid_catalogue = inv(Catalogue.query.filter_by(id=new_list['catalogue_id']), User.id, Catalogue.user_id).one_or_none()
@@ -1131,6 +1148,7 @@ def multiple_listing_add():
                         if valid_catalogue and valid_platform:
                             new_listing = Listing(dashboard_id=user_dashboard_id, **new_list)
                             new_listing.insert()
+                            created_listids.append(new_listing.id)
                             total_created += 1
                         else:
                             total_invalid += 1
@@ -1143,6 +1161,7 @@ def multiple_listing_add():
                 ignored = ', Ignored: {}'.format(total_invalid) if total_invalid > 0 else ''
                 duplicates = ', Duplicated: {}'.format(duplicates) if duplicates > 0 else ''
                 flash('Successfully created {} listings{}{}'.format(total_created, ignored, duplicates))
+                create_log(user=current_user, category=logsC.listing.value, action=logsA.multiple_create.value, action_ids=created_listids)
             else:
                 print('error from multiple_listing_add {}'.format(form.errors))
                 error_msg = get_errors_message(form)
@@ -1183,7 +1202,7 @@ def view_purchase_listing(listing_id, purchase_id):
                 success = False
                 message = 'unable to find selected purchase with id: ({}), it maybe deleted or you use invalid url'
 
-        except Exception as e:
+        except:
             print('System Error: {}'.format(sys.exc_info()))
             message = 'Unknown error unable to display Purchase with id: {}'.format(purchase_id)
             success = False
@@ -1245,6 +1264,7 @@ def add_purchase_listing(listing_id):
                         new_purchase.listing.catalogue.quantity = int(new_purchase.listing.catalogue.quantity) + int(new_purchase.quantity)                                        
                         new_purchase.listing.catalogue.update()
                         updateDashboardPurchasesSum(db, Purchase, Listing, user_dashboard)
+                        create_log(user=current_user, category=logsC.purchase.value, action=logsA.create.value, action_ids=[new_purchase.id])
                     else:
                         # invalid listing_id or supplier id, or listing_id not in selected dashboard, this should done from supplier which allow that secuirty
                         success = None
@@ -1309,8 +1329,7 @@ def edit_purchase_listing(listing_id, purchase_id):
             dashboard_listings = inv(db.session.query(Listing), User.dashboard_id, Listing.dashboard_id).all()
             form.listing_id.choices = [(listing.id, '{} - ({})'.format(listing.product_name, listing.sku) ) for listing in dashboard_listings]
             form.supplier_id.choices = [(supplier.id, supplier.name) for supplier in inv(Supplier.query, User.id, Supplier.user_id).all()]
-
-        except Exception as e:
+        except:
             print('System Error: {}'.format(sys.exc_info()))
             flash('Unknown error unable to display Add Purchase form', 'danger')
             return redirect(url_for('routes.view_listing', listing_id=listing_id))
@@ -1355,6 +1374,7 @@ def edit_purchase_listing(listing_id, purchase_id):
 
                             selected_listing.catalogue.update()
                             target_purchase.listing.catalogue.update()
+                            create_log(user=current_user, category=logsC.purchase.value, action=logsA.update.value, action_ids=[target_purchase.id])
 
                         else:
                                 
@@ -1380,6 +1400,8 @@ def edit_purchase_listing(listing_id, purchase_id):
 
                             if quantity_changed:
                                 selected_listing.catalogue.update()
+
+                            create_log(user=current_user, category=logsC.purchase.value, action=logsA.update.value, action_ids=[target_purchase.id])
                     else:                    
                         flash('Unable to edit Purchases with ID:{}'.format(purchase_id), 'danger')
                         success = None
@@ -1449,6 +1471,7 @@ def delete_purchase_listing(listing_id, purchase_id):
                         
                         # update sum of dashboard's purchases
                         updateDashboardPurchasesSum(db, Purchase, Listing, user_dashboard)
+                        create_log(user=current_user, category=logsC.purchase.value, action=logsA.delete.value, action_ids=[purchase_id])
                         flash('Successfully removed purchase with ID: {}'.format(purchase_id), 'success')
                     else:
                         flash('can not remove purchase, note you need to delete one or more orders that created after the deleted purchase, based on it upcoming qunaity', 'danger')
@@ -1626,6 +1649,7 @@ def add_order(listing_id):
 
                             # update dashboard orders count
                             updateDashboardOrders(db, user_dashboard)
+                            create_log(user=current_user, category=logsC.order.value, action=logsA.create.value, action_ids=[new_order.id])
                             flash('Successfully Created New Order', 'success')
                         else:
                             flash('Unable to add order, the order quantity is greater than the available catalog quantity', 'warning')
@@ -1676,7 +1700,7 @@ def add_order(listing_id):
     else:
         flash("You do not have permissions to add order.", 'danger')
         return redirect(url_for('routes.view_listing', listing_id=listing_id))
-    
+
 @routes.route('/listings/<int:listing_id>/orders/<int:order_id>/edit', methods=['GET', 'POST'])
 @login_required
 @vendor_permission.require(http_exception=403)
@@ -1761,7 +1785,7 @@ def edit_order(listing_id, order_id):
             dashboard_listings = inv(db.session.query(Listing), User.dashboard_id, Listing.dashboard_id).all()
             form.listing_id.choices = [(listing.id, '{} - ({})'.format(listing.product_name, listing.sku) ) for listing in dashboard_listings]
 
-        except Exception as e:
+        except:
             print('System Error: {}'.format(sys.exc_info()))
             flash('Unknown error unable to display Edit Order form', 'danger')
             return redirect(url_for('routes.view_listing', listing_id=listing_id))
@@ -1838,6 +1862,7 @@ def edit_order(listing_id, order_id):
 
                                 # update order_taxes
                                 update_order_taxes(form, target_order, db)
+                                create_log(user=current_user, category=logsC.order.value, action=logsA.update.value, action_ids=[target_order.id])
                                 flash('Successfully Updated The order', 'success')
                             else:
                                 flash('Unable to add edit, the order quantity is greater than the new catalog quantity', 'warning')
@@ -1916,6 +1941,7 @@ def edit_order(listing_id, order_id):
                                         selected_listing.catalogue.quantity = new_quantity                          
                                         selected_listing.catalogue.update()
 
+                                        create_log(user=current_user, category=logsC.order.value, action=logsA.update.value, action_ids=[target_order.id])
                                         # if require updates make update action for taxes
                                         flash('Successfully Updated The order', 'success')
                                     else:
@@ -1924,9 +1950,11 @@ def edit_order(listing_id, order_id):
                                 else: 
                                     # here quantity not changed so direct update others
                                     target_order.update()
+                                    create_log(user=current_user, category=logsC.order.value, action=logsA.update.value, action_ids=[target_order.id])
                                     flash('Successfully Updated The order', 'success')
                             else:
                                 if update_taxes_result['changed'] == True:
+                                    create_log(user=current_user, category=logsC.order.value, action=logsA.update.value, action_ids=[target_order.id])
                                     # taxes only changed
                                     flash('Successfully Updated The order', 'success')
                                 else:
@@ -2001,6 +2029,7 @@ def delete_order(listing_id, order_id):
 
                     # update dashboard orders count
                     updateDashboardOrders(db, user_dashboard)
+                    create_log(user=current_user, category=logsC.order.value, action=logsA.delete.value, action_ids=[order_id])
                     flash('Successfully removed order with ID: {}'.format(order_id), 'success')
                 else:
                     # security wtform
@@ -2146,6 +2175,7 @@ def add_supplier():
             if form.validate_on_submit():
                 new_supplier = Supplier(name=form.name.data, user_id=current_user.id, phone=form.full_phone_add.data, address=form.address.data)
                 new_supplier.insert()
+                create_log(user=current_user, category=logsC.supplier.value, action=logsA.create.value, action_ids=[new_supplier.id])
             else:
                 for field, errors in form.errors.items():
                     if field == 'full_phone_add':
@@ -2195,6 +2225,8 @@ def edit_supplier(supplier_id):
                     
                     if actions > 0:
                         target_supplier.update()
+                        # if admin go to supplier will see no changes so only when change happend display log
+                        create_log(user=current_user, category=logsC.supplier.value, action=logsA.update.value, action_ids=[target_supplier.id])
                 else:
                     success = False
                     flash('supplier with ID: ({})  not found or deleted'.format(supplier_id))
@@ -2205,13 +2237,16 @@ def edit_supplier(supplier_id):
 
                     flash('Error in {} : {}'.format(field, ','.join(errors)), 'danger')
                 success = False
-        except Exception as e:
+        except:
             print('System Error: {}'.format(sys.exc_info()))
             flash('Unknown error unable to edit supplier', 'danger')
             success = False
         finally:
             if success == True:
-                flash('Successfully edit supplier ID:({})'.format(supplier_id), 'success')
+                if actions > 0:
+                    flash('Successfully edit supplier ID:({})'.format(supplier_id), 'success')
+                else:
+                    flash("No changes detected.", 'info')
             return redirect(url_for('routes.suppliers'))
     else:
         flash("You do not have permissions to update supplier.", 'danger')
@@ -2229,6 +2264,7 @@ def delete_supplier(supplier_id):
             if target_supplier is not None:
                 if form.validate_on_submit():
                     target_supplier.delete()
+                    create_log(user=current_user, category=logsC.supplier.value, action=logsA.delete.value, action_ids=[supplier_id])
                     flash('Successfully deleted Supplier ID: {}'.format(supplier_id), 'success')
                 else:
                     flash('Unable to delete Supplier, ID: {}'.format(supplier_id), 'danger')
@@ -2268,14 +2304,12 @@ def view_purchase_supplier(supplier_id, purchase_id):
                 success = False
                 flash('unable to find selected purchase with id: ({}), it maybe deleted or you use invalid url', 'danger')
 
-        except Exception as e:
+        except:
             print('System Error: {}'.format(sys.exc_info()))
             flash('Unknown error unable to display Purchase with id: {}'.format(purchase_id), 'danger')
             success = False
-            raise e
         finally:
             if success == True:
-                
                 return render_template('purchase.html', purchase=target_purchase, dashboard_id=target_purchase.listing.dashboard_id, listing_id=target_purchase.listing_id, deleteform=deleteform)
             else:
                 return redirect(url_for('routes.view_supplier', supplier_id=supplier_id))
@@ -2326,6 +2360,7 @@ def add_purchase_supplier(supplier_id):
 
                             # update sum of dashboard's purchases
                             updateDashboardPurchasesSum(db, Purchase, Listing, current_user.dashboard)
+                            create_log(user=current_user, category=logsC.purchase.value, action=logsA.create.value, action_ids=[new_purchase.id])
                         else:
                             # invalid listing or supplier id, secuirty
                             success = None
@@ -2335,7 +2370,7 @@ def add_purchase_supplier(supplier_id):
                         success = None
                 else:
                     success = False
-            except Exception as e:
+            except:
                 print('System Error: {}'.format(sys.exc_info()))
                 flash('Unknown error unable to Add Purchase', 'danger')
                 success = None
@@ -2389,7 +2424,7 @@ def edit_purchase_supplier(supplier_id, purchase_id):
             form.listing_id.choices = [(listing.id, '{} - ({})'.format(listing.product_name, listing.sku) ) for listing in user_listings]
             form.supplier_id.choices = [(supplier.id, supplier.name) for supplier in inv(Supplier.query, User.id, Supplier.user_id).all()]
             
-        except Exception as e:
+        except:
             print('System Error: {} , info: {}'.format(e, sys.exc_info()))
             flash('Unknown error unable to display Edit Purchase form', 'danger')
             return redirect(url_for('routes.view_supplier', supplier_id=supplier_id))
@@ -2431,6 +2466,7 @@ def edit_purchase_supplier(supplier_id, purchase_id):
 
                             selected_listing.catalogue.update()
                             target_purchase.listing.catalogue.update()
+                            create_log(user=current_user, category=logsC.purchase.value, action=logsA.update.value, action_ids=[target_purchase.id])
 
                         else:
                                
@@ -2457,12 +2493,14 @@ def edit_purchase_supplier(supplier_id, purchase_id):
                             if quantity_changed:
                                 selected_listing.catalogue.update()
 
+                            create_log(user=current_user, category=logsC.purchase.value, action=logsA.update.value, action_ids=[target_purchase.id])
+
                     else:                    
                         flash('Unable to edit Purchases with ID:{}'.format(purchase_id), 'danger')
                         success = None
                 else:
                     success = False
-            except Exception as e:
+            except:
                 print('System Error: {}'.format(sys.exc_info()))
                 flash('Unknown error unable to edit Purchase with id: {}'.format(purchase_id), 'danger')
                 success = None
@@ -2512,13 +2550,14 @@ def delete_purchase_supplier(supplier_id, purchase_id):
 
                     # update sum of dashboard's purchases
                     updateDashboardPurchasesSum(db, Purchase, Listing, current_user.dashboard)
+                    create_log(user=current_user, category=logsC.purchase.value, action=logsA.delete.value, action_ids=[purchase_id])
                     flash('Successfully removed purchase with ID: {}'.format(purchase_id), 'success')
                 else:
                     # security wtform
                     flash('Unable to delete purchase with ID: {} , invalid Data'.format(purchase_id), 'danger')
             else:
                 flash('Unable to delete purchase with ID: {} , it not found or delete'.format(purchase_id), 'danger')
-        except Exception as e:
+        except:
             print('System Error: {}'.format(sys.exc_info()))
             flash('Unknown error unable to edit purchase with id: {}'.format(purchase_id), 'danger') 
         finally:
@@ -2578,7 +2617,7 @@ def setup():
         else:
             flash("You do not have permissions access setup page.", 'danger')
             return redirect(url_for('routes.index'))
-    except Exception as e:
+    except:
         print("Error in setup page Error: {}".format(sys.exc_info()))
         flash('Unknown error Unable to setup page', 'danger')
         return redirect(url_for('routes.index'))
@@ -2597,6 +2636,7 @@ def add_platform():
                 if not platform_exist:
                     new_platform = Platform(dashboard_id=current_user.dashboard.id, name=form.name_add.data)
                     new_platform.insert()
+                    create_log(user=current_user, category=logsC.platform.value, action=logsA.create.value, action_ids=[new_platform.id])
                     flash('Successfully Created New Platform', 'success')
                 else:
                     flash('Can not add platform, platform with same name [{}] already exist'.format(form.name_add.data), 'danger')
@@ -2609,7 +2649,7 @@ def add_platform():
                         field = 'name'
                     flash('Error in {} : {}'.format(field, ','.join(errors)), 'danger')
 
-        except Exception as e:
+        except:
             print('System Error: {}'.format(sys.exc_info()))
             flash('Unknown Error unable to create new Platform', 'danger')
         finally:       
@@ -2624,8 +2664,6 @@ def add_platform():
 def edit_platform(platform_id):
     can = user_have_permissions(app_permissions, permissions=['update'])
     if can:
-        success = True
-        actions = 0
         try:
             form = editPlatformForm()
             if form.validate_on_submit():
@@ -2636,6 +2674,7 @@ def edit_platform(platform_id):
                         if not platform_name_exist:
                             target_platform.name = form.name_edit.data
                             target_platform.update()
+                            create_log(user=current_user, category=logsC.platform.value, action=logsA.update.value, action_ids=[target_platform.id])
                             flash('Successfully edit platform ID:({})'.format(platform_id), 'success')
                         else:
                             flash('Can not edit platform, platform with same name [{}] already exist'.format(form.name_edit.data), 'danger')
@@ -2653,11 +2692,9 @@ def edit_platform(platform_id):
                         field = 'name'
 
                     flash('Error in {} : {}'.format(field, ','.join(errors)), 'danger')
-                success = False
-        except Exception as e:
+        except:
             print('System Error: {}'.format(sys.exc_info()))
             flash('Unknown error unable to edit platform', 'danger')
-            success = False
         finally:
             return redirect(url_for('routes.setup'))
     else:
@@ -2676,12 +2713,13 @@ def delete_platform(platform_id):
             if target_platform is not None:
                 if form.validate_on_submit():
                     target_platform.delete()
+                    create_log(user=current_user, category=logsC.platform.value, action=logsA.delete.value, action_ids=[platform_id])
                     flash('Successfully deleted Platform ID: {}'.format(platform_id), 'success')
                 else:
                     flash('Unable to delete platform, ID: {}'.format(platform_id), 'danger')
             else:
                 flash('Platform not found it maybe deleted, ID: {}'.format(platform_id), 'danger')
-        except Exception as e:
+        except:
             print('System Error: {}'.format(sys.exc_info()))
             flash('Unknown error unable to delete platform', 'danger')
         finally:
@@ -2704,6 +2742,7 @@ def add_location():
                 if not exist_location:
                     new_location = WarehouseLocations(dashboard_id=current_user.dashboard_id, name=form.location_name_add.data)
                     new_location.insert()
+                    create_log(user=current_user, category=logsC.warehouse_location.value, action=logsA.create.value, action_ids=[new_location.id])
                     flash('Successfully Created New Location', 'success')
                 else:
                     flash('Can not add location, location with same name [{}] already exist'.format(form.location_name_add.data), 'danger')
@@ -2716,7 +2755,7 @@ def add_location():
                         field = 'name'
                     flash('Error in {} : {}'.format(field, ','.join(errors)), 'danger')
 
-        except Exception as e:
+        except:
             print('System Error: {}'.format(sys.exc_info()))
             flash('Unknown Error unable to create new Location', 'danger')
         finally:       
@@ -2731,8 +2770,6 @@ def add_location():
 def edit_location(location_id):
     can = user_have_permissions(app_permissions, permissions=['update'])
     if can:
-        success = True
-        actions = 0
         try:
             form = editLocationForm()
             if form.validate_on_submit():
@@ -2743,6 +2780,7 @@ def edit_location(location_id):
                         if not exist_location_name:
                             target_location.name = form.location_name_edit.data
                             target_location.update()
+                            create_log(user=current_user, category=logsC.warehouse_location.value, action=logsA.update.value, action_ids=[target_location.id])
                             flash('Successfully edit location ID:({})'.format(location_id), 'success')
                         else:
                             flash('Can not edit location, location with same name [{}] already exist'.format(form.location_name_edit.data), 'danger')
@@ -2760,11 +2798,9 @@ def edit_location(location_id):
                         field = 'name'
 
                     flash('Error in {} : {}'.format(field, ','.join(errors)), 'danger')
-                success = False
-        except Exception as e:
+        except:
             print('System Error: {}'.format(sys.exc_info()))
             flash('Unknown error unable to edit location', 'danger')
-            success = False
         finally:
             return redirect(url_for('routes.setup'))
     else:
@@ -2783,12 +2819,13 @@ def delete_location(location_id):
             if target_location is not None:
                 if form.validate_on_submit():
                     target_location.delete()
+                    create_log(user=current_user, category=logsC.warehouse_location.value, action=logsA.delete.value, action_ids=[location_id])
                     flash('Successfully deleted Location ID: {}'.format(location_id), 'success')
                 else:
                     flash('Unable to delete Location, ID: {}'.format(location_id), 'danger')
             else:
                 flash('Location not found it maybe deleted, ID: {}'.format(location_id), 'danger')
-        except Exception as e:
+        except:
             print('System Error: {}'.format(sys.exc_info()))
             flash('Unknown error unable to delete location', 'danger')
         finally:
@@ -2815,6 +2852,7 @@ def add_bin(location_id):
                     if not exist_bin:
                         new_bin = LocationBins(name=form.bin_name_add.data, location_id=target_location.id)
                         new_bin.insert()
+                        create_log(user=current_user, category=logsC.bin_location.value, action=logsA.create.value, action_ids=[new_bin.id])
                         flash('Successfully Created New Bin', 'success')
                     else:
                         flash('Can not add bin, bin with same name [{}] already exist in this warehouse location'.format(form.bin_name_add.data), 'danger')
@@ -2829,7 +2867,7 @@ def add_bin(location_id):
                         field = 'name'
                     flash('Error in {} : {}'.format(field, ','.join(errors)), 'danger')
 
-        except Exception as e:
+        except:
             print('System Error: {}'.format(sys.exc_info()))
             flash('Unknown Error unable to create new Bin', 'danger')
         finally:       
@@ -2844,8 +2882,6 @@ def add_bin(location_id):
 def edit_bin(location_id, bin_id):
     can = user_have_permissions(app_permissions, permissions=['update'])
     if can:
-        success = True
-        actions = 0
         try:
             form = editBinForm()
             if form.validate_on_submit():
@@ -2858,6 +2894,7 @@ def edit_bin(location_id, bin_id):
                             if not exist_bin_name:
                                 target_bin.name = form.bin_name_edit.data
                                 target_bin.update()
+                                create_log(user=current_user, category=logsC.bin_location.value, action=logsA.update.value, action_ids=[target_bin.id])
                                 flash('Successfully edit bin', 'success')
                             else:
                                 flash('Can not edit bin, bin with same name [{}] already exist'.format(form.bin_name_edit.data), 'danger')
@@ -2877,11 +2914,9 @@ def edit_bin(location_id, bin_id):
                         field = 'name'
 
                     flash('Error in {} : {}'.format(field, ','.join(errors)), 'danger')
-                success = False
-        except Exception as e:
+        except:
             print('System Error: {}'.format(sys.exc_info()))
             flash('Unknown error unable to edit bin', 'danger')
-            success = False
         finally:
             return redirect(url_for('routes.setup'))
     else:
@@ -2909,6 +2944,7 @@ def delete_bin(location_id, bin_id):
                     
                     if target_bin is not None:
                         target_bin.delete()
+                        create_log(user=current_user, category=logsC.bin_location.value, action=logsA.delete.value, action_ids=[bin_id])
                         flash('Successfully deleted Bin', 'success')
                     else:
                         flash('Unable to delete Bin with ID: {}, bin not found it maybe deleted'.format(bin_id), 'danger')
@@ -2940,6 +2976,7 @@ def add_condition():
                 if not condition_exist:
                     new_platform = Condition(dashboard_id=current_user.dashboard.id, name=form.name_add.data)
                     new_platform.insert()
+                    create_log(user=current_user, category=logsC.condition.value, action=logsA.create.value, action_ids=[new_platform.id])
                     flash('Successfully Created New Condition', 'success')
                 else:
                     flash('Can not add Condition, condition with same name [{}] already exist'.format(form.name_add.data), 'danger')
@@ -2952,7 +2989,7 @@ def add_condition():
                         field = 'name'
                     flash('Error in {} : {}'.format(field, ','.join(errors)), 'danger')
 
-        except Exception as e:
+        except:
             print('System Error: {}'.format(sys.exc_info()))
             flash('Unknown Error unable to create new condition', 'danger')
         finally:       
@@ -2968,8 +3005,6 @@ def add_condition():
 def edit_condition(condition_id):
     can = user_have_permissions(app_permissions, permissions=['update'])
     if can:
-        success = True
-        actions = 0
         try:
             form = editConditionForm()
             if form.validate_on_submit():
@@ -2980,6 +3015,7 @@ def edit_condition(condition_id):
                         if not condition_name_exist:
                             target_condition.name = form.name_edit.data
                             target_condition.update()
+                            create_log(user=current_user, category=logsC.condition.value, action=logsA.update.value, action_ids=[target_condition.id])
                             flash('Successfully edit condition ID:({})'.format(condition_id), 'success')
                         else:
                             flash('Can not edit condition, condition with same name [{}] already exist'.format(form.name_edit.data), 'danger')
@@ -2997,11 +3033,9 @@ def edit_condition(condition_id):
                         field = 'name'
 
                     flash('Error in {} : {}'.format(field, ','.join(errors)), 'danger')
-                success = False
-        except Exception as e:
+        except:
             print('System Error: {}'.format(sys.exc_info()))
             flash('Unknown error unable to edit condition', 'danger')
-            success = False
         finally:
             return redirect(url_for('routes.setup'))
     else:
@@ -3020,12 +3054,13 @@ def delete_condition(condition_id):
             if target_condition is not None:
                 if form.validate_on_submit():
                     target_condition.delete()
+                    create_log(user=current_user, category=logsC.condition.value, action=logsA.delete.value, action_ids=[condition_id])
                     flash('Successfully deleted condition with ID: {}'.format(condition_id), 'success')
                 else:
                     flash('Unable to delete condition with ID: {}'.format(condition_id), 'danger')
             else:
                 flash('Condition not found it maybe deleted provided ID: {}'.format(condition_id), 'danger')
-        except Exception as e:
+        except:
             print('System Error: {}'.format(sys.exc_info()))
             flash('Unknown error unable to delete condition', 'danger')
         finally:
@@ -3049,6 +3084,7 @@ def add_category():
                 if not exist_category:
                     new_category = Category(dashboard_id=current_user.dashboard_id, code=form.code.data, label=form.label.data, level=form.level.data, parent_code=form.parent_code.data)
                     new_category.insert()
+                    create_log(user=current_user, category=logsC.category.value, action=logsA.create.value, action_ids=[new_category.id])
                     flash('Successfully Created New Category', 'success')
                 else:
                     flash('Can not add Category, Category with same code [{}] or label [{}] already exist'.format(form.code.data, form.label.data), 'danger')
@@ -3059,7 +3095,7 @@ def add_category():
                         continue
                     flash('Error in {} : {}'.format(field, ','.join(errors)), 'danger')
 
-        except Exception as e:
+        except:
             print('System Error: {}'.format(sys.exc_info()))
             flash('Unknown Error unable to create new Category', 'danger')
         finally:
@@ -3116,6 +3152,7 @@ def edit_category(category_id):
                     if unique_success == True:
                         if actions > 0:
                             target_category.update()
+                            create_log(user=current_user, category=logsC.category.value, action=logsA.update.value, action_ids=[target_category.id])
                             flash('Successfully edit category ID:({})'.format(category_id), 'success')
                         else:
                             flash('No changes Detected.', 'success')
@@ -3140,7 +3177,7 @@ def edit_category(category_id):
 
                     flash('Error in {} : {}'.format(field, ','.join(errors)), 'danger')
 
-        except Exception as e:
+        except:
             print('System Error: {}'.format(sys.exc_info()))
             flash('Unknown error unable to edit category', 'danger')
         finally:
@@ -3148,7 +3185,7 @@ def edit_category(category_id):
     else:
         flash("You do not have permissions to update category.", 'danger')
         return redirect(url_for('routes.setup'))
-    
+
 @routes.route('/categories/<int:category_id>/delete', methods=['POST'])
 @login_required
 @vendor_permission.require(http_exception=403)
@@ -3161,12 +3198,13 @@ def delete_category(category_id):
             if target_category is not None:
                 if form.validate_on_submit():
                     target_category.delete()
+                    create_log(user=current_user, category=logsC.category.value, action=logsA.delete.value, action_ids=[category_id])
                     flash('Successfully deleted Category ID: {}'.format(category_id), 'success')
                 else:
                     flash('Unable to delete Category, ID: {}'.format(category_id), 'danger')
             else:
                 flash('Category not found it maybe deleted, ID: {}'.format(category_id), 'danger')
-        except Exception as e:
+        except:
             print('System Error: {}'.format(sys.exc_info()))
             flash('Unknown error unable to delete category', 'danger')
         finally:
@@ -3174,6 +3212,7 @@ def delete_category(category_id):
     else:
         flash("You do not have permissions to delete category.", 'danger')
         return redirect(url_for('routes.setup'))
+
 
 @routes.route('/categories/delete', methods=['POST'])
 @login_required
@@ -3183,19 +3222,23 @@ def delete_categories():
     if can:
         try:
             form = removeSomeCategoriesForm()
-            target_categories = Category.query.filter(Category.id.in_(form.categories_ids.data.split(','))).all()
-            if len(target_categories) > 0:
-                if form.validate_on_submit():
+            if form.validate_on_submit():
+                categories_ids = form.categories_ids.data.split(',')
+                target_categories = inv(Category.query.filter(Category.id.in_(categories_ids)), User.dashboard_id, Category.dashboard_id).all()
+                if len(target_categories) > 0:
                     total_removed = 0
                     for target_cat in target_categories:
                         target_cat.delete()
                         total_removed += 1
+
+                    create_log(user=current_user, category=logsC.category.value, action=logsA.multiple_delete.value, action_ids=categories_ids)
                     flash('Successfully deleted ({}) categories.'.format(total_removed), 'success')
                 else:
-                    flash('Unable to delete categories, please reload page', 'danger')
+                    flash('No Categories Selected', 'warning')
             else:
-                flash('No Categories Selected', 'warning')
-        except Exception as e:
+                flash('Unable to delete categories, please reload page', 'danger')
+
+        except:
             print('System Error: {}'.format(sys.exc_info()))
             flash('Unknown error unable to delete categories', 'danger')
         finally:

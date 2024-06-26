@@ -15,11 +15,12 @@ get_export_data, get_charts, get_excel_rows, chunks, apikey_or_none, upload_cata
 bestbuy_ready, get_remaining_requests, get_requests_before_1minute, upload_orders, calc_orders_result, updateDashboardListings,\
 updateDashboardOrders, import_orders, order_ids_chunks, download_order_image, get_errors_message, generate_ourapi_key,\
 get_activity_dateobjs, complete_activity_date, get_charts_data, get_hashed_sqlalchemycol, ExportSqlalchemyFilter, get_unencrypted_cols,\
-get_sqlalchemy_filters, get_ordered_dicts, handle_crud_action, user_have_permissions, inv, insert_locs_bins
+get_sqlalchemy_filters, get_ordered_dicts, handle_crud_action, user_have_permissions, inv, insert_locs_bins, get_logs_queries,\
+create_log
 from flask_login import login_required, current_user
 import flask_excel
 import pyexcel
-from sqlalchemy import or_, and_, func , asc, desc, text
+from sqlalchemy import or_, and_, func , asc, desc, text, not_
 from datetime import datetime, timedelta
 from barcode import EAN13, Code128
 import barcode
@@ -29,10 +30,7 @@ from sqlalchemy import select
 
 #from app import excel
 
-
 main = Blueprint('main', __name__, template_folder='templates', static_folder='static')
-
-
 
 @main.route('/import_catalogues_excel', methods=['POST', 'GET'])
 @login_required
@@ -355,6 +353,7 @@ def search():
                     'sku': Catalogue.sku,
                     'product_name': Catalogue.product_name,
                     'price': Catalogue.price,
+                    'created_date': Catalogue.created_date,
                     'location': WarehouseLocations.name,
                     'bin': LocationBins.name
                 }
@@ -1122,6 +1121,8 @@ def profile():
             change_invadmin = None
             
             inventories = []
+
+            logs = {'data': [], 'total': 0, 'isAdmin': False, 'users': [], 'url': '', 'removeUrl': '', 'categories': [item.value for item in LogsCategories]}
             if current_user.isAdmin():
                 admin_inventories = Inventory.query.all()
                 all_users = User.query.order_by('uname').all()
@@ -1145,6 +1146,7 @@ def profile():
                 change_uadmin = adminChangeUserInv()
                 change_uadmin.user.choices = [('', 'Select User'), *[(u.id, u.uname) for u in all_users]]
                 change_uadmin.inv.choices = [('', 'Select Inventory'), *[(inv.id, inv.name) for inv in admin_inventories]]
+
                 
             if current_user.isInventoryAdmin():
                 # only 1 manager for inventory except will need new related table and more complex query or complex action by comma sperated value
@@ -1159,6 +1161,33 @@ def profile():
                 change_invadmin.user.choices = [('', 'Select User'), *[(u.id, u.uname) for u in invadmin_users]]
                 change_invadmin.inv.choices = [('', 'Select Inventory'), *[(inv.id, inv.name) for inv in inventories]]
 
+            logs_limit = 50
+            if current_user.isAdmin():
+                # logs
+                logs['data'] = [{'id': log.id, 'content': log.message} for log in Logs.query.order_by(desc(Logs.id)).limit(logs_limit).all()]
+                logs['users'] = [{'id': u.id, 'user': u.uname} for u in all_users]
+                logs['isAdmin'] = True
+                logs['total'] = db.session.query(func.count(Logs.id)).scalar()
+                logs['url'] = url_for('main.activity_logs_admin')
+                logs['removeUrl'] = url_for('main.delete_log_admin')
+
+            elif current_user.isInventoryAdmin():
+                logs['data'] = [{'id': log.id, 'content': log.message} for log in inv(Logs.query, User.id, Logs.user_id).order_by(desc(Logs.id)).limit(logs_limit).all()]
+                # every user have only 1 inventory belong to, user can add multiple invetories, user can add mutltiple inventory and be admin to it without join it thats why i added current user as logicaly if all created right by admin, the inventory admin must join the inventory he manage
+                logs['users'] = [{'id': u.id, 'user': u.uname} for u in invadmin_users]
+                logs['isAdmin'] = True
+                logs['total'] = inv(db.session.query(func.count(Logs.id)), User.id, Logs.user_id).scalar()
+                logs['url'] = url_for('main.activity_logs_invadmin')
+                logs['removeUrl'] = url_for('main.delete_log_invadmin')
+
+            else:
+                # logs
+                logs['data'] = [{'id': log.id, 'content': log.message} for log in Logs.query.filter_by(user_id=current_user.id).order_by(desc(Logs.id)).limit(logs_limit).all()]
+                logs['isAdmin'] = False
+                logs['total'] = db.session.query(func.count(Logs.id)).filter_by(user_id=current_user.id).scalar()
+                logs['url'] = url_for('main.activity_logs')                
+                logs['removeUrl'] = ''
+
             ourapi_requests_limit = UserMeta.query.filter_by(user_id=current_user.id, key='ourapi_requests_limit').first()
             ourapi_keys_max = UserMeta.query.filter_by(user_id=current_user.id, key='ourapi_keys_max').first()
             # dynamic get valid number of user keys if any, else look for init else set default number 10
@@ -1169,7 +1198,6 @@ def profile():
             print('error from profile {}'.format(sys.exc_info()))
             flash('unable to display profile page', 'danger')
             success = False
-
         finally:
             if success:
                 return render_template(
@@ -1179,7 +1207,7 @@ def profile():
                     ourapi_requests_limit=ourapi_requests_limit, ourapi_keys_max=ourapi_keys_max, user_keys_max=user_keys_max, add_user=add_user,
                     add_inventory=add_inventory, update_inventory=update_inventory, remove_inventory=remove_inventory, admin_inventories=admin_inventories, 
                     inventories=inventories, aupdate_inv=aupdate_inv, make_admin=make_admin, approve_form=approve_form, remove_form=remove_form, requests_warning=requests_warning,
-                    change_uadmin=change_uadmin, change_invadmin=change_invadmin)
+                    change_uadmin=change_uadmin, change_invadmin=change_invadmin, logs=logs)
             else:
                 return redirect(url_for('routes.index'))
 
@@ -2080,6 +2108,7 @@ def add_key():
                             if target_key:
                                 new_key = OurApiKeys(user_id=current_user.id, key=target_key, key_limit=submited_limit, expiration_date=form.expiration_date.data)
                                 new_key.insert()
+                                create_log(user=current_user, category=LogsCategories.api_key.value, action=LogsActions.create.value, action_ids=[new_key.id])
                                 flash('Successfully added new key.', 'success')
                             else:
                                 flash("Unable to generate a valid key now, please try again.", 'danger')
@@ -2116,6 +2145,7 @@ def remove_key(id):
                 key_exist = OurApiKeys.query.filter_by(id=id, user_id=current_user.id).one_or_none()
                 if key_exist is not None:
                     key_exist.delete()
+                    create_log(user=current_user, category=LogsCategories.api_key.value, action=LogsActions.delete.value, action_ids=[id])
                     flash('Successfully deleted key with id:{}.'.format(id), 'success')
                 else:
                     flash('Key not found', 'danger')
@@ -2157,7 +2187,7 @@ def update_key(id):
                                 requests_limit = int(ourapi_requests_limit.value)
 
                                 # sum of all except the key will updated now that do alot of calc fix
-                                keys_requests_sum = db.session.query(func.sum(OurApiKeys.key_limit)).filter(OurApiKeys.id != id, user_id=current_user.id).scalar()
+                                keys_requests_sum = db.session.query(func.sum(OurApiKeys.key_limit)).filter(OurApiKeys.id != id, OurApiKeys.user_id==current_user.id).scalar()
                                 if keys_requests_sum is None:
                                     keys_requests_sum = 0
                                 else:
@@ -2181,6 +2211,7 @@ def update_key(id):
                         elif changes > 0:
                             # limit maybe changed, and if it changed it valid limit, so update done, if limit_changed = false so it come here so if only date changed it update as well or any new val
                             selected_key.update()
+                            create_log(user=current_user, category=LogsCategories.api_key.value, action=LogsActions.update.value, action_ids=[selected_key.id])
                             flash('Successfully updated key with id:{}.'.format(id), 'success')
                         else:
                             flash('No changed detected.', 'info')
@@ -2198,7 +2229,6 @@ def update_key(id):
     except Exception as e:
         flash('unable to update key right now.', 'danger')
         print('system error {}'.format(sys.exc_info()))
-
     finally:
         return redirect(url_for('main.profile', movetocomponent='api'))
 
@@ -2237,6 +2267,7 @@ def renew_key(id):
                         key_exist.expiration_date = now + relativedelta(months=+1)
                         
                     key_exist.update()
+                    create_log(user=current_user, category=LogsCategories.api_key.value, action=LogsActions.update.value, action_ids=[key_exist.id])
                     flash('Successfully renew the key with id:({}).'.format(id), 'success')
                 else:
                     flash("Unable to renew the key with id:({}), Please try again.".format(id), 'danger')
@@ -2250,3 +2281,171 @@ def renew_key(id):
 
     finally:
         return redirect(url_for('main.profile', movetocomponent='api'))
+    
+
+# activity Logs
+@main.route('/activity_logs', methods=['POST'])
+@login_required
+@vendor_permission.require(http_exception=403)
+def activity_logs():
+    res = {}
+    try:
+        can = user_have_permissions(app_permissions, permissions=['read'])
+        if can:
+            limit = 50
+            data = request.get_json()
+            categories = data['filters']['categories'] if isinstance(data, dict) and 'filters' in data and 'categories' in data['filters'] else None
+            minid = data['minId'] if isinstance(data, dict) and 'minId' in data else None
+            maxid = data['maxId'] if isinstance(data, dict) and 'maxId' in data else None
+            if isinstance(categories, list) and isinstance(minid, int) and isinstance(maxid, int):
+                query = None
+                total_query = None
+                if 'all' in categories:
+                    query = db.session.query(Logs).filter(Logs.user_id==current_user.id, not_(Logs.id.between(minid, maxid))).order_by(desc(Logs.id))
+                    total_query = db.session.query(func.count(Logs.id)).filter(Logs.user_id==current_user.id)
+                else:
+                    query = db.session.query(Logs).filter(Logs.user_id==current_user.id, Logs.category.in_(categories), not_(Logs.id.between(minid, maxid)))
+                    total_query = db.session.query(func.count(Logs.id)).filter(Logs.user_id==current_user.id, Logs.category.in_(categories))
+
+                res['data'] = [{'id': log.id, 'content': log.message} for log in query.order_by(desc(Logs.id)).limit(limit).all()]
+                res['total'] = total_query.scalar()
+                res['code'] = 200
+            else:
+                res = {'code': 400, 'message': 'Unable to process your request.'}
+        else:
+            res = {'code': 400, 'message': 'You have no premssions to access data.'}
+    except:
+        print("error from activity_logs: {}".format(sys.exc_info()))
+        res = {'code': 500, 'message': 'Unable to load data system error.'}
+    finally:
+        return jsonify(res)
+
+@main.route('/activity_logs_invadmin', methods=['POST'])
+@login_required
+@inventory_admin_permission.require(http_exception=403)
+def activity_logs_invadmin():
+    res = {}
+    try:
+        can = user_have_permissions(app_permissions, permissions=['read'])
+        if can:
+            limit = 50
+            data = request.get_json()
+            categories = data['filters']['categories'] if isinstance(data, dict) and 'filters' in data and 'categories' in data['filters'] else None
+            users = data['filters']['users'] if isinstance(data, dict) and 'filters' in data and 'users' in data['filters'] else None
+            minid = data['minId'] if isinstance(data, dict) and 'minId' in data else None
+            maxid = data['maxId'] if isinstance(data, dict) and 'maxId' in data else None
+            if isinstance(categories, list) and isinstance(users, list) and isinstance(minid, int) and isinstance(maxid, int):
+                # secuirty
+                invadmin_users = [uidt[0] for uidt in db.session.query(User.id).join(Inventory, User.inventory_id==Inventory.id).filter(Inventory.added_by==current_user.id).all()]
+                allowed_users = []
+                for uid in users:
+                    if uid in invadmin_users:
+                        allowed_users.append(uid)
+                
+                queries = get_logs_queries(db, categories, allowed_users, minid, maxid)
+                res['data'] = [{'id': log.id, 'content': log.message} for log in inv(queries['query'], User.id, Logs.user_id).order_by(desc(Logs.id)).limit(limit).all()]
+                res['total'] = inv(queries['total_query'], User.id, Logs.user_id).scalar()
+                res['code'] = 200
+            else:
+                res = {'code': 400, 'message': 'Unable to process your request.'}
+        else:
+            res = {'code': 400, 'message': 'You have no premssions to access data.'}
+    except:
+        print("error from activity_logs_admin: {}".format(sys.exc_info()))
+        res = {'code': 500, 'message': 'Unable to load data system error.'}
+    finally:
+        return jsonify(res)
+
+@main.route('/activity_logs_admin', methods=['POST'])
+@login_required
+@admin_permission.require(http_exception=403)
+def activity_logs_admin():
+    res = {}
+    # 2 options 1- asc order the new added will be at end so offset has no issue if new items added after load all data, option 2 send all loaded ids and exculde it in query but when done found query string have limit and even not reached 199 ids so not good solution even if big dbsettings large data will get issue, option 3 (done) Use Not Between min loaded id AND max loaded id always get what between but in my target not between usally it will target in issue case the after but even within the load for example new items added within 50% only this case will get before and after then get offset (done) also if 0 items NOT BETWEEN 0 AND 0 has no issue and performance solution not only friendly (note while i solve issue i removed offset as no offset needed now) also small note it logical always between start with min and max
+    try:
+        can = user_have_permissions(app_permissions, permissions=['read'])
+        if can:
+            limit = 50
+            data = request.get_json()
+            categories = data['filters']['categories'] if isinstance(data, dict) and 'filters' in data and 'categories' in data['filters'] else None
+            users = data['filters']['users'] if isinstance(data, dict) and 'filters' in data and 'users' in data['filters'] else None
+            minid = data['minId'] if isinstance(data, dict) and 'minId' in data else None
+            maxid = data['maxId'] if isinstance(data, dict) and 'maxId' in data else None
+            if isinstance(categories, list) and isinstance(users, list) and isinstance(minid, int) and isinstance(maxid, int):
+                queries = get_logs_queries(db, categories, users, minid, maxid)
+                res['data'] = [{'id': log.id, 'content': log.message} for log in queries['query'].order_by(desc(Logs.id)).limit(limit).all()]
+                res['total'] = queries['total_query'].scalar()
+                res['code'] = 200
+            else:
+                res = {'code': 400, 'message': 'Unable to process your request.'}
+        else:
+            res = {'code': 400, 'message': 'You have no premssions to access data.'}
+    except:
+        print("error from activity_logs_admin: {}".format(sys.exc_info()))
+        res = {'code': 500, 'message': 'Unable to load data system error'}
+    finally:
+        return jsonify(res)
+
+
+@main.route('/delete_log_invadmin', methods=['POST'])
+@login_required
+@inventory_admin_permission.require(http_exception=403)
+def delete_log_invadmin():
+    res = {}
+    try:
+        can = user_have_permissions(app_permissions, permissions=['delete'])
+        if can:
+            data = request.get_json()
+            log_id = data['id'] if isinstance(data, dict) and 'id' in data else None
+            if isinstance(log_id, int):
+                log = Logs.query.filter_by(id=log_id).one_or_none()
+                # secuirty
+                if log is not None:
+                    invadmin_users = [uidt[0] for uidt in db.session.query(User.id).join(Inventory, User.inventory_id==Inventory.id).filter(Inventory.added_by==current_user.id).all()]
+                    if log.user_id in invadmin_users:
+                        # res_logid (risk cover not send what client sent to you (injections))
+                        message = 'successfully deleted log with id: {}'.format(log.id)
+                        log.delete()
+                        res = {'code': 200, 'message': message}
+                    else:
+                        res = {'code': 403, 'message': 'You have no premssions to manage logs for that user or user not exist.'}
+                else:
+                    res = {'code': 404, 'message': 'Unable to delete the log is not found, please restart the page and try again.'}
+            else:
+                res = {'code': 400, 'message': 'Unable to process your request.'}
+        else:
+            res = {'code': 400, 'message': 'You have no premssions to delete data.'}
+    except:
+        print("error from delete_log_invadmin: {}".format(sys.exc_info()))
+        res = {'code': 500, 'message': 'Unable to delete log system error.'}
+    finally:
+        return jsonify(res)
+
+
+@main.route('/delete_log_admin', methods=['POST'])
+@login_required
+@admin_permission.require(http_exception=403)
+def delete_log_admin():
+    res = {}
+    try:
+        can = user_have_permissions(app_permissions, permissions=['delete'])
+        if can:
+            data = request.get_json()
+            log_id = data['id'] if isinstance(data, dict) and 'id' in data else None
+            if isinstance(log_id, int):
+                log = Logs.query.filter_by(id=log_id).one_or_none()
+                if log is not None:
+                    message = 'successfully deleted log with id: {}'.format(log.id)
+                    log.delete()
+                    res = {'code': 200, 'message': message}
+                else:
+                    res = {'code': 404, 'message': 'Unable to delete the log is not found, please restart the page and try again.'}
+            else:
+                res = {'code': 400, 'message': 'Unable to process your request. {}'.format(log_id)}
+        else:
+            res = {'code': 400, 'message': 'You have no premssions to delete data.'}
+    except:
+        print("error from delete_log_admin: {}".format(sys.exc_info()))
+        res = {'code': 500, 'message': 'Unable to delete log system error'}
+    finally:
+        return jsonify(res)

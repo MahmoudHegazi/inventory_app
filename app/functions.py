@@ -15,9 +15,9 @@ from flask_login import current_user
 from sqlalchemy import func
 from .models import Supplier, Dashboard, Listing, Catalogue, Purchase, Order, Platform, CatalogueLocations, CatalogueLocationsBins,\
     WarehouseLocations, LocationBins, Category, UserMeta, OrderTaxes, Condition, OurApiKeys, ApiKeysLogs, User, Permission, RolePermissions, \
-    Permission
+    Permission, Logs, LogsActions, LogsCategories
 from sqlalchemy.sql import extract
-from sqlalchemy import or_, and_, func , asc, desc
+from sqlalchemy import or_, and_, func , asc, desc, not_
 from datetime import datetime, timedelta
 from uuid import uuid4
 import hashlib
@@ -25,10 +25,7 @@ import hashlib
 def is_safe_redirect_url(target):
     host_url = urlparse(request.host_url)
     redirect_url = urlparse(urljoin(request.host_url, target))
-    return (
-        redirect_url.scheme in ("http", "https")
-        and host_url.netloc == redirect_url.netloc
-    )
+    return redirect_url.scheme in ("http", "https") and host_url.netloc == redirect_url.netloc
 
 def get_safe_redirect(url=''):
     if url and is_safe_redirect_url(url):
@@ -36,8 +33,8 @@ def get_safe_redirect(url=''):
     return ''
 
 def inv(query, userCol, joinUserCol):
-    # make sure dynamic user inventory id provided is not None if so AND will false result
-    return query.join(User, userCol==joinUserCol).filter(User.inventory_id==current_user.inventory_id)
+    # make sure dynamic user inventory id provided is not None if so AND will false result (This != None to make first note no user can login if not in inventory, but incase happend this != None will prevent group the users that not in inventory togther in simple if not exist will consider None is inventory so will group all None togther as they in inventory None)
+    return query.join(User, userCol==joinUserCol).filter(User.inventory_id != None, User.inventory_id==current_user.inventory_id)
 
 
 #### main functions ####    
@@ -2569,3 +2566,82 @@ def user_have_permissions(app_permissions, permissions=[]):
     except:
         print("error from user_have_permissions {}".format(sys.exc_info()))
         return False
+
+# ex test_item will be Test Item can edit splitor
+def format_text(text='', spliter='_'):
+    text_parts = [txt.strip() for txt in str(text).split(spliter) if txt.strip()]# handle empty after split make sure no empty word added
+    formated_txt = ' '.join([tpart.capitalize() for tpart in text_parts]) # turn first letter in each word to upper
+    return formated_txt
+
+# simple plural and byoned simple a bit (this can said handle range 69-80% of American english words and all app properties can done aswell) (thanks for this dynamic function no need touch create_log message or other functions if decide add new categories all update is enum only and dynamic select word from 69-80%)
+def simple_plural(word):
+    result = word
+    word = str(word).strip()
+    speacials = ['s', 'x', 'z', 'ch', 'sh', 'ss']
+    speacialsv = ['f', 'fe']
+    # vowels = ['a', 'e', 'i', 'o', 'u']# not used
+    consonants = ['b', 'c', 'd', 'f', 'g', 'h', 'j', 'k', 'l', 'm', 'n', 'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'z.']
+    lasttwo = word[-2:].lower()
+    if len(lasttwo) >= 2:
+        if lasttwo[-1] in speacials or lasttwo in speacials:
+            result = word + 'es'
+        elif lasttwo[-1] in speacialsv or lasttwo in speacialsv:
+            result = word[0:-1] + 'ves'
+        elif lasttwo[0] in consonants and lasttwo[1] == 'y':
+            result = word[0:-1] + 'ies'
+        else:
+            result = word + 's'
+        return result
+    else:
+        return result
+
+# create new activity log
+def create_log(user, category, action, action_ids=[]):
+    new_log = None
+    try:
+        str_action_ids = [str(aid) for aid in action_ids]
+        formated_category = format_text(category, '_')
+        messages = {
+            'crud': 'User: {uname} {action}d {category} with ID:{id}'.format(
+                uname=user.uname, action=action, category=formated_category, id=str_action_ids[0]),
+            
+            'multiple_crud': 'User: {uname} {multiple_action}d multiple {category} with ID:{id}'.format(
+                uname=user.uname,
+                multiple_action=action.split('_')[-1] if '_' in action else action,
+                category=simple_plural(formated_category),
+                id=','.join(str_action_ids)),
+        }
+        message = messages['crud' if action in ['create', 'update', 'delete'] else 'multiple_crud']
+        new_log = Logs(user_id=user.id, category=category, action=action, message=message)
+        new_log.insert()
+    except:
+        new_log = None
+        print("-"*30)
+        print("#"*30)
+        print("-"*30)
+        print("error from create_log: {}".format(sys.exc_info()))
+        print("-"*30)
+        print("#"*30)
+        print("-"*30)
+    finally:
+        return new_log
+
+# return queries based on categories and users for activity logs ajax pagantion requests
+def get_logs_queries(db, categories, users, minid, maxid):
+    query = None
+    total_query = None
+    if 'all' in categories:
+        if len(users) > 0:
+            query = db.session.query(Logs).filter(Logs.user_id.in_(users), not_(Logs.id.between(minid, maxid)))
+            total_query = db.session.query(func.count(Logs.id)).filter(Logs.user_id.in_(users))
+        else:
+            query = db.session.query(Logs).filter(not_(Logs.id.between(minid, maxid)))
+            total_query = db.session.query(func.count(Logs.id))
+    else:
+        if len(users) > 0:
+            query = db.session.query(Logs).filter(Logs.category.in_(categories), Logs.user_id.in_(users), not_(Logs.id.between(minid, maxid)))
+            total_query = db.session.query(func.count(Logs.id)).filter(Logs.category.in_(categories), Logs.user_id.in_(users))
+        else:
+            query = db.session.query(Logs).filter(Logs.category.in_(categories), not_(Logs.id.between(minid, maxid)))
+            total_query = db.session.query(func.count(Logs.id)).filter(Logs.category.in_(categories))
+    return {'query': query, 'total_query': total_query}
